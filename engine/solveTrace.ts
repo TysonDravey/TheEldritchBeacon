@@ -18,6 +18,15 @@ export interface TraceStep {
   deduction: DeductionResult;
   technique: TechniqueLabel;
   cellsAfter: CellState[][];
+  // Cells placed in this specific step (for board animation)
+  newCells: [number, number][];
+  // Board highlight metadata for the generate page
+  highlightRows?: number[];
+  highlightCols?: number[];
+  highlightTerritories?: number[];
+  secondaryCells?: [number, number][];   // brass-outlined cause cells
+  // For cleanup batch steps: all cells warded in one sweep
+  batchCells?: [number, number][];
 }
 
 export interface TraceWave {
@@ -75,6 +84,53 @@ function cellsEqual(a: CellState[][], b: CellState[][]): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// computeStepHighlight — derive board highlight metadata from a deduction
+// ---------------------------------------------------------------------------
+
+function computeStepHighlight(
+  d: DeductionResult,
+  puzzle: Puzzle,
+): Pick<TraceStep, 'highlightRows' | 'highlightCols' | 'highlightTerritories' | 'secondaryCells'> {
+  switch (d.reasonType) {
+    case 'naked-single-territory':
+      return { highlightTerritories: [puzzle.territoryMap[d.row][d.col]] };
+    case 'naked-single-row':
+      return { highlightRows: [d.row], highlightTerritories: d.affectedTerritories?.slice(0, 1) };
+    case 'naked-single-col':
+      return { highlightCols: [d.col], highlightTerritories: d.affectedTerritories?.slice(0, 1) };
+    case 'row-confinement':
+      return {
+        highlightRows: [d.row],
+        highlightTerritories: d.confinedTerritory !== undefined ? [d.confinedTerritory] : undefined,
+      };
+    case 'col-confinement':
+      return {
+        highlightCols: [d.col],
+        highlightTerritories: d.confinedTerritory !== undefined ? [d.confinedTerritory] : undefined,
+      };
+    case 'pair-row':
+      return { highlightRows: [d.row], highlightTerritories: d.pairedTerritories };
+    case 'pair-col':
+      return { highlightCols: [d.col], highlightTerritories: d.pairedTerritories };
+    case 'row-occupied':
+      return { highlightRows: [d.row], secondaryCells: d.blockedBy ? [d.blockedBy] : undefined };
+    case 'col-occupied':
+      return { highlightCols: [d.col], secondaryCells: d.blockedBy ? [d.blockedBy] : undefined };
+    case 'territory-occupied':
+      return {
+        highlightTerritories: [puzzle.territoryMap[d.row][d.col]],
+        secondaryCells: d.blockedBy ? [d.blockedBy] : undefined,
+      };
+    case 'adjacency':
+      return { secondaryCells: d.blockedBy ? [d.blockedBy] : undefined };
+    case 'hypothetical':
+      return { highlightTerritories: d.affectedTerritories };
+    default:
+      return {};
+  }
+}
+
+// ---------------------------------------------------------------------------
 // buildSolveTrace
 // ---------------------------------------------------------------------------
 
@@ -120,36 +176,84 @@ export function buildSolveTrace(puzzle: Puzzle): SolveTrace {
       if (seenCells.has(key)) break;
       seenCells.add(key);
 
-      // Apply to waveTest
       waveTest[d.row][d.col] = d.type === 'watcher' ? 'watcher' : 'ward';
+
       if (d.type === 'watcher') {
-        // Also apply adjacency/row/col/territory propagation
+        // Push watcher step (board = just the watcher, before cleanup wards)
+        waveSteps.push({
+          deduction: d,
+          technique: techniqueLabel(d.reasonType),
+          cellsAfter: deepCopy(waveTest),
+          newCells: [[d.row, d.col]],
+          highlightRows: [d.row],
+          highlightCols: [d.col],
+          highlightTerritories: [puzzle.territoryMap[d.row][d.col]],
+        });
+
+        // Apply propagation and record affected cells for the cleanup step
         const nr = waveTest.length;
         const nc = waveTest[0].length;
+        const propagated: [number, number][] = [];
+
         for (let dr = -1; dr <= 1; dr++) {
           for (let dc = -1; dc <= 1; dc++) {
             if (dr === 0 && dc === 0) continue;
             const r2 = d.row + dr, c2 = d.col + dc;
-            if (r2 >= 0 && r2 < nr && c2 >= 0 && c2 < nc && waveTest[r2][c2] === 'empty')
+            if (r2 >= 0 && r2 < nr && c2 >= 0 && c2 < nc && waveTest[r2][c2] === 'empty') {
               waveTest[r2][c2] = 'ward';
+              propagated.push([r2, c2]);
+            }
           }
         }
         for (let c2 = 0; c2 < nc; c2++)
-          if (c2 !== d.col && waveTest[d.row][c2] === 'empty') waveTest[d.row][c2] = 'ward';
+          if (c2 !== d.col && waveTest[d.row][c2] === 'empty') {
+            waveTest[d.row][c2] = 'ward';
+            propagated.push([d.row, c2]);
+          }
         for (let r2 = 0; r2 < nr; r2++)
-          if (r2 !== d.row && waveTest[r2][d.col] === 'empty') waveTest[r2][d.col] = 'ward';
+          if (r2 !== d.row && waveTest[r2][d.col] === 'empty') {
+            waveTest[r2][d.col] = 'ward';
+            propagated.push([r2, d.col]);
+          }
         const wt = puzzle.territoryMap[d.row][d.col];
         for (let r2 = 0; r2 < nr; r2++)
           for (let c2 = 0; c2 < nc; c2++)
-            if (puzzle.territoryMap[r2][c2] === wt && waveTest[r2][c2] === 'empty')
+            if (puzzle.territoryMap[r2][c2] === wt && waveTest[r2][c2] === 'empty') {
               waveTest[r2][c2] = 'ward';
-      }
+              propagated.push([r2, c2]);
+            }
 
-      waveSteps.push({
-        deduction: d,
-        technique: techniqueLabel(d.reasonType),
-        cellsAfter: deepCopy(waveTest),
-      });
+        if (propagated.length > 0) {
+          waveSteps.push({
+            deduction: {
+              type: 'ward',
+              row: d.row,
+              col: d.col,
+              reason: `Row ${d.row + 1}, column ${d.col + 1}, adjacent cells, and the watcher's territory are all warded off.`,
+              reasonType: 'adjacency',
+              blockedBy: [d.row, d.col],
+              affectedCells: propagated,
+            },
+            technique: 'Adjacency / Row / Col / Territory Cleanup',
+            cellsAfter: deepCopy(waveTest),
+            newCells: propagated,
+            batchCells: propagated,
+            highlightRows: [d.row],
+            highlightCols: [d.col],
+            highlightTerritories: [wt],
+            secondaryCells: [[d.row, d.col]],
+          });
+        }
+      } else {
+        const highlight = computeStepHighlight(d, puzzle);
+        waveSteps.push({
+          deduction: d,
+          technique: techniqueLabel(d.reasonType),
+          cellsAfter: deepCopy(waveTest),
+          newCells: [[d.row, d.col]],
+          ...highlight,
+        });
+      }
 
       waveProgress = true;
     }

@@ -4,7 +4,7 @@ import { useState, useCallback, useRef } from 'react';
 import { generatePuzzle } from '@/engine/generator';
 import { rateDifficulty } from '@/engine/difficulty';
 import { buildSolveTrace } from '@/engine/solveTrace';
-import type { Puzzle } from '@/engine/boardTypes';
+import type { Puzzle, CellState } from '@/engine/boardTypes';
 import type { SolveTrace, TraceStep } from '@/engine/solveTrace';
 import { TERRITORY_NAMES, TERRITORY_COLORS, WATCHER_SVGS } from '@/theme/colors';
 
@@ -14,17 +14,38 @@ import { TERRITORY_NAMES, TERRITORY_COLORS, WATCHER_SVGS } from '@/theme/colors'
 
 function MiniBoard({
   puzzle,
-  highlightCell,
-  revealUpTo,
+  boardState,
+  activeCells,
+  highlightRows,
+  highlightCols,
+  highlightTerritories,
+  secondaryCells,
 }: {
   puzzle: Puzzle;
-  highlightCell?: [number, number];
-  revealUpTo?: { row: number; col: number; type: 'watcher' | 'ward' }[];
+  boardState?: CellState[][] | null;
+  activeCells?: [number, number][];
+  highlightRows?: number[];
+  highlightCols?: number[];
+  highlightTerritories?: number[];
+  secondaryCells?: [number, number][];
 }) {
   const n = puzzle.size;
   const px = Math.min(52, Math.floor(340 / n));
-  const placed = new Map<string, 'watcher' | 'ward'>();
-  for (const s of revealUpTo ?? []) placed.set(`${s.row},${s.col}`, s.type);
+
+  const hasHighlight = !!(
+    highlightRows?.length || highlightCols?.length ||
+    highlightTerritories?.length || activeCells?.length || secondaryCells?.length
+  );
+
+  function isLit(row: number, col: number, territory: number) {
+    if (!hasHighlight) return true;
+    if (activeCells?.some(([r, c]) => r === row && c === col)) return true;
+    if (secondaryCells?.some(([r, c]) => r === row && c === col)) return true;
+    if (highlightRows?.includes(row)) return true;
+    if (highlightCols?.includes(col)) return true;
+    if (highlightTerritories?.includes(territory)) return true;
+    return false;
+  }
 
   return (
     <div className="inline-block border-2 border-ink" style={{ lineHeight: 0 }}>
@@ -33,8 +54,10 @@ function MiniBoard({
           {Array.from({ length: n }, (_, col) => {
             const t = puzzle.territoryMap[row][col];
             const colors = TERRITORY_COLORS[t] ?? TERRITORY_COLORS[0];
-            const isActive = highlightCell?.[0] === row && highlightCell?.[1] === col;
-            const state = placed.get(`${row},${col}`);
+            const state = boardState?.[row]?.[col] ?? 'empty';
+            const isActive = activeCells?.some(([r, c]) => r === row && c === col) ?? false;
+            const isSecondary = secondaryCells?.some(([r, c]) => r === row && c === col) ?? false;
+            const lit = isLit(row, col, t);
             const thickT = row === 0 || puzzle.territoryMap[row-1][col] !== t;
             const thickB = row === n-1 || puzzle.territoryMap[row+1][col] !== t;
             const thickL = col === 0 || puzzle.territoryMap[row][col-1] !== t;
@@ -51,8 +74,9 @@ function MiniBoard({
                   borderRightWidth: thickR ? 2 : 1,
                   borderColor: '#1A1209',
                   borderStyle: 'solid',
-                  outline: isActive ? '2px solid #8B1A1A' : undefined,
-                  outlineOffset: isActive ? -2 : undefined,
+                  outline: isSecondary ? '2px solid #B5860D' : isActive ? '2px solid #8B1A1A' : undefined,
+                  outlineOffset: (isSecondary || isActive) ? -2 : undefined,
+                  opacity: lit ? 1 : 0.3,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -66,14 +90,13 @@ function MiniBoard({
                   />
                 )}
                 {state === 'ward' && (
-                  <img
-                    src="/svg/ward_sigil.svg"
-                    width={px * 0.7} height={px * 0.7} alt=""
-                    style={{
-                      opacity: isActive ? 1 : 0.6,
-                      ...(isActive ? { animation: 'spin 3s linear infinite' } : {}),
-                    }}
-                  />
+                  isActive ? (
+                    <div className="animate-spin" style={{ animationDuration: '3s', display: 'flex' }}>
+                      <img src="/svg/ward_sigil.svg" width={px * 0.7} height={px * 0.7} alt="" />
+                    </div>
+                  ) : (
+                    <img src="/svg/ward_sigil.svg" width={px * 0.7} height={px * 0.7} alt="" style={{ opacity: 0.6 }} />
+                  )
                 )}
               </div>
             );
@@ -182,7 +205,9 @@ function WavePanel({
                             <span className="font-bold">{step.technique}</span>
                             {tname && <span className="ml-1 opacity-70">— {tname}</span>}
                             <span className="ml-1 opacity-60">
-                              → {step.deduction.type === 'watcher' ? 'Watcher' : 'Ward'} ({step.deduction.row + 1},{step.deduction.col + 1})
+                              {step.batchCells
+                                ? `→ ${step.batchCells.length} wards`
+                                : `→ ${step.deduction.type === 'watcher' ? 'Watcher' : 'Ward'} (${step.deduction.row + 1},${step.deduction.col + 1})`}
                             </span>
                           </button>
                         );
@@ -292,22 +317,9 @@ export default function GeneratePage() {
     setProgress(null);
   }, [size, seed, maxDepth]);
 
-  // Collect placed cells up to the active wave/step
-  const revealUpTo: { row: number; col: number; type: 'watcher' | 'ward' }[] = [];
-  if (trace) {
-    for (let wi = 0; wi <= activeWave; wi++) {
-      const wave = trace.waves[wi];
-      if (!wave) break;
-      const maxStep = wi === activeWave ? activeStep : wave.steps.length - 1;
-      for (let si = 0; si <= maxStep; si++) {
-        const step = wave.steps[si];
-        if (!step) break;
-        revealUpTo.push({ row: step.deduction.row, col: step.deduction.col, type: step.deduction.type });
-      }
-    }
-  }
-
   const activeStepObj = trace?.waves[activeWave]?.steps[activeStep];
+  const boardState = activeStepObj?.cellsAfter ?? null;
+  const activeCells = activeStepObj?.newCells;
 
   return (
     <main className="min-h-screen bg-parchment px-6 py-8 font-serif">
@@ -422,8 +434,12 @@ export default function GeneratePage() {
             <div className="flex flex-col gap-4 items-start">
               <MiniBoard
                 puzzle={puzzle}
-                highlightCell={activeStepObj ? [activeStepObj.deduction.row, activeStepObj.deduction.col] : undefined}
-                revealUpTo={revealUpTo}
+                boardState={boardState}
+                activeCells={activeCells}
+                highlightRows={activeStepObj?.highlightRows}
+                highlightCols={activeStepObj?.highlightCols}
+                highlightTerritories={activeStepObj?.highlightTerritories}
+                secondaryCells={activeStepObj?.secondaryCells}
               />
 
               {activeStepObj && (
@@ -433,8 +449,9 @@ export default function GeneratePage() {
                   </p>
                   <p className="text-xs font-bold text-ink mb-1">{activeStepObj.technique}</p>
                   <p className="text-sm italic text-ink leading-relaxed">
-                    {activeStepObj.deduction.type === 'watcher' ? 'Place Watcher' : 'Place Ward'}{' '}
-                    at row {activeStepObj.deduction.row + 1}, col {activeStepObj.deduction.col + 1}
+                    {activeStepObj.batchCells
+                      ? `Place ${activeStepObj.batchCells.length} wards (cleanup from watcher at ${activeStepObj.deduction.row + 1},${activeStepObj.deduction.col + 1})`
+                      : `${activeStepObj.deduction.type === 'watcher' ? 'Place Watcher' : 'Place Ward'} at row ${activeStepObj.deduction.row + 1}, col ${activeStepObj.deduction.col + 1}`}
                   </p>
                   <p className="text-xs text-ink-light mt-2 leading-relaxed">
                     {activeStepObj.deduction.reason}
