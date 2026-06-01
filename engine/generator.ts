@@ -170,13 +170,14 @@ export interface GenerateOptions {
   size: number;
   seed: string;
   maxAttempts?: number;
+  maxDepth?: number;
   mode?: PuzzleMode;
   id?: string;
   title?: string;
 }
 
 export function generatePuzzle(opts: GenerateOptions): Puzzle | null {
-  const { size: n, seed, maxAttempts = 500, mode = 'initiate' } = opts;
+  const { size: n, seed, maxAttempts = 500, maxDepth = 0, mode = 'initiate' } = opts;
   const rng = createRNG(seed);
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -227,10 +228,11 @@ export function generatePuzzle(opts: GenerateOptions): Puzzle | null {
       createdAt:    new Date().toISOString(),
     };
 
-    // 5. Gate: logical solver must be able to crack it completely (depth-0 only for
-    // generation speed — random territory growth doesn't produce depth-1-only boards).
-    // Depth-1 is reserved for hand-crafted puzzles via the puzzle builder.
-    const solverResult = solveLogically(puzzle, 0);
+    // 5. Gate: logical solver must crack it at the requested depth.
+    // depth=0 (default): fast generation, works for most puzzles.
+    // depth=1: slow (2% hit rate for 8x8) but produces harder puzzles requiring
+    //          contradiction chains. Use the generateHard script for batch depth-1 runs.
+    const solverResult = solveLogically(puzzle, maxDepth);
     if (!solverResult) continue;
 
     return puzzle;

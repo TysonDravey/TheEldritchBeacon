@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { generatePuzzle } from '@/engine/generator';
+import { rateDifficulty } from '@/engine/difficulty';
 import { buildSolveTrace } from '@/engine/solveTrace';
 import type { Puzzle } from '@/engine/boardTypes';
-import type { SolveTrace, TraceWave } from '@/engine/solveTrace';
+import type { SolveTrace } from '@/engine/solveTrace';
 import { TERRITORY_NAMES, TERRITORY_COLORS, WATCHER_SVGS } from '@/theme/colors';
 
 // ---------------------------------------------------------------------------
@@ -55,7 +56,6 @@ function MiniBoard({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  position: 'relative',
                 }}
               >
                 {state === 'watcher' && (
@@ -87,11 +87,7 @@ const TECHNIQUE_COLORS: Record<string, string> = {
 };
 
 function WavePanel({
-  trace,
-  activeWave,
-  activeStep,
-  onSelectWave,
-  onSelectStep,
+  trace, activeWave, activeStep, onSelectWave, onSelectStep,
 }: {
   trace: SolveTrace;
   activeWave: number;
@@ -112,9 +108,7 @@ function WavePanel({
           onClick={() => onSelectWave(wi)}
         >
           <div className="flex items-center gap-2 mb-2">
-            <span className="font-serif text-xs text-ink-light tracking-widest uppercase">
-              Wave {wi + 1}
-            </span>
+            <span className="font-serif text-xs text-ink-light tracking-widest uppercase">Wave {wi + 1}</span>
             <span className="font-serif text-xs text-ink-light">
               — {wave.steps.length} step{wave.steps.length > 1 ? 's' : ''}
               {wave.parallel ? ' (can be spotted together)' : ''}
@@ -131,15 +125,13 @@ function WavePanel({
                     key={si}
                     onClick={(e) => { e.stopPropagation(); onSelectStep(wi, si); }}
                     className={`text-left border px-2 py-1.5 rounded-sm font-serif text-xs transition-colors ${tStyle} ${
-                      wi === activeWave && si === activeStep
-                        ? 'ring-1 ring-ink'
-                        : ''
+                      wi === activeWave && si === activeStep ? 'ring-1 ring-ink' : ''
                     }`}
                   >
                     <span className="font-bold">{step.technique}</span>
                     {tname && <span className="ml-1 opacity-70">— {tname}</span>}
                     <span className="ml-1 opacity-60">
-                      → {step.deduction.type === 'watcher' ? 'place Watcher' : 'place Ward'} at ({step.deduction.row + 1},{step.deduction.col + 1})
+                      → {step.deduction.type === 'watcher' ? 'Watcher' : 'Ward'} ({step.deduction.row + 1},{step.deduction.col + 1})
                     </span>
                   </button>
                 );
@@ -150,7 +142,7 @@ function WavePanel({
       ))}
       {trace.stuck && (
         <div className="border border-red-ink px-3 py-2 rounded-sm">
-          <p className="font-serif text-sm text-red-ink">Solver stuck — puzzle requires stronger techniques or is unsolvable by logic alone.</p>
+          <p className="font-serif text-sm text-red-ink">Solver stuck — puzzle requires stronger techniques.</p>
         </div>
       )}
       {trace.solved && (
@@ -163,43 +155,89 @@ function WavePanel({
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function randomSeed(): string {
+  return 'eb-' + Math.random().toString(36).slice(2, 10);
+}
+
+// ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
 
 export default function GeneratePage() {
-  const [size,      setSize]      = useState(6);
-  const [seed,      setSeed]      = useState('eldritch-dev-01');
-  const [puzzle,    setPuzzle]    = useState<Puzzle | null>(null);
-  const [trace,     setTrace]     = useState<SolveTrace | null>(null);
-  const [loading,   setLoading]   = useState(false);
-  const [error,     setError]     = useState<string | null>(null);
+  const [size,       setSize]       = useState(6);
+  const [seed,       setSeed]       = useState('eldritch-dev-01');
+  const [maxDepth,   setMaxDepth]   = useState(0);
+  const [puzzle,     setPuzzle]     = useState<Puzzle | null>(null);
+  const [trace,      setTrace]      = useState<SolveTrace | null>(null);
+  const [loading,    setLoading]    = useState(false);
+  const [progress,   setProgress]   = useState<{ tried: number; max: number } | null>(null);
+  const [error,      setError]      = useState<string | null>(null);
   const [activeWave, setActiveWave] = useState(0);
   const [activeStep, setActiveStep] = useState(0);
 
-  const handleGenerate = useCallback(() => {
+  const cancelledRef = useRef(false);
+
+  const handleCancel = useCallback(() => {
+    cancelledRef.current = true;
+  }, []);
+
+  const handleGenerate = useCallback(async () => {
     setLoading(true);
     setError(null);
     setPuzzle(null);
     setTrace(null);
     setActiveWave(0);
     setActiveStep(0);
+    cancelledRef.current = false;
 
-    // Run in a microtask so the loading state renders first
-    setTimeout(() => {
-      const p = generatePuzzle({ size, seed, maxAttempts: 3000 });
-      if (!p) {
-        setError(`Could not find a logically-solvable ${size}×${size} puzzle from seed "${seed}". Try a different seed.`);
+    // For depth-1 each attempt can take 5–25s, so we cap lower and yield every attempt.
+    // For depth-0 each attempt is fast, so we yield every 5.
+    const maxAttempts = maxDepth >= 1 ? 150 : 500;
+    const yieldEvery  = maxDepth >= 1 ? 1    : 5;
+
+    setProgress({ tried: 0, max: maxAttempts });
+
+    for (let i = 0; i < maxAttempts; i++) {
+      if (cancelledRef.current) {
         setLoading(false);
+        setProgress(null);
+        setError('Generation cancelled.');
         return;
       }
-      const t = buildSolveTrace(p);
-      setPuzzle(p);
+
+      // Yield to the UI periodically
+      if (i % yieldEvery === 0) {
+        setProgress({ tried: i, max: maxAttempts });
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+
+      const trySeed = `${seed}-${i}`;
+      const p = generatePuzzle({ size, seed: trySeed, maxAttempts: 1, maxDepth });
+      if (!p) continue;
+
+      const difficulty = rateDifficulty(p);
+      const finalPuzzle = { ...p, difficulty };
+      const t = buildSolveTrace(finalPuzzle);
+      setPuzzle(finalPuzzle);
       setTrace(t);
       setLoading(false);
-    }, 10);
-  }, [size, seed]);
+      setProgress(null);
+      return;
+    }
 
-  // Collect all placed cells up to the active wave/step
+    setError(
+      maxDepth >= 1
+        ? `No depth-${maxDepth} puzzle found in ${maxAttempts} attempts for ${size}×${size}. Try a different base seed.`
+        : `No puzzle found in ${maxAttempts} attempts for ${size}×${size} from base seed "${seed}". Try a different seed.`
+    );
+    setLoading(false);
+    setProgress(null);
+  }, [size, seed, maxDepth]);
+
+  // Collect placed cells up to the active wave/step
   const revealUpTo: { row: number; col: number; type: 'watcher' | 'ward' }[] = [];
   if (trace) {
     for (let wi = 0; wi <= activeWave; wi++) {
@@ -209,11 +247,7 @@ export default function GeneratePage() {
       for (let si = 0; si <= maxStep; si++) {
         const step = wave.steps[si];
         if (!step) break;
-        revealUpTo.push({
-          row: step.deduction.row,
-          col: step.deduction.col,
-          type: step.deduction.type,
-        });
+        revealUpTo.push({ row: step.deduction.row, col: step.deduction.col, type: step.deduction.type });
       }
     }
   }
@@ -244,30 +278,81 @@ export default function GeneratePage() {
             <select
               value={size}
               onChange={e => setSize(Number(e.target.value))}
+              disabled={loading}
               className="font-serif text-sm border border-ink bg-parchment px-2 py-1 rounded-sm"
             >
-              {[5, 6, 7, 8, 9, 10].map(n => (
+              {[5, 6, 7, 8].map(n => (
                 <option key={n} value={n}>{n}×{n}</option>
               ))}
             </select>
           </div>
-          <div className="flex-1 min-w-48">
-            <label className="block text-xs text-ink-light mb-1">Seed</label>
-            <input
-              type="text"
-              value={seed}
-              onChange={e => setSeed(e.target.value)}
-              className="font-serif text-sm border border-ink bg-parchment px-2 py-1 rounded-sm w-full"
-            />
+
+          <div>
+            <label className="block text-xs text-ink-light mb-1">Difficulty</label>
+            <select
+              value={maxDepth}
+              onChange={e => setMaxDepth(Number(e.target.value))}
+              disabled={loading}
+              className="font-serif text-sm border border-ink bg-parchment px-2 py-1 rounded-sm"
+            >
+              <option value={0}>Standard</option>
+              <option value={1}>Hard (slow — 5–25s each)</option>
+            </select>
           </div>
-          <button
-            onClick={handleGenerate}
-            disabled={loading}
-            className="font-serif text-sm border border-ink px-4 py-1.5 rounded-sm bg-parchment hover:bg-parchment-dark disabled:opacity-40"
-          >
-            {loading ? 'Generating…' : 'Generate'}
-          </button>
+
+          <div className="flex-1 min-w-48">
+            <label className="block text-xs text-ink-light mb-1">Base seed</label>
+            <div className="flex gap-1">
+              <input
+                type="text"
+                value={seed}
+                onChange={e => setSeed(e.target.value)}
+                disabled={loading}
+                className="font-serif text-sm border border-ink bg-parchment px-2 py-1 rounded-sm flex-1"
+              />
+              <button
+                onClick={() => setSeed(randomSeed())}
+                disabled={loading}
+                title="Random seed"
+                className="font-serif text-sm border border-ink px-2 py-1 rounded-sm bg-parchment hover:bg-parchment-dark disabled:opacity-40"
+              >
+                ↻
+              </button>
+            </div>
+          </div>
+
+          {loading ? (
+            <button
+              onClick={handleCancel}
+              className="font-serif text-sm border border-red-ink text-red-ink px-4 py-1.5 rounded-sm bg-parchment hover:bg-parchment-dark"
+            >
+              Cancel
+            </button>
+          ) : (
+            <button
+              onClick={handleGenerate}
+              className="font-serif text-sm border border-ink px-4 py-1.5 rounded-sm bg-parchment hover:bg-parchment-dark"
+            >
+              Generate
+            </button>
+          )}
         </div>
+
+        {/* Progress bar */}
+        {loading && progress && (
+          <div className="mb-4">
+            <div className="flex justify-between text-xs text-ink-light mb-1">
+              <span>Searching… attempt {progress.tried} of {progress.max}</span>
+              {maxDepth >= 1 && <span>Hard mode — each attempt takes several seconds</span>}
+            </div>
+            <div className="w-full bg-parchment-dark border border-ink rounded-sm h-2 overflow-hidden">
+              <div
+                className="bg-ink h-full transition-all duration-300"
+                style={{ width: `${Math.round((progress.tried / progress.max) * 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="border border-red-ink px-4 py-2 rounded-sm mb-4">
@@ -278,7 +363,7 @@ export default function GeneratePage() {
         {puzzle && trace && (
           <div className="flex flex-col lg:flex-row gap-6">
 
-            {/* Left: board + step detail */}
+            {/* Left: board + step detail + metadata */}
             <div className="flex flex-col gap-4 items-start">
               <MiniBoard
                 puzzle={puzzle}
@@ -286,7 +371,6 @@ export default function GeneratePage() {
                 revealUpTo={revealUpTo}
               />
 
-              {/* Step detail card */}
               {activeStepObj && (
                 <div className="border border-ink p-4 rounded-sm bg-parchment-dark max-w-xs w-full">
                   <p className="text-xs text-ink-light tracking-widest uppercase mb-1">
@@ -305,11 +389,8 @@ export default function GeneratePage() {
                       {activeStepObj.deduction.affectedTerritories.map(t => {
                         const colors = TERRITORY_COLORS[t] ?? TERRITORY_COLORS[0];
                         return (
-                          <span
-                            key={t}
-                            className="text-xs px-1.5 py-0.5 rounded-sm"
-                            style={{ backgroundColor: colors.bg, color: colors.text }}
-                          >
+                          <span key={t} className="text-xs px-1.5 py-0.5 rounded-sm"
+                            style={{ backgroundColor: colors.bg, color: colors.text }}>
                             {TERRITORY_NAMES[t] ?? `T${t+1}`}
                           </span>
                         );
@@ -319,14 +400,23 @@ export default function GeneratePage() {
                 </div>
               )}
 
-              {/* Puzzle metadata */}
               <div className="text-xs text-ink-light space-y-0.5">
                 <p>ID: <span className="font-mono">{puzzle.id}</span></p>
                 <p>Seed: <span className="font-mono">{puzzle.seed}</span></p>
-                <p>Difficulty: {puzzle.difficulty}</p>
-                <p>Total waves: {trace.waves.length}</p>
-                <p>Total steps: {trace.waves.reduce((s, w) => s + w.steps.length, 0)}</p>
+                <p>Difficulty: <span className="font-semibold">{puzzle.difficulty}</span></p>
+                <p>Waves: {trace.waves.length} &nbsp;·&nbsp; Steps: {trace.waves.reduce((s, w) => s + w.steps.length, 0)}</p>
               </div>
+
+              {/* Export snippet */}
+              <details className="w-full max-w-xs">
+                <summary className="text-xs text-ink-light cursor-pointer hover:text-ink">Export JSON</summary>
+                <textarea
+                  readOnly
+                  value={JSON.stringify(puzzle)}
+                  className="mt-1 w-full font-mono text-xs border border-ink bg-parchment p-2 rounded-sm resize-y h-24"
+                  onClick={e => (e.target as HTMLTextAreaElement).select()}
+                />
+              </details>
             </div>
 
             {/* Right: wave list */}
@@ -339,7 +429,6 @@ export default function GeneratePage() {
                 onSelectStep={(w, s) => { setActiveWave(w); setActiveStep(s); }}
               />
             </div>
-
           </div>
         )}
       </div>
