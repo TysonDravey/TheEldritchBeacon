@@ -9,10 +9,11 @@
  *   npx tsx scripts/generateBatch.ts --per-size 10 --sizes 5,6,7,8 --base eldritch-v3
  *
  * Options:
- *   --per-size  Puzzles to add per board size (default: 10)
- *   --sizes     Comma-separated list of sizes (default: 5,6,7,8)
- *   --base      Base seed string (default: eldritch-v3)
- *   --depth     Max solver depth (0 = forward only, 1 = hypothesis/Archon; default: 0)
+ *   --per-size    Puzzles to add per board size (default: 10)
+ *   --sizes       Comma-separated list of sizes (default: 5,6,7,8)
+ *   --base        Base seed string (default: eldritch-v3)
+ *   --depth       Max solver depth (0 = forward only, 1 = hypothesis/Archon; default: 0)
+ *   --difficulty  Filter for a specific difficulty label, e.g. Harbinger or Archon
  */
 
 import { generatePuzzle } from '../engine/generator';
@@ -88,14 +89,16 @@ function parseArgs() {
   let sizes = [5, 6, 7, 8];
   let base = 'eldritch-v3';
   let depth = 0;
+  let difficulty: string | null = null;
 
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--per-size' && args[i + 1]) perSize = parseInt(args[++i]);
-    if (args[i] === '--sizes'    && args[i + 1]) sizes = args[++i].split(',').map(Number);
-    if (args[i] === '--base'     && args[i + 1]) base = args[++i];
-    if (args[i] === '--depth'    && args[i + 1]) depth = parseInt(args[++i]);
+    if (args[i] === '--per-size'   && args[i + 1]) perSize = parseInt(args[++i]);
+    if (args[i] === '--sizes'      && args[i + 1]) sizes = args[++i].split(',').map(Number);
+    if (args[i] === '--base'       && args[i + 1]) base = args[++i];
+    if (args[i] === '--depth'      && args[i + 1]) depth = parseInt(args[++i]);
+    if (args[i] === '--difficulty' && args[i + 1]) difficulty = args[++i];
   }
-  return { perSize, sizes, base, depth };
+  return { perSize, sizes, base, depth, difficulty };
 }
 
 function nextIdNum(content: string, size: number): number {
@@ -117,7 +120,7 @@ function usedSeeds(content: string): Set<string> {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  const { perSize, sizes, base, depth } = parseArgs();
+  const { perSize, sizes, base, depth, difficulty } = parseArgs();
   const filePath = join(process.cwd(), 'data', 'samplePuzzles.ts');
 
   let content = readFileSync(filePath, 'utf-8');
@@ -144,7 +147,10 @@ async function main() {
       }
 
       const diff = rateDifficulty(puzzle);
-      if (depth > 0 && diff !== 'Archon') {
+      if (difficulty && diff !== difficulty) {
+        process.stderr.write(`  skip ${seed}: wrong difficulty ${diff}\n`);
+        continue;
+      } else if (!difficulty && depth > 0 && diff !== 'Archon') {
         process.stderr.write(`  skip ${seed}: solvable without hypothesis (${diff})\n`);
         continue;
       }

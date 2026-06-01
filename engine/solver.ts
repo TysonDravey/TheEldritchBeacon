@@ -639,7 +639,11 @@ export function getNextDeduction(
   const pe = pairElimination(puzzle, playerCells, candidates);
   if (pe) return pe;
 
-  // Technique 5: Contradiction test (depth controlled by maxDepth)
+  // Technique 5: Hidden set elimination
+  const hs = hiddenSetElimination(puzzle, playerCells, candidates);
+  if (hs) return hs;
+
+  // Technique 6: Contradiction test (depth controlled by maxDepth)
   const ct = contradictionTest(puzzle, playerCells, candidates, maxDepth);
   if (ct) return ct;
 
@@ -647,7 +651,84 @@ export function getNextDeduction(
 }
 
 /**
- * Technique 5: Contradiction test (hypothetical elimination).
+ * Technique 5: Hidden set elimination (dual of pair elimination).
+ * If N rows (or columns) collectively contain candidates for only N territories,
+ * those N territories must go in those N rows → eliminate their candidates elsewhere.
+ */
+function hiddenSetElimination(
+  puzzle: Puzzle,
+  playerCells: CellState[][],
+  candidates: Map<number, [number, number][]>
+): DeductionResult | null {
+  const n = puzzle.size;
+  const watchers = getWatcherPositions(playerCells);
+  const watcherRows = new Set(watchers.map(([r]) => r));
+  const watcherCols = new Set(watchers.map(([, c]) => c));
+
+  const unfilledRows = Array.from({ length: n }, (_, i) => i).filter(r => !watcherRows.has(r));
+  const unfilledCols = Array.from({ length: n }, (_, i) => i).filter(c => !watcherCols.has(c));
+
+  // Hidden sets by row
+  for (let k = 2; k <= unfilledRows.length - 1; k++) {
+    for (const rowSet of combinations(unfilledRows, k)) {
+      const rowSetSet = new Set(rowSet);
+
+      const territoriesInRows = new Set<number>();
+      for (const [t, cands] of candidates) {
+        if (cands.length === 0) continue;
+        if (cands.some(([r]) => rowSetSet.has(r))) territoriesInRows.add(t);
+      }
+      if (territoriesInRows.size !== k) continue;
+
+      for (const t of territoriesInRows) {
+        for (const [r, c] of (candidates.get(t) ?? [])) {
+          if (!rowSetSet.has(r)) {
+            return {
+              type: 'ward', row: r, col: c,
+              reason: `Rows ${rowSet.map(v => v + 1).join(', ')} can only hold territories ${Array.from(territoriesInRows).map(v => v + 1).join(', ')}, so those territories are locked to those rows.`,
+              reasonType: 'hidden-set-row',
+              pairedTerritories: Array.from(territoriesInRows),
+              affectedTerritories: [t],
+            };
+          }
+        }
+      }
+    }
+  }
+
+  // Hidden sets by column
+  for (let k = 2; k <= unfilledCols.length - 1; k++) {
+    for (const colSet of combinations(unfilledCols, k)) {
+      const colSetSet = new Set(colSet);
+
+      const territoriesInCols = new Set<number>();
+      for (const [t, cands] of candidates) {
+        if (cands.length === 0) continue;
+        if (cands.some(([, c]) => colSetSet.has(c))) territoriesInCols.add(t);
+      }
+      if (territoriesInCols.size !== k) continue;
+
+      for (const t of territoriesInCols) {
+        for (const [r, c] of (candidates.get(t) ?? [])) {
+          if (!colSetSet.has(c)) {
+            return {
+              type: 'ward', row: r, col: c,
+              reason: `Columns ${colSet.map(v => v + 1).join(', ')} can only hold territories ${Array.from(territoriesInCols).map(v => v + 1).join(', ')}, so those territories are locked to those columns.`,
+              reasonType: 'hidden-set-col',
+              pairedTerritories: Array.from(territoriesInCols),
+              affectedTerritories: [t],
+            };
+          }
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Technique 6: Contradiction test (hypothetical elimination).
  * For each candidate cell (r,c), try placing a watcher there and propagating.
  * If any territory ends up with 0 candidates, (r,c) must be a ward.
  *

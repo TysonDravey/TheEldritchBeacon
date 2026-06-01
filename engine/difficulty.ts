@@ -15,12 +15,14 @@ interface TechniqueRecord {
   rowConfinement: number;
   columnConfinement: number;
   pairElimination: number;
+  hiddenSet: number;
   contradictionTest: number;
 }
 
 function classifyDeduction(d: DeductionResult): keyof TechniqueRecord {
   if (d.type === 'watcher') return 'naked';
   if (d.reasonType === 'hypothetical') return 'contradictionTest';
+  if (d.reasonType === 'hidden-set-row' || d.reasonType === 'hidden-set-col') return 'hiddenSet';
   if (d.reason.includes('confined to row') || d.reason.includes('only place its Watcher in row')) {
     return 'rowConfinement';
   }
@@ -97,6 +99,7 @@ export function rateDifficulty(puzzle: Puzzle): Difficulty {
     rowConfinement: 0,
     columnConfinement: 0,
     pairElimination: 0,
+    hiddenSet: 0,
     contradictionTest: 0,
   };
 
@@ -119,6 +122,7 @@ export function rateDifficulty(puzzle: Puzzle): Difficulty {
   // Any puzzle requiring hypothesis-based contradiction testing is Archon —
   // qualitatively harder than forward-reasoning alone.
   if (record.contradictionTest > 0) return 'Archon';
+  if (record.hiddenSet > 0) return 'Harbinger';
   return scoreTodifficulty(computeScore(record));
 }
 

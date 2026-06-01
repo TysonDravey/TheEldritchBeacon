@@ -15,6 +15,7 @@ function difficultyColor(difficulty: Difficulty): string {
     case 'Occultist':   return 'text-red-ink border-red-ink';
     case 'High Priest': return 'text-red-ink border-red-ink opacity-80';
     case 'Eldritch':    return 'text-red-ink border-red-ink font-bold';
+    case 'Harbinger':   return 'text-red-ink border-red-ink font-bold italic';
     case 'Archon':      return 'text-red-ink border-red-ink font-bold opacity-90';
     default:            return 'text-ink border-ink';
   }

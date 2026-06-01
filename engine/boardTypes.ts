@@ -15,7 +15,7 @@ export interface Board {
 
 export type PuzzleMode = 'initiate' | 'cult-master' | 'twin-watchers' | 'shattered-realms';
 
-export type Difficulty = 'Initiate' | 'Scholar' | 'Occultist' | 'High Priest' | 'Eldritch' | 'Archon';
+export type Difficulty = 'Initiate' | 'Scholar' | 'Occultist' | 'High Priest' | 'Eldritch' | 'Harbinger' | 'Archon';
 
 export interface Puzzle {
   id: string;
@@ -49,6 +49,8 @@ export type DeductionReasonType =
   | 'col-confinement'
   | 'pair-row'
   | 'pair-col'
+  | 'hidden-set-row'
+  | 'hidden-set-col'
   | 'naked-single-territory'
   | 'naked-single-row'
   | 'naked-single-col'
