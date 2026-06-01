@@ -122,6 +122,87 @@ function generateTerritoryMap(
 }
 
 // ---------------------------------------------------------------------------
+// Shattered Realms territory map — multiple seeds per territory, non-contiguous
+// ---------------------------------------------------------------------------
+
+function generateShatteredTerritoryMap(
+  n: number,
+  solution: [number, number][],
+  rng: () => number
+): number[][] {
+  const map: number[][] = Array.from({ length: n }, () => Array(n).fill(-1));
+  const pending: Array<{ row: number; col: number; territory: number }> = [];
+
+  // Seed each territory with its watcher position first
+  for (let t = 0; t < solution.length; t++) {
+    const [r, c] = solution[t];
+    map[r][c] = t;
+    pending.push({ row: r, col: c, territory: t });
+  }
+
+  // Add 1–2 extra scattered seeds per territory, placed far from existing seeds
+  const minDist = Math.max(2, Math.floor(n / 3));
+  for (let t = 0; t < solution.length; t++) {
+    const extraCount = rng() < 0.4 ? 2 : 1;
+    for (let s = 0; s < extraCount; s++) {
+      let placed = false;
+      for (let attempt = 0; attempt < 30 && !placed; attempt++) {
+        const r = Math.floor(rng() * n);
+        const c = Math.floor(rng() * n);
+        if (map[r][c] !== -1) continue;
+        // Must be far enough from all existing seeds of this territory
+        const tooClose = pending
+          .filter(p => p.territory === t)
+          .some(p => Math.abs(p.row - r) + Math.abs(p.col - c) < minDist);
+        if (tooClose) continue;
+        map[r][c] = t;
+        pending.push({ row: r, col: c, territory: t });
+        placed = true;
+      }
+    }
+  }
+
+  // Shuffle then BFS-fill from all seeds simultaneously (no axis bias)
+  for (let i = pending.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [pending[i], pending[j]] = [pending[j], pending[i]];
+  }
+
+  while (pending.length > 0) {
+    const idx = Math.floor(rng() * Math.min(pending.length, 6));
+    const { row, col, territory } = pending.splice(idx, 1)[0];
+    for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]] as [number,number][]) {
+      const nr = row + dr, nc = col + dc;
+      if (nr < 0 || nr >= n || nc < 0 || nc >= n) continue;
+      if (map[nr][nc] !== -1) continue;
+      map[nr][nc] = territory;
+      pending.push({ row: nr, col: nc, territory });
+    }
+  }
+
+  // Fill any stragglers
+  let hasUnfilled = true;
+  while (hasUnfilled) {
+    hasUnfilled = false;
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        if (map[r][c] !== -1) continue;
+        hasUnfilled = true;
+        for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]] as [number,number][]) {
+          const nr = r + dr, nc = c + dc;
+          if (nr >= 0 && nr < n && nc >= 0 && nc < n && map[nr][nc] !== -1) {
+            map[r][c] = map[nr][nc];
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  return map;
+}
+
+// ---------------------------------------------------------------------------
 // Connectivity check — each territory must be one connected blob
 // ---------------------------------------------------------------------------
 
@@ -180,40 +261,44 @@ export function generatePuzzle(opts: GenerateOptions): Puzzle | null {
   const { size: n, seed, maxAttempts = 500, maxDepth = 0, mode = 'initiate' } = opts;
   const rng = createRNG(seed);
 
+  const isShattered = mode === 'shattered-realms';
+
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     // 1. Generate a valid solution
     const solution = generateSolution(n, rng);
     if (!solution) continue;
 
     // 2. Build territory map
-    const map = generateTerritoryMap(n, solution, rng);
+    const map = isShattered
+      ? generateShatteredTerritoryMap(n, solution, rng)
+      : generateTerritoryMap(n, solution, rng);
 
-    // 3. Verify no unassigned cells and all territories are connected
+    // 3. Verify no unassigned cells
     let mapValid = true;
     for (let r = 0; r < n && mapValid; r++)
       for (let c = 0; c < n && mapValid; c++)
         if (map[r][c] < 0) mapValid = false;
     if (!mapValid) continue;
 
-    let connected = true;
-    for (let t = 0; t < n; t++) {
-      if (!isConnected(map, n, t)) { connected = false; break; }
-    }
-    if (!connected) continue;
+    if (!isShattered) {
+      // Connectivity required for standard mode
+      let connected = true;
+      for (let t = 0; t < n; t++) {
+        if (!isConnected(map, n, t)) { connected = false; break; }
+      }
+      if (!connected) continue;
 
-    // 3b. Cheap confinement pre-filter: skip territory maps where too few territories
-    // are row- or column-confined. These maps almost never pass the logical solver.
-    // A territory is "confined" if its cells span ≤ 2 rows OR ≤ 2 columns.
-    let confinedCount = 0;
-    for (let t = 0; t < n; t++) {
-      const rows = new Set<number>(), cols = new Set<number>();
-      for (let r = 0; r < n; r++)
-        for (let c = 0; c < n; c++)
-          if (map[r][c] === t) { rows.add(r); cols.add(c); }
-      if (rows.size <= 2 || cols.size <= 2) confinedCount++;
+      // Confinement pre-filter (not meaningful for shattered territories)
+      let confinedCount = 0;
+      for (let t = 0; t < n; t++) {
+        const rows = new Set<number>(), cols = new Set<number>();
+        for (let r = 0; r < n; r++)
+          for (let c = 0; c < n; c++)
+            if (map[r][c] === t) { rows.add(r); cols.add(c); }
+        if (rows.size <= 2 || cols.size <= 2) confinedCount++;
+      }
+      if (confinedCount < Math.ceil(n / 2)) continue;
     }
-    // Require at least half the territories to be row- or column-confined
-    if (confinedCount < Math.ceil(n / 2)) continue;
 
     // 4. Build a candidate puzzle
     const puzzle: Puzzle = {

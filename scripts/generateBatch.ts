@@ -14,13 +14,28 @@
  *   --base        Base seed string (default: eldritch-v3)
  *   --depth       Max solver depth (0 = forward only, 1 = hypothesis/Archon; default: 0)
  *   --difficulty  Filter for a specific difficulty label, e.g. Harbinger or Archon
+ *   --mode        Puzzle mode: initiate (default) or shattered-realms
  */
 
 import { generatePuzzle } from '../engine/generator';
 import { rateDifficulty } from '../engine/difficulty';
 import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import type { Puzzle } from '../engine/boardTypes';
+import type { Puzzle, PuzzleMode } from '../engine/boardTypes';
+
+const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK ?? '';
+
+async function discordPing(msg: string): Promise<void> {
+  try {
+    await fetch(DISCORD_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: msg }),
+    });
+  } catch {
+    // non-fatal — don't interrupt generation if Discord is unreachable
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Title pool — enough for many runs
@@ -90,6 +105,7 @@ function parseArgs() {
   let base = 'eldritch-v3';
   let depth = 0;
   let difficulty: string | null = null;
+  let mode: PuzzleMode = 'initiate';
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--per-size'   && args[i + 1]) perSize = parseInt(args[++i]);
@@ -97,8 +113,9 @@ function parseArgs() {
     if (args[i] === '--base'       && args[i + 1]) base = args[++i];
     if (args[i] === '--depth'      && args[i + 1]) depth = parseInt(args[++i]);
     if (args[i] === '--difficulty' && args[i + 1]) difficulty = args[++i];
+    if (args[i] === '--mode'       && args[i + 1]) mode = args[++i] as PuzzleMode;
   }
-  return { perSize, sizes, base, depth, difficulty };
+  return { perSize, sizes, base, depth, difficulty, mode };
 }
 
 function nextIdNum(content: string, size: number): number {
@@ -120,7 +137,7 @@ function usedSeeds(content: string): Set<string> {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  const { perSize, sizes, base, depth, difficulty } = parseArgs();
+  const { perSize, sizes, base, depth, difficulty, mode } = parseArgs();
   const filePath = join(process.cwd(), 'data', 'samplePuzzles.ts');
 
   let content = readFileSync(filePath, 'utf-8');
@@ -140,7 +157,7 @@ async function main() {
 
       if (existingSeeds.has(seed)) continue;
 
-      const puzzle = generatePuzzle({ size, seed, maxAttempts: depth > 0 ? 200 : 500, maxDepth: depth });
+      const puzzle = generatePuzzle({ size, seed, maxAttempts: depth > 0 ? 200 : 500, maxDepth: depth, mode });
       if (!puzzle) {
         process.stderr.write(`  skip ${seed}: no puzzle\n`);
         continue;
@@ -179,12 +196,14 @@ async function main() {
       existingSeeds.add(seed);
 
       process.stderr.write(`  ✓ ${id} — ${diff} (seed ${seed})\n`);
+      await discordPing(`✓ ${id} — ${diff}`);
       added++;
       totalAdded++;
     }
   }
 
   process.stderr.write(`\nDone. Added ${totalAdded} puzzles.\n`);
+  await discordPing(`@here 🔔 Vesper — generation complete. Added ${totalAdded} puzzle${totalAdded !== 1 ? 's' : ''} (sizes: ${sizes.join(', ')}).`);
 }
 
 main().catch(err => { console.error(err); process.exit(1); });

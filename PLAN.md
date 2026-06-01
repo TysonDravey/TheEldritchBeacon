@@ -176,7 +176,17 @@ The Campaign and the Daily Beacon serve fundamentally different purposes and mus
 
 **Campaign:** teaches deduction techniques, puzzle logic, pattern recognition, and advanced strategies. Progression makes players stronger solvers.
 
-**Daily Beacon:** provides a shared daily challenge, streak tracking, long-term engagement, and advanced practice. It is not a tutorial.
+**Daily Beacon:** provides a shared daily challenge, a monthly completion goal, long-term engagement, and advanced practice. It is not a tutorial.
+
+---
+
+### Format — Shattered Realms
+
+Daily Beacon puzzles use **Shattered Realms** mode: territories are non-contiguous. A color may appear as multiple disconnected islands, but the rule is unchanged — exactly one Watcher per color, regardless of how many islands it spans.
+
+This makes the daily feel meaningfully distinct from campaign puzzles and introduces a richer set of deductions (Broken Territory, Echo Territory, Phantom Refuge).
+
+**Difficulty target:** Occultist minimum, Eldritch/Harbinger typical. The Daily Beacon is a challenge, not an introduction.
 
 ---
 
@@ -208,14 +218,37 @@ Daily Beacons function as both challenge content and discovery content.
 
 ---
 
+### Monthly Calendar Model
+
+The Daily Beacon tracks completions per calendar date, not just streaks. Each month is displayed as a grid of days — completed days are marked, missed days remain open.
+
+**Key behaviours:**
+- Players can go back and complete any puzzle from the current month
+- A full month completion is a distinct achievement (separate from streak)
+- Past months are archived and remain playable indefinitely
+- Streak counts consecutive days with no gap (as usual)
+- Monthly completion rate shown alongside streak (e.g. "14/30 this month")
+
+This encourages two habits: daily play (streak), and catch-up play (monthly completion). A player who misses Tuesday can still chase the full month.
+
+---
+
 ### Statistics (per player, separate from campaign)
 
 - Current streak
 - Longest streak
-- Solve time
-- Hints used
-- Mistakes made
-- Completion rate
+- Monthly completion count (e.g. 22/31)
+- Solve time per puzzle
+- Hints used per puzzle
+- Mistakes per puzzle
+- All-time completion count
+
+---
+
+### Seed Strategy
+
+- **Phase 2:** Local seed — date string hashed to a puzzle seed. Deterministic, no server needed.
+- **Phase 3:** Server seed — puzzle curated or generated server-side, allows quality control and special event puzzles.
 
 ---
 
@@ -224,8 +257,9 @@ Daily Beacons function as both challenge content and discovery content.
 - Global daily leaderboards
 - Friend challenges
 - Shared puzzle seeds
-- Daily Beacon archives
-- Seasonal events
+- Daily Beacon archives (all past months browsable)
+- Seasonal events / special puzzles
+- Monthly completion badges
 
 These must not require changes to the puzzle engine.
 
@@ -290,13 +324,15 @@ These apply in every phase and must never be violated:
 
 ## Difficulty Scale
 
-| Rating      | Techniques Required                         |
-|-------------|---------------------------------------------|
-| Initiate    | Single candidate                            |
-| Scholar     | Row/column elimination                      |
-| Occultist   | Territory elimination, forced row/col       |
-| High Priest | Contradiction deduction                     |
-| Eldritch    | Multi-step chains                           |
+| Rating      | Techniques Required                                        |
+|-------------|------------------------------------------------------------|
+| Initiate    | Single candidate                                           |
+| Scholar     | Row/column elimination                                     |
+| Occultist   | Territory elimination, forced row/col                      |
+| High Priest | Pair/group elimination (naked sets)                        |
+| Eldritch    | Multi-step chains, heavy group elimination                 |
+| Harbinger   | Hidden set elimination (inverse of naked sets)             |
+| Archon      | Hypothesis — place, propagate, prove contradiction         |
 
 ---
 
