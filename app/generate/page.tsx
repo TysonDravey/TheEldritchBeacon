@@ -248,14 +248,17 @@ export default function GeneratePage() {
     setActiveStep(0);
     cancelledRef.current = false;
 
-    // For depth-1 each attempt can take 5–25s, so we cap lower and yield every attempt.
-    // For depth-0 each attempt is fast, so we yield every 5.
-    const maxAttempts = maxDepth >= 1 ? 150 : 500;
-    const yieldEvery  = maxDepth >= 1 ? 1    : 5;
+    // depth-1 puzzles require exploring many territory maps per seed (not just the first one).
+    // With maxAttempts:1, you only see each seed's first territory map; the hit rate is ~0.004%.
+    // Using maxAttempts:200 per call gives each seed a proper 200-map exploration before moving on.
+    // Most attempts fail pre-filters in <1ms; the occasional solver run may block for 5–25s.
+    const outerMax   = maxDepth >= 1 ? 50  : 500;
+    const innerMax   = maxDepth >= 1 ? 200 : 1;
+    const totalMax   = outerMax * innerMax;
 
-    setProgress({ tried: 0, max: maxAttempts });
+    setProgress({ tried: 0, max: totalMax });
 
-    for (let i = 0; i < maxAttempts; i++) {
+    for (let i = 0; i < outerMax; i++) {
       if (cancelledRef.current) {
         setLoading(false);
         setProgress(null);
@@ -263,14 +266,11 @@ export default function GeneratePage() {
         return;
       }
 
-      // Yield to the UI periodically
-      if (i % yieldEvery === 0) {
-        setProgress({ tried: i, max: maxAttempts });
-        await new Promise(resolve => setTimeout(resolve, 0));
-      }
+      setProgress({ tried: i * innerMax, max: totalMax });
+      await new Promise(resolve => setTimeout(resolve, 0));
 
       const trySeed = `${seed}-${i}`;
-      const p = generatePuzzle({ size, seed: trySeed, maxAttempts: 1, maxDepth });
+      const p = generatePuzzle({ size, seed: trySeed, maxAttempts: innerMax, maxDepth });
       if (!p) continue;
 
       const difficulty = rateDifficulty(p);
@@ -285,8 +285,8 @@ export default function GeneratePage() {
 
     setError(
       maxDepth >= 1
-        ? `No depth-${maxDepth} puzzle found in ${maxAttempts} attempts for ${size}×${size}. Try a different base seed.`
-        : `No puzzle found in ${maxAttempts} attempts for ${size}×${size} from base seed "${seed}". Try a different seed.`
+        ? `No depth-${maxDepth} puzzle found in ${totalMax} territory map attempts for ${size}×${size}. Try a different base seed, or use the CLI script for bulk generation.`
+        : `No puzzle found in ${totalMax} attempts for ${size}×${size} from base seed "${seed}". Try a different seed.`
     );
     setLoading(false);
     setProgress(null);
@@ -397,8 +397,8 @@ export default function GeneratePage() {
         {loading && progress && (
           <div className="mb-4">
             <div className="flex justify-between text-xs text-ink-light mb-1">
-              <span>Searching… attempt {progress.tried} of {progress.max}</span>
-              {maxDepth >= 1 && <span>Hard mode — each attempt takes several seconds</span>}
+              <span>Searching… {progress.tried.toLocaleString()} of {progress.max.toLocaleString()} maps tried</span>
+              {maxDepth >= 1 && <span>Hard mode — may pause briefly when solver runs</span>}
             </div>
             <div className="w-full bg-parchment-dark border border-ink rounded-sm h-2 overflow-hidden">
               <div
