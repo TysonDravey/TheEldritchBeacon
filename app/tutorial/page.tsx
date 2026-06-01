@@ -188,11 +188,14 @@ function computeWaves(row: number, col: number, cells: CellState[][]): {
 // Page
 // ---------------------------------------------------------------------------
 
+const EMPTY_BOARD = (): CellState[][] =>
+  Array.from({ length: N }, () => Array<CellState>(N).fill('empty'));
+
 export default function TutorialPage() {
   const [stepIdx, setStepIdx] = useState(0);
-  const [cells, setCells] = useState<CellState[][]>(
-    () => Array.from({ length: N }, () => Array<CellState>(N).fill('empty')),
-  );
+  const [cells, setCells] = useState<CellState[][]>(EMPTY_BOARD);
+  // cellHistory[i] = board state at the start of step i
+  const [cellHistory, setCellHistory] = useState<CellState[][][]>(() => [EMPTY_BOARD()]);
   const [wrongMsg, setWrongMsg] = useState<string | null>(null);
   const placingRef = useRef(false); // lock during wave animation
 
@@ -237,12 +240,19 @@ export default function TutorialPage() {
     }, 130);
 
     // Wave 2: far row/col wards + advance step (320ms)
+    // Compute the final board state now (for history) since we know all wards ahead of time
+    const snapshot = cells.map(r => [...r]) as CellState[][];
+    snapshot[row][col] = 'watcher';
+    wave1.forEach(([r, c]) => { if (snapshot[r][c] === 'empty') snapshot[r][c] = 'ward'; });
+    wave2.forEach(([r, c]) => { if (snapshot[r][c] === 'empty') snapshot[r][c] = 'ward'; });
+
     setTimeout(() => {
       setCells(prev => {
         const next = prev.map(r => [...r]);
         wave2.forEach(([r, c]) => { if (next[r][c] === 'empty') next[r][c] = 'ward'; });
         return next;
       });
+      setCellHistory(h => [...h.slice(0, stepIdx + 1), snapshot]);
       setStepIdx(i => i + 1);
       placingRef.current = false;
     }, 320);
@@ -260,6 +270,13 @@ export default function TutorialPage() {
 
     if (step.wardWaves?.length) {
       placingRef.current = true;
+
+      // Pre-compute final board state for history (known ahead of time)
+      const snapshot = cells.map(r => [...r]) as CellState[][];
+      step.wardWaves.forEach(wave => {
+        wave.forEach(([r, c]) => { if (snapshot[r][c] === 'empty') snapshot[r][c] = 'ward'; });
+      });
+
       step.wardWaves.forEach((wave, i) => {
         setTimeout(() => {
           setCells(prev => {
@@ -270,12 +287,21 @@ export default function TutorialPage() {
         }, i * 150);
       });
       setTimeout(() => {
+        setCellHistory(h => [...h.slice(0, stepIdx + 1), snapshot]);
         setStepIdx(i => i + 1);
         placingRef.current = false;
       }, step.wardWaves.length * 150 + 200);
     } else {
+      setCellHistory(h => [...h.slice(0, stepIdx + 1), cells.map(r => [...r])]);
       setStepIdx(i => i + 1);
     }
+  }
+
+  function handleBack() {
+    if (stepIdx === 0 || placingRef.current) return;
+    setWrongMsg(null);
+    setCells(cellHistory[stepIdx - 1]);
+    setStepIdx(i => i - 1);
   }
 
   const isDone = step.action.type === 'done';
@@ -338,9 +364,21 @@ export default function TutorialPage() {
             <p className="mt-3 font-serif text-xs text-red-ink italic">{wrongMsg}</p>
           )}
 
-          <div className="mt-5 flex items-center justify-between">
-            {/* Progress dots */}
-            <div className="flex gap-1.5 items-center">
+          <div className="mt-5 grid grid-cols-3 items-center">
+            {/* Back */}
+            <div>
+              {stepIdx > 0 && (
+                <button
+                  onClick={handleBack}
+                  className="font-serif text-xs text-ink-light border border-ink border-opacity-40 px-3 py-1.5 rounded-sm hover:bg-parchment-dark transition-colors opacity-50 hover:opacity-100"
+                >
+                  &larr; Back
+                </button>
+              )}
+            </div>
+
+            {/* Progress dots — centred */}
+            <div className="flex justify-center gap-1.5 items-center">
               {STEPS.map((_, i) => (
                 <div
                   key={i}
@@ -356,28 +394,30 @@ export default function TutorialPage() {
               ))}
             </div>
 
-            {/* CTA */}
-            {step.action.type === 'next' && (
-              <button
-                onClick={handleNext}
-                className="font-serif text-sm border border-ink px-4 py-1.5 rounded-sm hover:bg-parchment-dark transition-colors"
-              >
-                Next &rarr;
-              </button>
-            )}
-            {step.action.type === 'watcher' && (
-              <span className="font-serif text-xs text-ink-light italic">
-                Double-click to place
-              </span>
-            )}
-            {isDone && (
-              <Link
-                href="/"
-                className="font-serif text-sm border border-brass text-brass px-4 py-1.5 rounded-sm hover:bg-parchment-dark transition-colors"
-              >
-                Begin Puzzles &rarr;
-              </Link>
-            )}
+            {/* CTA — right-aligned */}
+            <div className="flex justify-end">
+              {step.action.type === 'next' && (
+                <button
+                  onClick={handleNext}
+                  className="font-serif text-sm border border-ink px-4 py-1.5 rounded-sm hover:bg-parchment-dark transition-colors"
+                >
+                  Next &rarr;
+                </button>
+              )}
+              {step.action.type === 'watcher' && (
+                <span className="font-serif text-xs text-ink-light italic">
+                  Double-click to place
+                </span>
+              )}
+              {isDone && (
+                <Link
+                  href="/"
+                  className="font-serif text-sm border border-brass text-brass px-4 py-1.5 rounded-sm hover:bg-parchment-dark transition-colors"
+                >
+                  Begin Puzzles &rarr;
+                </Link>
+              )}
+            </div>
           </div>
         </div>
 
