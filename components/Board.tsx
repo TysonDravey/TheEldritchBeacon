@@ -9,6 +9,7 @@ interface BoardProps {
   playerCells: CellState[][];
   onCellWard: (row: number, col: number) => void;
   onCellWatcher: (row: number, col: number) => void;
+  primaryCell?: [number, number];
   highlightCells?: [number, number][];
   highlightTerritories?: number[];
   highlightRows?: number[];
@@ -42,6 +43,7 @@ export default function Board({
   playerCells,
   onCellWard,
   onCellWatcher,
+  primaryCell,
   highlightCells,
   highlightTerritories,
   highlightRows,
@@ -204,7 +206,7 @@ export default function Board({
                 state={state}
                 isHighlighted={isCellHighlighted(row, col, territory, highlightCells, highlightTerritories, highlightRows, highlightCols)}
                 isDimmed={hintActive && !isCellHighlighted(row, col, territory, highlightCells, highlightTerritories, highlightRows, highlightCols)}
-                isPrimaryHint={highlightCells?.some(([r, c]) => r === row && c === col) ?? false}
+                isPrimaryHint={primaryCell ? primaryCell[0] === row && primaryCell[1] === col : false}
                 isContradiction={isCellContradiction(row, col, contradiction)}
                 isFlash={flashCells?.some(([r, c]) => r === row && c === col) ?? false}
                 size={size}

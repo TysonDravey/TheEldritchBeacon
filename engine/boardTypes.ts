@@ -73,6 +73,7 @@ export interface DeductionResult {
 export interface HintResult {
   level: 1 | 2 | 3 | 4;
   message: string;
+  primaryCell?: [number, number];    // single cell that gets the spinner marker
   highlightCells?: [number, number][];
   highlightTerritories?: number[];
   highlightRows?: number[];

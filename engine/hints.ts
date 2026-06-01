@@ -232,13 +232,11 @@ function buildWardHint(
       whySealed = `this Watcher's row, column, and adjacency zone together eliminate every remaining refuge in the ${tname(victim)} territory`;
     }
 
-    const highlightAll: [number, number][] = [[row, col], ...victimCells];
-
     if (depth === 0) {
       return {
         level: 1,
         message: `Consider what would happen if a Watcher rose at this cell. Study where the ${tname(victim)} territory can still place its Watcher.`,
-        highlightCells: [[row, col]],
+        primaryCell: [row, col],
         highlightTerritories: [cellTerritory, victim],
       };
     }
@@ -246,14 +244,16 @@ function buildWardHint(
       return {
         level: 2,
         message: `If a Watcher rose here, ${whySealed}. The ${tname(victim)} territory would be left with nowhere to go.`,
-        highlightCells: highlightAll,
+        primaryCell: [row, col],
+        highlightCells: victimCells,
         highlightTerritories: [cellTerritory, victim],
       };
     }
     return {
       level: 3,
       message: `A Watcher here is impossible — ${whySealed}. The ${tname(victim)} territory would be sealed off entirely. Mark this cell with a Ward.`,
-      highlightCells: highlightAll,
+      primaryCell: [row, col],
+      highlightCells: victimCells,
       highlightTerritories: [cellTerritory, victim],
       deduction: d,
     };

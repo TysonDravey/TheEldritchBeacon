@@ -56,6 +56,7 @@ export default function PuzzlePage() {
       ].slice(-UNDO_LIMIT);
 
       hintDepthRef.current = 0; // any move resets hint escalation
+      setHintResult(null);      // dismiss active hint on any move
       const contra  = findContradictions(puzzle, newCells);
       const solved  = isSolved(puzzle, newCells);
 
@@ -211,6 +212,7 @@ export default function PuzzlePage() {
         playerCells={playerState.cells}
         onCellWard={handleCellWard}
         onCellWatcher={handleCellWatcher}
+        primaryCell={hintResult?.primaryCell}
         highlightCells={hintResult?.highlightCells}
         highlightTerritories={hintResult?.highlightTerritories}
         highlightRows={hintResult?.highlightRows}
