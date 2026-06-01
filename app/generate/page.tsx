@@ -7,6 +7,7 @@ import { buildSolveTrace } from '@/engine/solveTrace';
 import type { Puzzle, CellState } from '@/engine/boardTypes';
 import type { SolveTrace, TraceStep } from '@/engine/solveTrace';
 import { TERRITORY_NAMES, TERRITORY_COLORS, WATCHER_SVGS } from '@/theme/colors';
+import { SAMPLE_PUZZLES } from '@/data/samplePuzzles';
 
 // ---------------------------------------------------------------------------
 // Tiny board preview
@@ -257,12 +258,46 @@ export default function GeneratePage() {
   const [error,      setError]      = useState<string | null>(null);
   const [activeWave, setActiveWave] = useState(0);
   const [activeStep, setActiveStep] = useState(0);
+  // Puzzle source: 'generated' shows Add to Game, 'browsed' does not
+  const [puzzleSource, setPuzzleSource] = useState<'generated' | 'browsed'>('generated');
+  const [puzzleTitle,  setPuzzleTitle]  = useState('');
+  const [addStatus,    setAddStatus]    = useState<string | null>(null);
 
   const cancelledRef = useRef(false);
 
   const handleCancel = useCallback(() => {
     cancelledRef.current = true;
   }, []);
+
+  const handleBrowse = useCallback((id: string) => {
+    if (!id) { setPuzzle(null); setTrace(null); return; }
+    const p = SAMPLE_PUZZLES.find(p => p.id === id);
+    if (!p) return;
+    setPuzzle(p);
+    setTrace(buildSolveTrace(p));
+    setActiveWave(0);
+    setActiveStep(0);
+    setPuzzleTitle(p.title);
+    setPuzzleSource('browsed');
+    setAddStatus(null);
+    setError(null);
+  }, []);
+
+  const handleAddToGame = useCallback(async () => {
+    if (!puzzle) return;
+    setAddStatus('saving…');
+    try {
+      const res = await fetch('/api/add-puzzle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ puzzle, title: puzzleTitle }),
+      });
+      const data = await res.json();
+      setAddStatus(res.ok ? `Saved as ${data.id}` : `Error: ${data.error}`);
+    } catch (e) {
+      setAddStatus(`Error: ${String(e)}`);
+    }
+  }, [puzzle, puzzleTitle]);
 
   const handleGenerate = useCallback(async () => {
     setLoading(true);
@@ -303,6 +338,9 @@ export default function GeneratePage() {
       const t = buildSolveTrace(finalPuzzle);
       setPuzzle(finalPuzzle);
       setTrace(t);
+      setPuzzleTitle(finalPuzzle.title);
+      setPuzzleSource('generated');
+      setAddStatus(null);
       setLoading(false);
       setProgress(null);
       return;
@@ -336,6 +374,24 @@ export default function GeneratePage() {
           <a href="/" className="text-sm text-ink-light hover:text-ink border-b border-transparent hover:border-ink">
             ← Game
           </a>
+        </div>
+
+        {/* Browse existing puzzles */}
+        <div className="flex items-center gap-3 mb-3 border border-ink px-4 py-3 rounded-sm bg-parchment">
+          <label className="text-xs text-ink-light whitespace-nowrap">Browse game puzzles</label>
+          <select
+            value={puzzle && puzzleSource === 'browsed' ? puzzle.id : ''}
+            onChange={e => handleBrowse(e.target.value)}
+            disabled={loading}
+            className="font-serif text-sm border border-ink bg-parchment px-2 py-1 rounded-sm flex-1"
+          >
+            <option value="">— pick a puzzle to inspect —</option>
+            {SAMPLE_PUZZLES.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.title}  ({p.difficulty} · {p.size}×{p.size})
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Controls */}
@@ -478,6 +534,32 @@ export default function GeneratePage() {
                 <p>Difficulty: <span className="font-semibold">{puzzle.difficulty}</span></p>
                 <p>Waves: {trace.waves.length} &nbsp;·&nbsp; Steps: {trace.waves.reduce((s, w) => s + w.steps.length, 0)}</p>
               </div>
+
+              {/* Add to game — only for freshly generated puzzles */}
+              {puzzleSource === 'generated' && (
+                <div className="border border-brass rounded-sm p-3 bg-parchment-dark w-full max-w-xs">
+                  <p className="text-xs text-brass tracking-widest uppercase mb-2">Add to game</p>
+                  <input
+                    type="text"
+                    value={puzzleTitle}
+                    onChange={e => setPuzzleTitle(e.target.value)}
+                    placeholder="Puzzle title"
+                    className="font-serif text-sm border border-ink bg-parchment px-2 py-1 rounded-sm w-full mb-2"
+                  />
+                  <button
+                    onClick={handleAddToGame}
+                    disabled={!!addStatus && addStatus !== 'saving…' && addStatus.startsWith('Saved')}
+                    className="font-serif text-sm border border-brass text-brass px-3 py-1 rounded-sm bg-parchment hover:bg-parchment-dark w-full disabled:opacity-50"
+                  >
+                    {addStatus === 'saving…' ? 'Saving…' : 'Add to samplePuzzles.ts'}
+                  </button>
+                  {addStatus && addStatus !== 'saving…' && (
+                    <p className={`text-xs mt-1.5 font-mono ${addStatus.startsWith('Saved') ? 'text-brass' : 'text-red-ink'}`}>
+                      {addStatus}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Export snippet */}
               <details className="w-full max-w-xs">
