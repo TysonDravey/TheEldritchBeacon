@@ -58,69 +58,86 @@ interface TutorialStep {
 // ---------------------------------------------------------------------------
 
 const STEPS: TutorialStep[] = [
+  // ── Introduction ──────────────────────────────────────────────────────────
   {
     title: 'The Watchers Stir',
-    body: 'The board is divided into five colored territories. Every territory must hold exactly one Watcher — no more, no fewer.',
+    body: 'Five colored territories. Each must hold exactly one Watcher — no more, no fewer.',
     action: { type: 'next' },
   },
   {
-    title: 'Three Laws',
-    body: '• One Watcher per territory\n• No two Watchers in the same row\n• No two Watchers in the same column\n• Watchers may never stand adjacent — not even diagonally',
+    title: 'Four Laws',
+    body: '• One Watcher per territory\n• No two in the same row\n• No two in the same column\n• None adjacent — not even diagonally',
     action: { type: 'next' },
   },
+
+  // ── Row confinement ───────────────────────────────────────────────────────
   {
-    title: 'Start with the Smallest',
-    body: 'The highlighted territory has only two cells. Fewer options means fewer guesses — start here. Double-click the glowing cell to place the first Watcher.',
-    action: { type: 'watcher', row: 0, col: 4 },
-    primaryCell: [0, 4],
-    highlightTerritories: [0],
-  },
-  {
-    // Wards placed by T0 at (0,4): row 0 → (0,0)–(0,3); col 4 → (1,4)(2,4)(3,4)(4,4); adj → (1,3)
-    title: 'Row and Column Claimed',
-    body: 'The Watcher holds its entire row and column. Wards (×) mark every eliminated cell — including diagonal neighbors no Watcher may enter.',
+    title: 'Row Confinement',
+    body: 'The two red territories each have only two cells — and both cells sit in the same row. No matter which cell a Watcher uses, it will always claim that row.\n\nThe gold cells share those rows. They will be eliminated.',
     action: { type: 'next' },
-    secondaryCells: [[0,0],[0,1],[0,2],[0,3],[1,3],[1,4],[2,4],[3,4],[4,4]],
+    // Red: T0 and T2 (the confining territories)
+    highlightTerritories: [0, 2],
+    // Brass: cells in those claimed rows belonging to other territories
+    secondaryCells: [[0,0],[0,1],[0,2],[2,2],[2,3],[2,4]],
   },
   {
-    title: 'The Large Territory',
-    body: 'The previous Watcher trimmed this territory\'s options. Follow the deduction — double-click to place the next Watcher.',
+    title: 'The Large Territory Narrows',
+    body: 'After the gold cells are eliminated, the large territory is left with just three candidates — all in the middle row (red).',
+    action: { type: 'next' },
+    // Red: T1's only remaining candidates
+    highlightCells: [[1,0],[1,1],[1,2]],
+    // Brass: T1's doomed cells (claimed rows)
+    secondaryCells: [[0,0],[0,1],[0,2],[2,2]],
+  },
+
+  // ── First placement (fully explained) ────────────────────────────────────
+  {
+    title: 'One Column Survives',
+    body: 'The left territory\'s cells sit at columns 1 and 2 (gold). Placing at those same columns would make the Watcher diagonally adjacent to both — eliminating the left territory entirely.\n\nOnly column 3 (glowing) is safe. Double-click to place.',
     action: { type: 'watcher', row: 1, col: 2 },
     primaryCell: [1, 2],
-    highlightTerritories: [1],
+    // Brass: T2's cells — the ones that would be wiped out by the bad columns
+    secondaryCells: [[2,0],[2,1]],
   },
+
+  // ── Cascade ───────────────────────────────────────────────────────────────
   {
-    // After T1 at (1,2): adjacency eliminates (2,1) from T2 — only (2,0) remains
-    title: 'A Chain Reaction',
-    body: 'The last placement eliminated one of the two cells in this small territory. Now only one valid cell remains — the logic demands it.',
+    title: 'Chain Reaction',
+    body: 'The Watcher\'s diagonal adjacency just eliminated one of the left territory\'s two cells. Only one remains — the logic forces the next move.',
     action: { type: 'next' },
     highlightTerritories: [2],
   },
   {
-    title: 'Forced Placement',
-    body: 'One cell remains in this territory. Double-click to place the Watcher.',
+    title: 'Forced',
+    body: 'One cell remains. Double-click to place.',
     action: { type: 'watcher', row: 2, col: 0 },
     primaryCell: [2, 0],
     highlightTerritories: [2],
   },
   {
-    // After T2 at (2,0): col 0 + adj eliminates (3,0)(3,1)(4,0) from T4; col 2 already cleared (4,2); only (4,1) left
     title: 'The Cascade Continues',
-    body: 'Each Watcher narrows the remaining options. The bottom territory has also collapsed to a single valid cell.',
+    body: 'Row and column eliminations have closed off four of the bottom territory\'s five cells. One remains.',
     action: { type: 'watcher', row: 4, col: 1 },
     primaryCell: [4, 1],
     highlightTerritories: [4],
   },
   {
+    title: 'Top-Right Territory Revealed',
+    body: 'The diagonal adjacency from the large territory\'s Watcher just eliminated the left cell of the top-right territory. Only one option remains.',
+    action: { type: 'watcher', row: 0, col: 4 },
+    primaryCell: [0, 4],
+    highlightTerritories: [0],
+  },
+  {
     title: 'One Last Light',
-    body: 'One territory remains. Place the final Watcher to restore the Beacon.',
+    body: 'Place the final Watcher.',
     action: { type: 'watcher', row: 3, col: 3 },
     primaryCell: [3, 3],
     highlightTerritories: [3],
   },
   {
     title: 'The Beacon Is Restored',
-    body: 'You have mastered the basics. Each puzzle uses the same tools — start small, follow the eliminations, let the logic lead.',
+    body: 'You mastered row confinement and cascading deductions — the same logic powers every puzzle in the Beacon.',
     action: { type: 'done' },
   },
 ];
