@@ -21,15 +21,26 @@ interface BoardProps {
   flashCells?: [number, number][];
 }
 
-function isCellHighlighted(
+// Red outline — only explicit cells and territories, NOT rows/cols
+function isCellOutlined(
+  row: number, col: number, territory: number,
+  highlightCells?: [number, number][],
+  highlightTerritories?: number[],
+): boolean {
+  if (highlightCells?.some(([r, c]) => r === row && c === col)) return true;
+  if (highlightTerritories?.includes(territory)) return true;
+  return false;
+}
+
+// Lit up (not dimmed) — all sources including rows/cols
+function isCellLit(
   row: number, col: number, territory: number,
   highlightCells?: [number, number][],
   highlightTerritories?: number[],
   highlightRows?: number[],
   highlightCols?: number[],
 ): boolean {
-  if (highlightCells?.some(([r, c]) => r === row && c === col)) return true;
-  if (highlightTerritories?.includes(territory)) return true;
+  if (isCellOutlined(row, col, territory, highlightCells, highlightTerritories)) return true;
   if (highlightRows?.includes(row)) return true;
   if (highlightCols?.includes(col)) return true;
   return false;
@@ -201,9 +212,10 @@ export default function Board({
             const territory = territoryMap[row][col];
             const state     = playerCells[row]?.[col] ?? 'empty';
 
-            const highlighted = isCellHighlighted(row, col, territory, highlightCells, highlightTerritories, highlightRows, highlightCols);
+            const outlined = isCellOutlined(row, col, territory, highlightCells, highlightTerritories);
+            const lit = outlined || isCellLit(row, col, territory, highlightCells, highlightTerritories, highlightRows, highlightCols);
             const isPrimary = primaryCell ? primaryCell[0] === row && primaryCell[1] === col : false;
-            const secondaryHighlighted = !highlighted && !isPrimary && (
+            const secondaryHighlighted = !outlined && !isPrimary && (
               (secondaryHighlightCells?.some(([r, c]) => r === row && c === col) ?? false) ||
               (secondaryHighlightTerritories?.includes(territory) ?? false)
             );
@@ -215,9 +227,9 @@ export default function Board({
                 col={col}
                 territory={territory}
                 state={state}
-                isHighlighted={highlighted}
+                isHighlighted={outlined}
                 isSecondaryHighlighted={secondaryHighlighted}
-                isDimmed={hintActive && !highlighted && !secondaryHighlighted && !isPrimary}
+                isDimmed={hintActive && !lit && !secondaryHighlighted && !isPrimary}
                 isPrimaryHint={isPrimary}
                 isContradiction={isCellContradiction(row, col, contradiction)}
                 isFlash={flashCells?.some(([r, c]) => r === row && c === col) ?? false}
