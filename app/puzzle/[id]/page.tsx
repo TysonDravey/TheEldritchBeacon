@@ -214,6 +214,7 @@ export default function PuzzlePage() {
         onCellWatcher={handleCellWatcher}
         primaryCell={hintResult?.primaryCell}
         highlightCells={hintResult?.highlightCells}
+        secondaryHighlightCells={hintResult?.secondaryHighlightCells}
         highlightTerritories={hintResult?.highlightTerritories}
         secondaryHighlightTerritories={hintResult?.secondaryHighlightTerritories}
         highlightRows={hintResult?.highlightRows}

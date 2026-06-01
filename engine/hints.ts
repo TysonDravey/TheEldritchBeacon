@@ -190,12 +190,14 @@ function buildWardHint(
     const dim = reasonType === 'pair-row' ? 'row' : 'column';
     const dimNum = reasonType === 'pair-row' ? row + 1 : col + 1;
 
-    // Compute the full set of contested rows/cols from the paired territories' candidates
+    // Compute contested rows/cols and the candidate cells of the paired territories
     const allCandidates = getCandidates(puzzle, playerCells);
     const contestedDims = new Set<number>();
+    const pairedCandidateCells: [number, number][] = [];
     for (const t of paired) {
       for (const [r, c] of (allCandidates.get(t) ?? [])) {
         contestedDims.add(reasonType === 'pair-row' ? r : c);
+        pairedCandidateCells.push([r, c]);
       }
     }
     const dimHighlight = reasonType === 'pair-row'
@@ -206,6 +208,7 @@ function buildWardHint(
       return {
         level: 1,
         message: `${tnames(paired)} are competing for the same ${dim}s. Consider what that means for other territories.`,
+        secondaryHighlightCells: pairedCandidateCells,
         ...dimHighlight,
       };
     }
@@ -214,6 +217,7 @@ function buildWardHint(
         level: 2,
         message: `${tnames(paired)} together can only fit into the same ${paired.length} ${dim}s. If a Watcher rose here, it would steal ${dim} ${dimNum} from them — leaving one of those territories with no valid home.`,
         highlightCells: [[row, col]],
+        secondaryHighlightCells: pairedCandidateCells,
         ...dimHighlight,
       };
     }
@@ -221,6 +225,7 @@ function buildWardHint(
       level: 3,
       message: `${tnames(paired)} are collectively confined to exactly ${paired.length} ${dim}${paired.length > 1 ? 's' : ''}. They must fill those ${dim}s between them, so no other Watcher can occupy ${dim} ${dimNum}. This cell must be a Ward.`,
       highlightCells: [[row, col]],
+      secondaryHighlightCells: pairedCandidateCells,
       ...dimHighlight,
       deduction: d,
     };
