@@ -1,5 +1,7 @@
 bug list
 
+clicking on a hint spinning eye, should close the tip, currently it remains open.
+
 hints still need some love as they are often vague. and also they repeat if nothing has changed. this might be helped when we make the puzzle generator portion of the build.
 
 "The Bone territory has only 4 possible positions remaining. Begin your reasoning there." this means nothing. but this was happening before the unique puzzle problem. 

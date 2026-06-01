@@ -132,6 +132,7 @@ A split was made between puzzle generation tooling and the playable game.
 - [ ] Lore/Codex entry structure (`CodexEntry`) — content empty, system present
 - [ ] Achievement event hooks (`onPuzzleSolved`, `onHintUsed`, etc.) — wired but inert
 - [ ] PlayerProgress model (separate from puzzle definitions)
+- [ ] 9×9 and 10×10 puzzle generation (requires deeper contradiction solver — 2-level chains; current solver tops out at 8×8)
 - [ ] Twin Watchers mode (2 per territory/row/col)
 - [ ] Shattered Realms mode (disconnected color islands)
 - [ ] Daily Beacon puzzle (local seed Phase 2, server seed Phase 3)
