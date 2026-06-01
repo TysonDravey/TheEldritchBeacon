@@ -235,50 +235,55 @@ function buildWardHint(
   if (reasonType === 'hypothetical' && confinedTerritory !== undefined) {
     const victim = confinedTerritory;
 
-    // Compute victim's remaining valid candidates so we can show and explain them
+    // Compute victim's remaining valid candidates
     const allCandidates = getCandidates(puzzle, playerCells);
     const victimCells: [number, number][] = allCandidates.get(victim) ?? [];
     const victimRows = new Set(victimCells.map(([r]) => r));
     const victimCols = new Set(victimCells.map(([, c]) => c));
 
-    // Build a plain-language reason for why those cells would be eliminated
+    // Explain exactly which constraint wipes out the victim
     let whySealed: string;
     if (victimCells.length === 0) {
       whySealed = `the ${tname(victim)} territory already has no valid refuge`;
     } else if (victimRows.size === 1 && victimRows.has(row)) {
-      whySealed = `all of ${tname(victim)}'s remaining cells are in row ${row + 1} — the same row this Watcher would claim`;
+      whySealed = `every remaining cell in the ${tname(victim)} territory sits in row ${row + 1} — the same row this Watcher would claim`;
     } else if (victimCols.size === 1 && victimCols.has(col)) {
-      whySealed = `all of ${tname(victim)}'s remaining cells are in column ${col + 1} — the same column this Watcher would claim`;
+      whySealed = `every remaining cell in the ${tname(victim)} territory sits in column ${col + 1} — the same column this Watcher would claim`;
     } else {
-      whySealed = `this Watcher's row, column, and adjacency zone together eliminate every remaining refuge in the ${tname(victim)} territory`;
+      whySealed = `this Watcher's row ${row + 1}, column ${col + 1}, and adjacency zone together cover every remaining refuge in the ${tname(victim)} territory`;
     }
 
     if (depth === 0) {
+      // Level I: point to the hypothetical cell and the victim territory only
       return {
         level: 1,
         message: `Consider what would happen if a Watcher rose at this cell. Study where the ${tname(victim)} territory can still place its Watcher.`,
         primaryCell: [row, col],
         highlightTerritories: [victim],
-        secondaryHighlightTerritories: [cellTerritory],
       };
     }
+
+    // Level II / III: show the cross-pattern (row + col) the hypothetical watcher claims,
+    // with the victim's remaining cells outlined in red within that zone.
+    // This makes the cascade visible: "the cross is what the watcher claims; the red cells
+    // are what it destroys."
     if (depth === 1) {
       return {
         level: 2,
-        message: `If a Watcher rose here, ${whySealed}. The ${tname(victim)} territory would be left with nowhere to go.`,
+        message: `If a Watcher rose here, it would claim row ${row + 1} and column ${col + 1}. ${whySealed.charAt(0).toUpperCase() + whySealed.slice(1)}. The ${tname(victim)} territory would have nowhere to go.`,
         primaryCell: [row, col],
         highlightCells: victimCells,
-        highlightTerritories: [victim],
-        secondaryHighlightTerritories: [cellTerritory],
+        highlightRows: [row],
+        highlightCols: [col],
       };
     }
     return {
       level: 3,
-      message: `A Watcher here is impossible — ${whySealed}. The ${tname(victim)} territory would be sealed off entirely. Mark this cell with a Ward.`,
+      message: `A Watcher here is impossible. It would claim row ${row + 1} and column ${col + 1} — but ${whySealed}. The ${tname(victim)} territory would be sealed off. Mark this cell with a Ward.`,
       primaryCell: [row, col],
       highlightCells: victimCells,
-      highlightTerritories: [victim],
-      secondaryHighlightTerritories: [cellTerritory],
+      highlightRows: [row],
+      highlightCols: [col],
       deduction: d,
     };
   }
