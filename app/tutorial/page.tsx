@@ -51,6 +51,9 @@ interface TutorialStep {
   highlightRows?: number[];
   highlightCols?: number[];
   hintActive?: boolean;
+  // Each sub-array is a wave of wards that animate in when Next is pressed,
+  // 150ms apart. Step advances 200ms after the last wave.
+  wardWaves?: [number, number][][];
 }
 
 // ---------------------------------------------------------------------------
@@ -73,19 +76,21 @@ const STEPS: TutorialStep[] = [
   // ── Row confinement ───────────────────────────────────────────────────────
   {
     title: 'Row Confinement',
-    body: 'The two outlined territories each have only two cells — both in the same row. No matter which cell a Watcher uses, it will always claim that entire row.\n\nThe dimmed cells sharing those rows will be eliminated.',
+    body: 'The two outlined territories each have only two cells — both in the same row. No matter which cell a Watcher uses, it will always claim that entire row.\n\nPress Next — watch those rows fill.',
     action: { type: 'next' },
     highlightTerritories: [0, 2],
-    // Brass outlines on same-row cells from other territories
     secondaryCells: [[0,0],[0,1],[0,2],[2,2],[2,3],[2,4]],
     hintActive: true,
+    wardWaves: [
+      [[0,0],[0,1],[0,2]],   // row 0 eliminated
+      [[2,2],[2,3],[2,4]],   // row 2 eliminated
+    ],
   },
   {
     title: 'The Large Territory Narrows',
     body: 'Once those rows are claimed, the large territory loses its top-row cells and its one row-3 cell. Only three candidates remain — all in the second row (outlined).',
     action: { type: 'next' },
     highlightCells: [[1,0],[1,1],[1,2]],
-    secondaryCells: [[0,0],[0,1],[0,2],[2,2]],
     hintActive: true,
   },
 
@@ -250,8 +255,27 @@ export default function TutorialPage() {
 
   function handleNext() {
     if (step.action.type !== 'next') return;
+    if (placingRef.current) return;
     setWrongMsg(null);
-    setStepIdx(i => i + 1);
+
+    if (step.wardWaves?.length) {
+      placingRef.current = true;
+      step.wardWaves.forEach((wave, i) => {
+        setTimeout(() => {
+          setCells(prev => {
+            const next = prev.map(r => [...r]);
+            wave.forEach(([r, c]) => { if (next[r][c] === 'empty') next[r][c] = 'ward'; });
+            return next;
+          });
+        }, i * 150);
+      });
+      setTimeout(() => {
+        setStepIdx(i => i + 1);
+        placingRef.current = false;
+      }, step.wardWaves.length * 150 + 200);
+    } else {
+      setStepIdx(i => i + 1);
+    }
   }
 
   const isDone = step.action.type === 'done';
