@@ -1,27 +1,29 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import Board from '@/components/Board';
 import type { CellState, Puzzle } from '@/engine/boardTypes';
 
 // ---------------------------------------------------------------------------
-// Tutorial puzzle — 4×4, two valid solutions, scripted path: (0,1)→(1,3)→(2,0)→(3,2)
+// Tutorial puzzle — 5×5 based on eb-5x5-001
+// Solution path: T0(0,4) → T1(1,2) → T2(2,0) forced → T4(4,1) cascade → T3(3,3)
 // ---------------------------------------------------------------------------
 
 const PUZZLE: Puzzle = {
   id: 'tutorial',
   title: 'The First Awakening',
   mode: 'initiate',
-  size: 4,
+  size: 5,
   territoryMap: [
-    [0, 0, 1, 1],
-    [0, 0, 1, 1],
-    [2, 2, 3, 3],
-    [2, 2, 3, 3],
+    [1, 1, 1, 0, 0],
+    [1, 1, 1, 3, 3],
+    [2, 2, 1, 3, 3],
+    [4, 4, 3, 3, 3],
+    [4, 4, 4, 3, 3],
   ],
-  solution: [[0, 1], [1, 3], [2, 0], [3, 2]],
+  solution: [[0, 4], [1, 2], [2, 0], [3, 3], [4, 1]],
   difficulty: 'Initiate',
   seed: 'tutorial',
   createdAt: '2026-01-01',
@@ -58,7 +60,7 @@ interface TutorialStep {
 const STEPS: TutorialStep[] = [
   {
     title: 'The Watchers Stir',
-    body: 'The board is divided into four colored territories. Every territory must hold exactly one Watcher — no more, no fewer.',
+    body: 'The board is divided into five colored territories. Every territory must hold exactly one Watcher — no more, no fewer.',
     action: { type: 'next' },
   },
   {
@@ -67,74 +69,97 @@ const STEPS: TutorialStep[] = [
     action: { type: 'next' },
   },
   {
-    title: 'Your First Watcher',
-    body: 'Double-click the glowing cell to place a Watcher in the top-left territory.',
-    action: { type: 'watcher', row: 0, col: 1 },
-    primaryCell: [0, 1],
+    title: 'Start with the Smallest',
+    body: 'The highlighted territory has only two cells. Fewer options means fewer guesses — start here. Double-click the glowing cell to place the first Watcher.',
+    action: { type: 'watcher', row: 0, col: 4 },
+    primaryCell: [0, 4],
+    highlightTerritories: [0],
   },
   {
+    // Wards placed by T0 at (0,4): row 0 → (0,0)–(0,3); col 4 → (1,4)(2,4)(3,4)(4,4); adj → (1,3)
     title: 'Row and Column Claimed',
-    body: 'This Watcher now holds its row and column. No second Watcher may stand in either. The × marks show every cell that has been eliminated.',
+    body: 'The Watcher holds its entire row and column. Wards (×) mark every eliminated cell — including diagonal neighbors no Watcher may enter.',
     action: { type: 'next' },
-    // Brass outlines on all wards placed by this watcher
-    secondaryCells: [[0,0],[0,2],[0,3],[1,0],[1,1],[1,2],[2,1],[3,1]],
+    secondaryCells: [[0,0],[0,1],[0,2],[0,3],[1,3],[1,4],[2,4],[3,4],[4,4]],
   },
   {
-    title: 'One Cell Remains',
-    body: 'Three of the four cells in the top-right territory are now blocked. Only one valid placement remains — the logic compels it.',
-    action: { type: 'next' },
+    title: 'The Large Territory',
+    body: 'The previous Watcher trimmed this territory\'s options. Follow the deduction — double-click to place the next Watcher.',
+    action: { type: 'watcher', row: 1, col: 2 },
+    primaryCell: [1, 2],
     highlightTerritories: [1],
   },
   {
-    title: 'Follow the Logic',
-    body: 'Double-click to place the Watcher in the only open cell of the top-right territory.',
-    action: { type: 'watcher', row: 1, col: 3 },
-    primaryCell: [1, 3],
-  },
-  {
-    title: 'Two Down',
-    body: 'Two territories remain. Study what the eliminations have left open, and find where the Watchers must stand.',
+    // After T1 at (1,2): adjacency eliminates (2,1) from T2 — only (2,0) remains
+    title: 'A Chain Reaction',
+    body: 'The last placement eliminated one of the two cells in this small territory. Now only one valid cell remains — the logic demands it.',
     action: { type: 'next' },
+    highlightTerritories: [2],
   },
   {
-    title: 'The Bottom-Left Territory',
-    body: 'Double-click to place the Watcher in the bottom-left territory.',
+    title: 'Forced Placement',
+    body: 'One cell remains in this territory. Double-click to place the Watcher.',
     action: { type: 'watcher', row: 2, col: 0 },
     primaryCell: [2, 0],
+    highlightTerritories: [2],
+  },
+  {
+    // After T2 at (2,0): col 0 + adj eliminates (3,0)(3,1)(4,0) from T4; col 2 already cleared (4,2); only (4,1) left
+    title: 'The Cascade Continues',
+    body: 'Each Watcher narrows the remaining options. The bottom territory has also collapsed to a single valid cell.',
+    action: { type: 'watcher', row: 4, col: 1 },
+    primaryCell: [4, 1],
+    highlightTerritories: [4],
   },
   {
     title: 'One Last Light',
-    body: 'Place the final Watcher to complete the puzzle.',
-    action: { type: 'watcher', row: 3, col: 2 },
-    primaryCell: [3, 2],
+    body: 'One territory remains. Place the final Watcher to restore the Beacon.',
+    action: { type: 'watcher', row: 3, col: 3 },
+    primaryCell: [3, 3],
+    highlightTerritories: [3],
   },
   {
     title: 'The Beacon Is Restored',
-    body: 'You have mastered the basics. The puzzles grow harder — but the logic always lights the way.',
+    body: 'You have mastered the basics. Each puzzle uses the same tools — start small, follow the eliminations, let the logic lead.',
     action: { type: 'done' },
   },
 ];
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Ward wave propagation — splits into adjacent (wave1) and far row/col (wave2)
 // ---------------------------------------------------------------------------
 
-function propagateWatcher(cells: CellState[][], row: number, col: number): CellState[][] {
-  const next = cells.map(r => [...r]);
-  next[row][col] = 'watcher';
-  for (let c = 0; c < N; c++)
-    if (c !== col && next[row][c] === 'empty') next[row][c] = 'ward';
-  for (let r = 0; r < N; r++)
-    if (r !== row && next[r][col] === 'empty') next[r][col] = 'ward';
+function computeWaves(row: number, col: number, cells: CellState[][]): {
+  wave1: [number, number][];
+  wave2: [number, number][];
+} {
+  const wave1: [number, number][] = [];
+  const wave2: [number, number][] = [];
+
+  // Wave 1: all cells within Chebyshev distance 1 (the 8 surrounding cells)
   for (let dr = -1; dr <= 1; dr++) {
     for (let dc = -1; dc <= 1; dc++) {
       if (dr === 0 && dc === 0) continue;
       const nr = row + dr, nc = col + dc;
-      if (nr >= 0 && nr < N && nc >= 0 && nc < N && next[nr][nc] === 'empty')
-        next[nr][nc] = 'ward';
+      if (nr >= 0 && nr < N && nc >= 0 && nc < N && cells[nr][nc] === 'empty') {
+        wave1.push([nr, nc]);
+      }
     }
   }
-  return next;
+
+  // Wave 2: row/col cells further than distance 1
+  for (let c = 0; c < N; c++) {
+    if (c !== col && Math.abs(c - col) > 1 && cells[row][c] === 'empty') {
+      wave2.push([row, c]);
+    }
+  }
+  for (let r = 0; r < N; r++) {
+    if (r !== row && Math.abs(r - row) > 1 && cells[r][col] === 'empty') {
+      wave2.push([r, col]);
+    }
+  }
+
+  return { wave1, wave2 };
 }
 
 // ---------------------------------------------------------------------------
@@ -147,6 +172,7 @@ export default function TutorialPage() {
     () => Array.from({ length: N }, () => Array<CellState>(N).fill('empty')),
   );
   const [wrongMsg, setWrongMsg] = useState<string | null>(null);
+  const placingRef = useRef(false); // lock during wave animation
 
   const step = STEPS[stepIdx];
 
@@ -156,6 +182,7 @@ export default function TutorialPage() {
   }
 
   function handleCellWatcher(row: number, col: number) {
+    if (placingRef.current) return;
     if (step.action.type !== 'watcher') {
       if (step.action.type === 'next') showWrong('Press Next to continue.');
       return;
@@ -164,9 +191,39 @@ export default function TutorialPage() {
       showWrong('Try the glowing cell.');
       return;
     }
-    setCells(prev => propagateWatcher(prev, row, col));
+
+    placingRef.current = true;
     setWrongMsg(null);
-    setStepIdx(i => i + 1);
+
+    // Compute waves before any state update
+    const { wave1, wave2 } = computeWaves(row, col, cells);
+
+    // Immediately place the watcher
+    setCells(prev => {
+      const next = prev.map(r => [...r]);
+      next[row][col] = 'watcher';
+      return next;
+    });
+
+    // Wave 1: adjacent wards (130ms)
+    setTimeout(() => {
+      setCells(prev => {
+        const next = prev.map(r => [...r]);
+        wave1.forEach(([r, c]) => { if (next[r][c] === 'empty') next[r][c] = 'ward'; });
+        return next;
+      });
+    }, 130);
+
+    // Wave 2: far row/col wards + advance step (320ms)
+    setTimeout(() => {
+      setCells(prev => {
+        const next = prev.map(r => [...r]);
+        wave2.forEach(([r, c]) => { if (next[r][c] === 'empty') next[r][c] = 'ward'; });
+        return next;
+      });
+      setStepIdx(i => i + 1);
+      placingRef.current = false;
+    }, 320);
   }
 
   function handleCellWard(_row: number, _col: number) {
@@ -199,22 +256,24 @@ export default function TutorialPage() {
 
       <div className="flex flex-col items-center gap-6 w-full max-w-lg">
 
-        {/* Board */}
-        <Board
-          puzzle={PUZZLE}
-          playerCells={cells}
-          onCellWard={handleCellWard}
-          onCellWatcher={handleCellWatcher}
-          primaryCell={step.primaryCell}
-          highlightCells={step.highlightCells}
-          secondaryHighlightCells={step.secondaryCells}
-          highlightTerritories={step.highlightTerritories}
-          highlightRows={step.highlightRows}
-          highlightCols={step.highlightCols}
-          hintActive={step.hintActive ?? false}
-        />
+        {/* Board — data-ward-animate scopes the CSS pop-in to this page only */}
+        <div data-ward-animate="true">
+          <Board
+            puzzle={PUZZLE}
+            playerCells={cells}
+            onCellWard={handleCellWard}
+            onCellWatcher={handleCellWatcher}
+            primaryCell={step.primaryCell}
+            highlightCells={step.highlightCells}
+            secondaryHighlightCells={step.secondaryCells}
+            highlightTerritories={step.highlightTerritories}
+            highlightRows={step.highlightRows}
+            highlightCols={step.highlightCols}
+            hintActive={step.hintActive ?? false}
+          />
+        </div>
 
-        {/* Victory banner — shown on the final step */}
+        {/* Victory banner */}
         {isDone && (
           <div className="w-full border-2 border-brass bg-parchment px-5 py-4 flex items-center gap-4 rounded-sm">
             <Image src="/svg/completion_stamp.svg" alt="Complete" width={44} height={44} />
@@ -245,15 +304,12 @@ export default function TutorialPage() {
                 <div
                   key={i}
                   style={{
-                    width:  i === stepIdx ? '10px' : '8px',
-                    height: i === stepIdx ? '10px' : '8px',
-                    borderRadius: '50%',
-                    border: `1px solid ${i <= stepIdx ? '#1A1209' : '#1A1209'}`,
-                    backgroundColor:
-                      i < stepIdx  ? '#1A1209' :
-                      i === stepIdx ? '#B5860D' :
-                      'transparent',
-                    transition: 'all 0.2s',
+                    width:           i === stepIdx ? '10px' : '8px',
+                    height:          i === stepIdx ? '10px' : '8px',
+                    borderRadius:    '50%',
+                    border:          '1px solid #1A1209',
+                    backgroundColor: i < stepIdx ? '#1A1209' : i === stepIdx ? '#B5860D' : 'transparent',
+                    transition:      'all 0.2s',
                   }}
                 />
               ))}

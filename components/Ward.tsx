@@ -11,6 +11,7 @@ export default function Ward({ size }: WardProps) {
       width={size}
       height={size}
       alt="Ward"
+      className="ward-sigil"
       style={{ opacity: 0.6 }}
       draggable={false}
     />
