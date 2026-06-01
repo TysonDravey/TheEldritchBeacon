@@ -131,17 +131,39 @@ const TECHNIQUE_GROUP_COLOR: Record<string, string> = {
   'Contradiction Test':                        '#555555',
 };
 
-type StepGroup = { technique: string; steps: Array<{ step: TraceStep; si: number }> };
+type StepGroup = {
+  technique: string;
+  key: string;
+  // For Group Elimination: the territory pair that caused this cluster
+  pairedTerritories?: number[];
+  steps: Array<{ step: TraceStep; si: number }>;
+};
+
+function stepGroupKey(step: TraceStep): string {
+  if (step.technique === 'Group Elimination') {
+    const sorted = (step.deduction.pairedTerritories ?? []).slice().sort((a, b) => a - b);
+    return `Group Elimination:${sorted.join(',')}`;
+  }
+  return step.technique;
+}
 
 function groupSteps(steps: TraceStep[]): StepGroup[] {
   const groups: StepGroup[] = [];
   for (let si = 0; si < steps.length; si++) {
     const step = steps[si];
+    const key = stepGroupKey(step);
     const last = groups[groups.length - 1];
-    if (last && last.technique === step.technique) {
+    if (last && last.key === key) {
       last.steps.push({ step, si });
     } else {
-      groups.push({ technique: step.technique, steps: [{ step, si }] });
+      groups.push({
+        technique: step.technique,
+        key,
+        pairedTerritories: step.technique === 'Group Elimination'
+          ? (step.deduction.pairedTerritories ?? []).slice().sort((a, b) => a - b)
+          : undefined,
+        steps: [{ step, si }],
+      });
     }
   }
   return groups;
@@ -186,8 +208,27 @@ function WavePanel({
                     style={{ borderLeft: `2px solid ${groupColor}` }}
                   >
                     {group.steps.length > 1 && (
-                      <div className="text-[10px] tracking-wider uppercase mb-1" style={{ color: groupColor, opacity: 0.75 }}>
-                        {group.technique} × {group.steps.length}
+                      <div className="flex items-center gap-1 flex-wrap mb-1">
+                        {group.pairedTerritories ? (
+                          <>
+                            {group.pairedTerritories.map(t => {
+                              const c = TERRITORY_COLORS[t] ?? TERRITORY_COLORS[0];
+                              return (
+                                <span key={t} className="text-[10px] px-1.5 py-px rounded-sm leading-tight"
+                                  style={{ backgroundColor: c.bg, color: c.text }}>
+                                  {TERRITORY_NAMES[t] ?? `T${t + 1}`}
+                                </span>
+                              );
+                            })}
+                            <span className="text-[10px] opacity-60" style={{ color: groupColor }}>
+                              × {group.steps.length}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-[10px] tracking-wider uppercase" style={{ color: groupColor, opacity: 0.75 }}>
+                            {group.technique} × {group.steps.length}
+                          </span>
+                        )}
                       </div>
                     )}
                     <div className="flex flex-col gap-1">
