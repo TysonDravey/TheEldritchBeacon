@@ -5,7 +5,7 @@ import { generatePuzzle } from '@/engine/generator';
 import { rateDifficulty } from '@/engine/difficulty';
 import { buildSolveTrace } from '@/engine/solveTrace';
 import type { Puzzle } from '@/engine/boardTypes';
-import type { SolveTrace } from '@/engine/solveTrace';
+import type { SolveTrace, TraceStep } from '@/engine/solveTrace';
 import { TERRITORY_NAMES, TERRITORY_COLORS, WATCHER_SVGS } from '@/theme/colors';
 
 // ---------------------------------------------------------------------------
@@ -33,7 +33,7 @@ function MiniBoard({
           {Array.from({ length: n }, (_, col) => {
             const t = puzzle.territoryMap[row][col];
             const colors = TERRITORY_COLORS[t] ?? TERRITORY_COLORS[0];
-            const isHL = highlightCell?.[0] === row && highlightCell?.[1] === col;
+            const isActive = highlightCell?.[0] === row && highlightCell?.[1] === col;
             const state = placed.get(`${row},${col}`);
             const thickT = row === 0 || puzzle.territoryMap[row-1][col] !== t;
             const thickB = row === n-1 || puzzle.territoryMap[row+1][col] !== t;
@@ -51,18 +51,29 @@ function MiniBoard({
                   borderRightWidth: thickR ? 2 : 1,
                   borderColor: '#1A1209',
                   borderStyle: 'solid',
-                  outline: isHL ? '2px solid #8B1A1A' : undefined,
-                  outlineOffset: isHL ? -2 : undefined,
+                  outline: isActive ? '2px solid #8B1A1A' : undefined,
+                  outlineOffset: isActive ? -2 : undefined,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
                 {state === 'watcher' && (
-                  <img src={WATCHER_SVGS[t]} width={px * 0.8} height={px * 0.8} alt="" />
+                  <img
+                    src={WATCHER_SVGS[t]}
+                    width={px * 0.8} height={px * 0.8} alt=""
+                    className={isActive ? 'animate-pulse' : ''}
+                  />
                 )}
                 {state === 'ward' && (
-                  <img src="/svg/ward_sigil.svg" width={px * 0.7} height={px * 0.7} alt="" style={{ opacity: 0.6 }} />
+                  <img
+                    src="/svg/ward_sigil.svg"
+                    width={px * 0.7} height={px * 0.7} alt=""
+                    style={{
+                      opacity: isActive ? 1 : 0.6,
+                      ...(isActive ? { animation: 'spin 3s linear infinite' } : {}),
+                    }}
+                  />
                 )}
               </div>
             );
@@ -85,6 +96,32 @@ const TECHNIQUE_COLORS: Record<string, string> = {
   'Group Elimination':                         'bg-parchment border-red-ink-light text-red-ink',
   'Contradiction Test':                        'bg-parchment border-ink-light text-ink-light',
 };
+
+// Left-border colour for technique groups (hex so it works with inline styles)
+const TECHNIQUE_GROUP_COLOR: Record<string, string> = {
+  'Adjacency / Row / Col / Territory Cleanup': '#1A1209',
+  'Naked Single':                              '#B5860D',
+  'Row Confinement':                           '#8B1A1A',
+  'Column Confinement':                        '#8B1A1A',
+  'Group Elimination':                         '#A03030',
+  'Contradiction Test':                        '#555555',
+};
+
+type StepGroup = { technique: string; steps: Array<{ step: TraceStep; si: number }> };
+
+function groupSteps(steps: TraceStep[]): StepGroup[] {
+  const groups: StepGroup[] = [];
+  for (let si = 0; si < steps.length; si++) {
+    const step = steps[si];
+    const last = groups[groups.length - 1];
+    if (last && last.technique === step.technique) {
+      last.steps.push({ step, si });
+    } else {
+      groups.push({ technique: step.technique, steps: [{ step, si }] });
+    }
+  }
+  return groups;
+}
 
 function WavePanel({
   trace, activeWave, activeStep, onSelectWave, onSelectStep,
@@ -115,25 +152,43 @@ function WavePanel({
             </span>
           </div>
           {wi === activeWave && (
-            <div className="flex flex-col gap-1.5 mt-1">
-              {wave.steps.map((step, si) => {
-                const tStyle = TECHNIQUE_COLORS[step.technique] ?? 'bg-parchment border-ink text-ink';
-                const t = step.deduction.affectedTerritories?.[0];
-                const tname = t !== undefined ? TERRITORY_NAMES[t] ?? `T${t+1}` : '';
+            <div className="flex flex-col gap-2 mt-1">
+              {groupSteps(wave.steps).map((group, gi) => {
+                const groupColor = TECHNIQUE_GROUP_COLOR[group.technique] ?? '#1A1209';
                 return (
-                  <button
-                    key={si}
-                    onClick={(e) => { e.stopPropagation(); onSelectStep(wi, si); }}
-                    className={`text-left border px-2 py-1.5 rounded-sm font-serif text-xs transition-colors ${tStyle} ${
-                      wi === activeWave && si === activeStep ? 'ring-1 ring-ink' : ''
-                    }`}
+                  <div
+                    key={gi}
+                    className="pl-2.5"
+                    style={{ borderLeft: `2px solid ${groupColor}` }}
                   >
-                    <span className="font-bold">{step.technique}</span>
-                    {tname && <span className="ml-1 opacity-70">— {tname}</span>}
-                    <span className="ml-1 opacity-60">
-                      → {step.deduction.type === 'watcher' ? 'Watcher' : 'Ward'} ({step.deduction.row + 1},{step.deduction.col + 1})
-                    </span>
-                  </button>
+                    {group.steps.length > 1 && (
+                      <div className="text-[10px] tracking-wider uppercase mb-1" style={{ color: groupColor, opacity: 0.75 }}>
+                        {group.technique} × {group.steps.length}
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-1">
+                      {group.steps.map(({ step, si }) => {
+                        const tStyle = TECHNIQUE_COLORS[step.technique] ?? 'bg-parchment border-ink text-ink';
+                        const t = step.deduction.affectedTerritories?.[0];
+                        const tname = t !== undefined ? TERRITORY_NAMES[t] ?? `T${t+1}` : '';
+                        return (
+                          <button
+                            key={si}
+                            onClick={(e) => { e.stopPropagation(); onSelectStep(wi, si); }}
+                            className={`text-left border px-2 py-1.5 rounded-sm font-serif text-xs transition-colors ${tStyle} ${
+                              si === activeStep ? 'ring-1 ring-ink' : ''
+                            }`}
+                          >
+                            <span className="font-bold">{step.technique}</span>
+                            {tname && <span className="ml-1 opacity-70">— {tname}</span>}
+                            <span className="ml-1 opacity-60">
+                              → {step.deduction.type === 'watcher' ? 'Watcher' : 'Ward'} ({step.deduction.row + 1},{step.deduction.col + 1})
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 );
               })}
             </div>
