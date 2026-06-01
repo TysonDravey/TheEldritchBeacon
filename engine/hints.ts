@@ -34,6 +34,7 @@ function buildWardHint(
   d: DeductionResult,
   puzzle: Puzzle,
   depth: number,
+  playerCells: CellState[][],
 ): HintResult {
   const { row, col, reasonType, confinedTerritory, pairedTerritories, blockedBy } = d;
   const cellTerritory = puzzle.territoryMap[row][col];
@@ -212,10 +213,31 @@ function buildWardHint(
   // ---- Hypothetical (contradiction test) ----
   if (reasonType === 'hypothetical' && confinedTerritory !== undefined) {
     const victim = confinedTerritory;
+
+    // Compute victim's remaining valid candidates so we can show and explain them
+    const allCandidates = getCandidates(puzzle, playerCells);
+    const victimCells: [number, number][] = allCandidates.get(victim) ?? [];
+    const victimRows = new Set(victimCells.map(([r]) => r));
+    const victimCols = new Set(victimCells.map(([, c]) => c));
+
+    // Build a plain-language reason for why those cells would be eliminated
+    let whySealed: string;
+    if (victimCells.length === 0) {
+      whySealed = `the ${tname(victim)} territory already has no valid refuge`;
+    } else if (victimRows.size === 1 && victimRows.has(row)) {
+      whySealed = `all of ${tname(victim)}'s remaining cells are in row ${row + 1} — the same row this Watcher would claim`;
+    } else if (victimCols.size === 1 && victimCols.has(col)) {
+      whySealed = `all of ${tname(victim)}'s remaining cells are in column ${col + 1} — the same column this Watcher would claim`;
+    } else {
+      whySealed = `this Watcher's row, column, and adjacency zone together eliminate every remaining refuge in the ${tname(victim)} territory`;
+    }
+
+    const highlightAll: [number, number][] = [[row, col], ...victimCells];
+
     if (depth === 0) {
       return {
         level: 1,
-        message: `Consider what would happen if a Watcher rose at this cell. Study its relationship to ${tnames([cellTerritory, victim])}.`,
+        message: `Consider what would happen if a Watcher rose at this cell. Study where the ${tname(victim)} territory can still place its Watcher.`,
         highlightCells: [[row, col]],
         highlightTerritories: [cellTerritory, victim],
       };
@@ -223,15 +245,15 @@ function buildWardHint(
     if (depth === 1) {
       return {
         level: 2,
-        message: `If a Watcher rose here, it would claim this row, column, and territory — and leave the ${tname(victim)} territory with no valid refuge at all.`,
-        highlightCells: [[row, col]],
+        message: `If a Watcher rose here, ${whySealed}. The ${tname(victim)} territory would be left with nowhere to go.`,
+        highlightCells: highlightAll,
         highlightTerritories: [cellTerritory, victim],
       };
     }
     return {
       level: 3,
-      message: `A Watcher here is impossible. It would seal off the ${tname(victim)} territory entirely, leaving it with nowhere to go. Mark this cell with a Ward.`,
-      highlightCells: [[row, col]],
+      message: `A Watcher here is impossible — ${whySealed}. The ${tname(victim)} territory would be sealed off entirely. Mark this cell with a Ward.`,
+      highlightCells: highlightAll,
       highlightTerritories: [cellTerritory, victim],
       deduction: d,
     };
@@ -363,8 +385,8 @@ export function getHint(
     .includes(deduction.reasonType ?? '');
 
   if (isCheapFact && depth >= 1) {
-    return buildWardHint(deduction, puzzle, 2);
+    return buildWardHint(deduction, puzzle, 2, playerCells);
   }
 
-  return buildWardHint(deduction, puzzle, depth);
+  return buildWardHint(deduction, puzzle, depth, playerCells);
 }
