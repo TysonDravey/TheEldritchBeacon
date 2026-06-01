@@ -73,31 +73,31 @@ const STEPS: TutorialStep[] = [
   // ── Row confinement ───────────────────────────────────────────────────────
   {
     title: 'Row Confinement',
-    body: 'The two red territories each have only two cells — and both cells sit in the same row. No matter which cell a Watcher uses, it will always claim that row.\n\nThe gold cells share those rows. They will be eliminated.',
+    body: 'The two outlined territories each have only two cells — both in the same row. No matter which cell a Watcher uses, it will always claim that entire row.\n\nThe dimmed cells sharing those rows will be eliminated.',
     action: { type: 'next' },
-    // Red: T0 and T2 (the confining territories)
     highlightTerritories: [0, 2],
-    // Brass: cells in those claimed rows belonging to other territories
+    // Brass outlines on same-row cells from other territories
     secondaryCells: [[0,0],[0,1],[0,2],[2,2],[2,3],[2,4]],
+    hintActive: true,
   },
   {
     title: 'The Large Territory Narrows',
-    body: 'After the gold cells are eliminated, the large territory is left with just three candidates — all in the middle row (red).',
+    body: 'Once those rows are claimed, the large territory loses its top-row cells and its one row-3 cell. Only three candidates remain — all in the second row (outlined).',
     action: { type: 'next' },
-    // Red: T1's only remaining candidates
     highlightCells: [[1,0],[1,1],[1,2]],
-    // Brass: T1's doomed cells (claimed rows)
     secondaryCells: [[0,0],[0,1],[0,2],[2,2]],
+    hintActive: true,
   },
 
   // ── First placement (fully explained) ────────────────────────────────────
   {
     title: 'One Column Survives',
-    body: 'The left territory\'s cells sit at columns 1 and 2 (gold). Placing at those same columns would make the Watcher diagonally adjacent to both — eliminating the left territory entirely.\n\nOnly column 3 (glowing) is safe. Double-click to place.',
+    body: 'Columns 1 and 2 (outlined red) would sit diagonally adjacent to the left territory\'s cells (outlined gold). That would eliminate both — making it unsolvable.\n\nOnly the third column (glowing) is safe. Double-click to place.',
     action: { type: 'watcher', row: 1, col: 2 },
     primaryCell: [1, 2],
-    // Brass: T2's cells — the ones that would be wiped out by the bad columns
+    highlightCells: [[1,0],[1,1]],
     secondaryCells: [[2,0],[2,1]],
+    hintActive: true,
   },
 
   // ── Cascade ───────────────────────────────────────────────────────────────
