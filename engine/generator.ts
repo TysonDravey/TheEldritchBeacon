@@ -227,11 +227,10 @@ export function generatePuzzle(opts: GenerateOptions): Puzzle | null {
       createdAt:    new Date().toISOString(),
     };
 
-    // 5. Gate: logical solver must be able to crack it completely.
-    // Sound logical deductions (adjacency, naked single, confinement, pair elimination,
-    // contradiction test) guarantee uniqueness — if the solver fully solves it, no
-    // alternative solution exists. The expensive hasUniqueSolution backtrack is redundant.
-    const solverResult = solveLogically(puzzle);
+    // 5. Gate: logical solver must be able to crack it completely (depth-0 only for
+    // generation speed — random territory growth doesn't produce depth-1-only boards).
+    // Depth-1 is reserved for hand-crafted puzzles via the puzzle builder.
+    const solverResult = solveLogically(puzzle, 0);
     if (!solverResult) continue;
 
     return puzzle;

@@ -1,6 +1,6 @@
 bug list
 
-clicking on a hint spinning eye, should close the tip, currently it remains open.
+clicking/completing a hint spinning eye or a row suggestion any tip, should close the tip, currently it remains open.
 
 hints still need some love as they are often vague. and also they repeat if nothing has changed. this might be helped when we make the puzzle generator portion of the build.
 

@@ -10,12 +10,12 @@ const STORAGE_KEY_PREFIX = 'eldritch_beacon_state_';
 
 function difficultyColor(difficulty: Difficulty): string {
   switch (difficulty) {
-    case 'Initiate':   return 'text-ink border-ink';
-    case 'Scholar':    return 'text-brass border-brass';
-    case 'Occultist':  return 'text-red-ink border-red-ink';
-    case 'High Priest': return 'text-red-ink border-red-ink';
-    case 'Eldritch':   return 'text-red-ink border-red-ink';
-    default:           return 'text-ink border-ink';
+    case 'Initiate':    return 'text-ink border-ink';
+    case 'Scholar':     return 'text-brass border-brass';
+    case 'Occultist':   return 'text-red-ink border-red-ink';
+    case 'High Priest': return 'text-red-ink border-red-ink opacity-80';
+    case 'Eldritch':    return 'text-red-ink border-red-ink font-bold';
+    default:            return 'text-ink border-ink';
   }
 }
 

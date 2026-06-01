@@ -233,6 +233,8 @@ These must not require changes to the puzzle engine.
 
 ## Known Issues Fixed
 
+- **Difficulty rating system broken (2026-06-01):** `classifyDeduction()` in `difficulty.ts` did not handle `reasonType: 'hypothetical'` (contradiction test deductions) — they fell through to the `naked` category (weight 1 instead of 5). A chain bonus heuristic also fired incorrectly, inflating all scores beyond the Eldritch threshold. Result: all 20 puzzles rated Eldritch regardless of actual technique usage. Fixed by: adding `contradictionTest` category to `TechniqueRecord`, checking `d.reasonType === 'hypothetical'` in `classifyDeduction`, removing chain bonus, and recalibrating score thresholds. Puzzles now rate Scholar–Eldritch with real variation. `samplePuzzles.ts` now calls `rateDifficulty()` dynamically so labels stay accurate after any threshold adjustment.
+
 - **Contradiction test false positive (2026-06-01):** `contradictionTest` in `solver.ts` was checking `t2 !== territory` instead of `!occupiedTerritories.has(t2)` when looking for zero-candidate territories. This meant an already-satisfied territory (watcher placed) triggered a false "impossible" signal, incorrectly eliminating valid watcher positions. Result: `hasUniqueSolution` returned `true` for puzzles with multiple solutions, and `solveLogically` occasionally produced results on invalid or multi-solution puzzles. All 20 sample puzzles were regenerated after this fix.
 
 - **Territory map gaps (2026-06-01):** Axis-biased BFS territory generation could leave isolated cells unassigned (value `-1`) when bias strength was high. The single-pass greedy fill missed these. Fixed with multi-pass BFS fill and an explicit `-1` cell guard in `generatePuzzle`.

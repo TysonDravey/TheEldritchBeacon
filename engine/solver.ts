@@ -613,7 +613,8 @@ function adjacencyElimination(
  */
 export function getNextDeduction(
   puzzle: Puzzle,
-  playerCells: CellState[][]
+  playerCells: CellState[][],
+  maxDepth: number = 1,
 ): DeductionResult | null {
   const candidates = getCandidates(puzzle, playerCells);
 
@@ -638,10 +639,8 @@ export function getNextDeduction(
   const pe = pairElimination(puzzle, playerCells, candidates);
   if (pe) return pe;
 
-  // Technique 5: Contradiction test
-  // For each candidate cell, try placing a watcher there and propagate.
-  // If that causes any territory to have 0 candidates, this cell must be a ward.
-  const ct = contradictionTest(puzzle, playerCells, candidates);
+  // Technique 5: Contradiction test (depth controlled by maxDepth)
+  const ct = contradictionTest(puzzle, playerCells, candidates, maxDepth);
   if (ct) return ct;
 
   return null;
@@ -649,13 +648,20 @@ export function getNextDeduction(
 
 /**
  * Technique 5: Contradiction test (hypothetical elimination).
- * For each candidate cell (r,c), try placing a watcher there and running basic
- * propagation. If any territory ends up with 0 candidates, (r,c) must be a ward.
+ * For each candidate cell (r,c), try placing a watcher there and propagating.
+ * If any territory ends up with 0 candidates, (r,c) must be a ward.
+ *
+ * depth=0: propagate with basic techniques only (fast, original behaviour).
+ * depth=1: after basic propagation stalls, run a sub-contradiction pass (depth=0)
+ *          on the hypothesis board. Any ward it finds is applied and basic
+ *          propagation restarts. This unlocks chains like:
+ *          "placing A forces B which eliminates C's last refuge → A is impossible."
  */
 function contradictionTest(
   puzzle: Puzzle,
   playerCells: CellState[][],
-  candidates: Map<number, [number, number][]>
+  candidates: Map<number, [number, number][]>,
+  depth: number = 1,
 ): DeductionResult | null {
   // Collect all candidate cells across all territories
   const seen = new Set<string>();
@@ -668,45 +674,53 @@ function contradictionTest(
   }
 
   for (const [r, c, territory] of allCands) {
-    // Clone the board and place a watcher at (r, c)
     const test = deepCopy(playerCells);
     applyDeduction(test, { type: 'watcher', row: r, col: c, reason: 'test' });
 
-    // Propagate basic eliminations until stable
-    let changed = true;
-    while (changed) {
-      changed = false;
-      const testCands = getCandidates(puzzle, test);
-      // Check for zero-candidate territory (contradiction).
-      // Must exclude territories already satisfied (watcher placed) — getCandidates
-      // returns [] for both "satisfied" and "stuck" territories, so we need to
-      // distinguish them to avoid false positives.
-      const testOccupied = new Set(
-        getWatcherPositions(test).map(([wr, wc]) => puzzle.territoryMap[wr][wc])
-      );
-      for (const [t2, tc] of testCands) {
-        if (tc.length === 0 && !testOccupied.has(t2)) {
-          // Placing watcher at (r,c) makes territory t2 impossible → (r,c) must be ward
-          return {
-            type: 'ward', row: r, col: c,
-            reason: `Placing a Watcher here would leave the ${t2 + 1} territory with no valid cells.`,
-            reasonType: 'hypothetical',
-            confinedTerritory: t2,
-            affectedTerritories: [territory, t2],
-          };
+    let outerChanged = true;
+    while (outerChanged) {
+      outerChanged = false;
+
+      // --- Inner loop: basic propagation until stable ---
+      let innerChanged = true;
+      while (innerChanged) {
+        innerChanged = false;
+        const testCands = getCandidates(puzzle, test);
+        // getCandidates returns [] for both satisfied AND stuck territories;
+        // use testOccupied to avoid false positives on satisfied territories.
+        const testOccupied = new Set(
+          getWatcherPositions(test).map(([wr, wc]) => puzzle.territoryMap[wr][wc])
+        );
+        for (const [t2, tc] of testCands) {
+          if (tc.length === 0 && !testOccupied.has(t2)) {
+            return {
+              type: 'ward', row: r, col: c,
+              reason: `Placing a Watcher here would leave the ${t2 + 1} territory with no valid cells.`,
+              reasonType: 'hypothetical',
+              confinedTerritory: t2,
+              affectedTerritories: [territory, t2],
+            };
+          }
+        }
+        const propagate =
+          adjacencyElimination(puzzle, test, testCands) ??
+          nakedSingle(puzzle, test, testCands) ??
+          rowConfinement(puzzle, test, testCands) ??
+          columnConfinement(puzzle, test, testCands);
+        if (propagate && test[propagate.row][propagate.col] === 'empty') {
+          applyDeduction(test, propagate);
+          innerChanged = true;
         }
       }
-      // Propagate with cheaper techniques only — pairElimination is O(2^n) per
-      // candidate and too expensive to run inside each hypothesis.
-      const propagate =
-        adjacencyElimination(puzzle, test, testCands) ??
-        nakedSingle(puzzle, test, testCands) ??
-        rowConfinement(puzzle, test, testCands) ??
-        columnConfinement(puzzle, test, testCands);
 
-      if (propagate && test[propagate.row][propagate.col] === 'empty') {
-        applyDeduction(test, propagate);
-        changed = true;
+      // --- After basic propagation stalls, try a sub-contradiction pass ---
+      if (depth > 0) {
+        const testCands = getCandidates(puzzle, test);
+        const sub = contradictionTest(puzzle, test, testCands, depth - 1);
+        if (sub && test[sub.row][sub.col] === 'empty') {
+          applyDeduction(test, sub);
+          outerChanged = true; // re-run basic propagation with the new ward applied
+        }
       }
     }
   }
@@ -722,7 +736,10 @@ function contradictionTest(
  * Returns the final CellState[][] if the puzzle is solved by pure logic,
  * or null if stuck before completion.
  */
-export function solveLogically(puzzle: Puzzle): CellState[][] | null {
+export function solveLogically(
+  puzzle: Puzzle,
+  maxDepth: number = 1,
+): CellState[][] | null {
   const n = puzzle.size;
   const cells: CellState[][] = Array.from({ length: n }, () =>
     Array.from({ length: n }, (): CellState => 'empty')
@@ -737,7 +754,7 @@ export function solveLogically(puzzle: Puzzle): CellState[][] | null {
     const contradiction = findContradictions(puzzle, cells);
     if (contradiction.found) return null;
 
-    const deduction = getNextDeduction(puzzle, cells);
+    const deduction = getNextDeduction(puzzle, cells, maxDepth);
     if (deduction) {
       applyDeduction(cells, deduction);
       progress = true;

@@ -15,12 +15,12 @@ interface TechniqueRecord {
   rowConfinement: number;
   columnConfinement: number;
   pairElimination: number;
-  nakedSinglesSinceLastChain: number;
-  chainBonus: number;
+  contradictionTest: number;
 }
 
-function classifyDeduction(d: DeductionResult): keyof Omit<TechniqueRecord, 'nakedSinglesSinceLastChain' | 'chainBonus'> {
+function classifyDeduction(d: DeductionResult): keyof TechniqueRecord {
   if (d.type === 'watcher') return 'naked';
+  if (d.reasonType === 'hypothetical') return 'contradictionTest';
   if (d.reason.includes('confined to row') || d.reason.includes('only place its Watcher in row')) {
     return 'rowConfinement';
   }
@@ -30,7 +30,6 @@ function classifyDeduction(d: DeductionResult): keyof Omit<TechniqueRecord, 'nak
   if (d.reason.includes('confined to rows') || d.reason.includes('confined to columns')) {
     return 'pairElimination';
   }
-  // adjacency / warden-style ward deductions count as naked
   return 'naked';
 }
 
@@ -40,7 +39,7 @@ function computeScore(record: TechniqueRecord): number {
     record.rowConfinement * 2 +
     record.columnConfinement * 2 +
     record.pairElimination * 3 +
-    record.chainBonus * 5
+    record.contradictionTest * 5
   );
 }
 
@@ -73,6 +72,19 @@ function applyDeductionToBoard(cells: CellState[][], d: DeductionResult, n: numb
 /**
  * Simulates a logical solve, records which techniques were used, and maps
  * the resulting score to a Difficulty label.
+ *
+ * Scoring weights:
+ *   naked (watcher placement)  × 1
+ *   row/col confinement        × 2
+ *   pair elimination           × 3
+ *   contradiction test         × 5
+ *
+ * Thresholds are calibrated so:
+ *   Initiate  — naked singles only (or trivial confinement)
+ *   Scholar   — moderate row/col confinement
+ *   Occultist — significant confinement + light pair/contradiction
+ *   High Priest — pair elimination and/or several contradictions
+ *   Eldritch  — heavy pair elimination and/or many contradictions
  */
 export function rateDifficulty(puzzle: Puzzle): Difficulty {
   const n = puzzle.size;
@@ -85,11 +97,8 @@ export function rateDifficulty(puzzle: Puzzle): Difficulty {
     rowConfinement: 0,
     columnConfinement: 0,
     pairElimination: 0,
-    nakedSinglesSinceLastChain: 0,
-    chainBonus: 0,
+    contradictionTest: 0,
   };
-
-  let stepsSinceNakedSingle = 0;
 
   let progress = true;
   while (progress) {
@@ -102,31 +111,18 @@ export function rateDifficulty(puzzle: Puzzle): Difficulty {
     const d = getNextDeduction(puzzle, cells);
     if (!d) break;
 
-    const technique = classifyDeduction(d);
-    record[technique]++;
+    record[classifyDeduction(d)]++;
     progress = true;
-
-    if (technique === 'naked') {
-      // Check if we've gone more than 4 non-naked steps before this naked single
-      if (stepsSinceNakedSingle > 4) {
-        record.chainBonus++;
-      }
-      stepsSinceNakedSingle = 0;
-    } else {
-      stepsSinceNakedSingle++;
-    }
-
     applyDeductionToBoard(cells, d, n);
   }
 
-  const score = computeScore(record);
-  return scoreTodifficulty(score);
+  return scoreTodifficulty(computeScore(record));
 }
 
 function scoreTodifficulty(score: number): Difficulty {
-  if (score <= 5) return 'Initiate';
-  if (score <= 12) return 'Scholar';
-  if (score <= 20) return 'Occultist';
-  if (score <= 30) return 'High Priest';
+  if (score <= 8)  return 'Initiate';
+  if (score <= 22) return 'Scholar';
+  if (score <= 45) return 'Occultist';
+  if (score <= 85) return 'High Priest';
   return 'Eldritch';
 }
