@@ -75,7 +75,8 @@ export interface HintResult {
   message: string;
   primaryCell?: [number, number];    // single cell that gets the spinner marker
   highlightCells?: [number, number][];
-  highlightTerritories?: number[];
+  highlightTerritories?: number[];   // red — the affected territory
+  secondaryHighlightTerritories?: number[];  // brass — the cause territory
   highlightRows?: number[];
   highlightCols?: number[];
   deduction?: DeductionResult;

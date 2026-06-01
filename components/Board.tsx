@@ -12,6 +12,7 @@ interface BoardProps {
   primaryCell?: [number, number];
   highlightCells?: [number, number][];
   highlightTerritories?: number[];
+  secondaryHighlightTerritories?: number[];
   highlightRows?: number[];
   highlightCols?: number[];
   hintActive?: boolean;
@@ -46,6 +47,7 @@ export default function Board({
   primaryCell,
   highlightCells,
   highlightTerritories,
+  secondaryHighlightTerritories,
   highlightRows,
   highlightCols,
   hintActive = false,
@@ -197,6 +199,9 @@ export default function Board({
             const territory = territoryMap[row][col];
             const state     = playerCells[row]?.[col] ?? 'empty';
 
+            const highlighted = isCellHighlighted(row, col, territory, highlightCells, highlightTerritories, highlightRows, highlightCols);
+            const secondaryHighlighted = !highlighted && (secondaryHighlightTerritories?.includes(territory) ?? false);
+
             return (
               <Cell
                 key={col}
@@ -204,8 +209,9 @@ export default function Board({
                 col={col}
                 territory={territory}
                 state={state}
-                isHighlighted={isCellHighlighted(row, col, territory, highlightCells, highlightTerritories, highlightRows, highlightCols)}
-                isDimmed={hintActive && !isCellHighlighted(row, col, territory, highlightCells, highlightTerritories, highlightRows, highlightCols)}
+                isHighlighted={highlighted}
+                isSecondaryHighlighted={secondaryHighlighted}
+                isDimmed={hintActive && !highlighted && !secondaryHighlighted}
                 isPrimaryHint={primaryCell ? primaryCell[0] === row && primaryCell[1] === col : false}
                 isContradiction={isCellContradiction(row, col, contradiction)}
                 isFlash={flashCells?.some(([r, c]) => r === row && c === col) ?? false}

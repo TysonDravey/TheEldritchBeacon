@@ -215,6 +215,7 @@ export default function PuzzlePage() {
         primaryCell={hintResult?.primaryCell}
         highlightCells={hintResult?.highlightCells}
         highlightTerritories={hintResult?.highlightTerritories}
+        secondaryHighlightTerritories={hintResult?.secondaryHighlightTerritories}
         highlightRows={hintResult?.highlightRows}
         highlightCols={hintResult?.highlightCols}
         hintActive={!!hintResult}

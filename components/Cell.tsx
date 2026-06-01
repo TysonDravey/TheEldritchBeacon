@@ -11,6 +11,7 @@ interface CellProps {
   territory: number;
   state: CellState;
   isHighlighted: boolean;
+  isSecondaryHighlighted: boolean;
   isDimmed: boolean;
   isPrimaryHint: boolean;
   isContradiction: boolean;
@@ -40,6 +41,7 @@ export default function Cell({
   territory,
   state,
   isHighlighted,
+  isSecondaryHighlighted,
   isDimmed,
   isPrimaryHint,
   isContradiction,
@@ -73,6 +75,8 @@ export default function Cell({
     ringClass = 'outline outline-2 outline-red-ink outline-offset-[-2px] shake';
   } else if (isHighlighted) {
     ringClass = 'outline outline-2 outline-red-ink outline-offset-[-2px]';
+  } else if (isSecondaryHighlighted) {
+    ringClass = 'outline outline-2 outline-brass outline-offset-[-2px]';
   }
 
   return (

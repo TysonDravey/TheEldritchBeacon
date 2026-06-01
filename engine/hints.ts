@@ -127,7 +127,8 @@ function buildWardHint(
       return {
         level: 1,
         message: `Study the ${tname(confined)} territory. Its Watcher is confined to a single row.`,
-        highlightTerritories: [confined],
+        secondaryHighlightTerritories: [confined],
+        highlightRows: [row],
       };
     }
     if (depth === 1) {
@@ -135,7 +136,8 @@ function buildWardHint(
         level: 2,
         message: `The ${tname(confined)} territory can only place its Watcher somewhere in row ${row + 1}. If a Watcher rose at this cell, it would claim that row — leaving the ${tname(confined)} territory with nowhere to go.`,
         highlightCells: [[row, col]],
-        highlightTerritories: [confined, cellTerritory],
+        highlightTerritories: [cellTerritory],
+        secondaryHighlightTerritories: [confined],
         highlightRows: [row],
       };
     }
@@ -143,7 +145,8 @@ function buildWardHint(
       level: 3,
       message: `The ${tname(confined)} territory is confined to row ${row + 1}. Since it must use that row, no other Watcher can occupy it. This cell — belonging to the ${tname(cellTerritory)} territory — must be a Ward.`,
       highlightCells: [[row, col]],
-      highlightTerritories: [confined, cellTerritory],
+      highlightTerritories: [cellTerritory],
+      secondaryHighlightTerritories: [confined],
       highlightRows: [row],
       deduction: d,
     };
@@ -156,7 +159,8 @@ function buildWardHint(
       return {
         level: 1,
         message: `Study the ${tname(confined)} territory. Its Watcher is confined to a single column.`,
-        highlightTerritories: [confined],
+        secondaryHighlightTerritories: [confined],
+        highlightCols: [col],
       };
     }
     if (depth === 1) {
@@ -164,7 +168,8 @@ function buildWardHint(
         level: 2,
         message: `The ${tname(confined)} territory can only place its Watcher somewhere in column ${col + 1}. If a Watcher rose at this cell, it would claim that column — leaving the ${tname(confined)} territory with nowhere to go.`,
         highlightCells: [[row, col]],
-        highlightTerritories: [confined, cellTerritory],
+        highlightTerritories: [cellTerritory],
+        secondaryHighlightTerritories: [confined],
         highlightCols: [col],
       };
     }
@@ -172,7 +177,8 @@ function buildWardHint(
       level: 3,
       message: `The ${tname(confined)} territory is confined to column ${col + 1}. Since it must use that column, no other Watcher can occupy it. This cell must be a Ward.`,
       highlightCells: [[row, col]],
-      highlightTerritories: [confined, cellTerritory],
+      highlightTerritories: [cellTerritory],
+      secondaryHighlightTerritories: [confined],
       highlightCols: [col],
       deduction: d,
     };
@@ -184,11 +190,23 @@ function buildWardHint(
     const dim = reasonType === 'pair-row' ? 'row' : 'column';
     const dimNum = reasonType === 'pair-row' ? row + 1 : col + 1;
 
+    // Compute the full set of contested rows/cols from the paired territories' candidates
+    const allCandidates = getCandidates(puzzle, playerCells);
+    const contestedDims = new Set<number>();
+    for (const t of paired) {
+      for (const [r, c] of (allCandidates.get(t) ?? [])) {
+        contestedDims.add(reasonType === 'pair-row' ? r : c);
+      }
+    }
+    const dimHighlight = reasonType === 'pair-row'
+      ? { highlightRows: Array.from(contestedDims) }
+      : { highlightCols: Array.from(contestedDims) };
+
     if (depth === 0) {
       return {
         level: 1,
         message: `${tnames(paired)} are competing for the same ${dim}s. Consider what that means for other territories.`,
-        highlightTerritories: [...paired, cellTerritory],
+        ...dimHighlight,
       };
     }
     if (depth === 1) {
@@ -196,16 +214,14 @@ function buildWardHint(
         level: 2,
         message: `${tnames(paired)} together can only fit into the same ${paired.length} ${dim}s. If a Watcher rose here, it would steal ${dim} ${dimNum} from them — leaving one of those territories with no valid home.`,
         highlightCells: [[row, col]],
-        highlightTerritories: [...paired, cellTerritory],
-        ...(reasonType === 'pair-row' ? { highlightRows: [row] } : { highlightCols: [col] }),
+        ...dimHighlight,
       };
     }
     return {
       level: 3,
       message: `${tnames(paired)} are collectively confined to exactly ${paired.length} ${dim}${paired.length > 1 ? 's' : ''}. They must fill those ${dim}s between them, so no other Watcher can occupy ${dim} ${dimNum}. This cell must be a Ward.`,
       highlightCells: [[row, col]],
-      highlightTerritories: [...paired, cellTerritory],
-      ...(reasonType === 'pair-row' ? { highlightRows: [row] } : { highlightCols: [col] }),
+      ...dimHighlight,
       deduction: d,
     };
   }
@@ -237,7 +253,8 @@ function buildWardHint(
         level: 1,
         message: `Consider what would happen if a Watcher rose at this cell. Study where the ${tname(victim)} territory can still place its Watcher.`,
         primaryCell: [row, col],
-        highlightTerritories: [cellTerritory, victim],
+        highlightTerritories: [victim],
+        secondaryHighlightTerritories: [cellTerritory],
       };
     }
     if (depth === 1) {
@@ -246,7 +263,8 @@ function buildWardHint(
         message: `If a Watcher rose here, ${whySealed}. The ${tname(victim)} territory would be left with nowhere to go.`,
         primaryCell: [row, col],
         highlightCells: victimCells,
-        highlightTerritories: [cellTerritory, victim],
+        highlightTerritories: [victim],
+        secondaryHighlightTerritories: [cellTerritory],
       };
     }
     return {
@@ -254,7 +272,8 @@ function buildWardHint(
       message: `A Watcher here is impossible — ${whySealed}. The ${tname(victim)} territory would be sealed off entirely. Mark this cell with a Ward.`,
       primaryCell: [row, col],
       highlightCells: victimCells,
-      highlightTerritories: [cellTerritory, victim],
+      highlightTerritories: [victim],
+      secondaryHighlightTerritories: [cellTerritory],
       deduction: d,
     };
   }
