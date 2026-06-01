@@ -22,6 +22,7 @@ function difficultyColor(difficulty: Difficulty): string {
 }
 
 function PuzzleCard({ puzzle, completed }: { puzzle: Puzzle; completed: boolean }) {
+  const isShattered = puzzle.mode === 'shattered-realms';
   return (
     <Link
       href={`/puzzle/${puzzle.id}`}
@@ -32,9 +33,7 @@ function PuzzleCard({ puzzle, completed }: { puzzle: Puzzle; completed: boolean 
           {puzzle.title}
         </h3>
         {completed && (
-          <span className="text-brass text-lg flex-shrink-0" title="Completed">
-            ✓
-          </span>
+          <span className="text-brass text-lg flex-shrink-0" title="Completed">✓</span>
         )}
       </div>
 
@@ -42,12 +41,58 @@ function PuzzleCard({ puzzle, completed }: { puzzle: Puzzle; completed: boolean 
         {puzzle.size}&times;{puzzle.size}
       </p>
 
-      <span
-        className={`mt-2 inline-block text-xs border px-1.5 py-0.5 rounded-sm font-serif ${difficultyColor(puzzle.difficulty)}`}
-      >
-        {puzzle.difficulty}
-      </span>
+      <div className="mt-2 flex items-center gap-2 flex-wrap">
+        <span className={`inline-block text-xs border px-1.5 py-0.5 rounded-sm font-serif ${difficultyColor(puzzle.difficulty)}`}>
+          {puzzle.difficulty}
+        </span>
+        {isShattered && (
+          <span className="inline-block text-xs border border-brass text-brass px-1.5 py-0.5 rounded-sm font-serif italic opacity-80">
+            Shattered
+          </span>
+        )}
+      </div>
     </Link>
+  );
+}
+
+function SizeSection({
+  size,
+  puzzles,
+  completedIds,
+}: {
+  size: number;
+  puzzles: Puzzle[];
+  completedIds: Set<string>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const PREVIEW = 6;
+  const shown = expanded ? puzzles : puzzles.slice(0, PREVIEW);
+  const completedCount = puzzles.filter(p => completedIds.has(p.id)).length;
+
+  return (
+    <div className="mb-8">
+      <div className="flex items-baseline justify-between mb-3">
+        <h3 className="font-serif text-base font-bold text-ink">
+          {size}&times;{size}
+        </h3>
+        <span className="font-serif text-xs text-ink-light">
+          {completedCount}/{puzzles.length} solved
+        </span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {shown.map(p => (
+          <PuzzleCard key={p.id} puzzle={p} completed={completedIds.has(p.id)} />
+        ))}
+      </div>
+      {puzzles.length > PREVIEW && (
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="mt-3 font-serif text-xs text-ink-light border-b border-transparent hover:border-ink-light transition-colors"
+        >
+          {expanded ? 'Show less' : `Show all ${puzzles.length} →`}
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -63,17 +108,35 @@ export default function HomePage() {
           const state = JSON.parse(raw);
           if (state?.completed) ids.add(puzzle.id);
         }
-      } catch {
-        // ignore
-      }
+      } catch { /* ignore */ }
     }
     setCompletedIds(ids);
   }, []);
 
+  // Split by mode
+  const campaignPuzzles = SAMPLE_PUZZLES.filter(
+    p => p.mode === 'initiate' || p.mode === 'cult-master'
+  );
+  const shatteredPuzzles = SAMPLE_PUZZLES.filter(p => p.mode === 'shattered-realms');
+
+  // Group by size
+  function groupBySize(puzzles: Puzzle[]): [number, Puzzle[]][] {
+    const map = new Map<number, Puzzle[]>();
+    for (const p of puzzles) {
+      if (!map.has(p.size)) map.set(p.size, []);
+      map.get(p.size)!.push(p);
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => a - b);
+  }
+
+  const campaignGroups  = groupBySize(campaignPuzzles);
+  const shatteredGroups = groupBySize(shatteredPuzzles);
+
   return (
     <main className="min-h-screen bg-parchment flex flex-col items-center px-4 py-12">
+
       {/* Header */}
-      <div className="flex flex-col items-center gap-4 mb-12">
+      <div className="flex flex-col items-center gap-4 mb-10">
         <Image
           src="/svg/lighthouse_mark.svg"
           alt="The Eldritch Beacon"
@@ -90,37 +153,75 @@ export default function HomePage() {
         <div className="w-24 border-t border-ink opacity-30 mt-1" />
       </div>
 
-      {/* Tutorial nudge */}
-      <section className="w-full max-w-2xl mb-6">
-        <Link
-          href="/tutorial"
-          className="flex items-center justify-between border border-brass bg-parchment hover:bg-parchment-dark transition-colors px-4 py-3 rounded-sm"
-        >
-          <div>
-            <p className="font-serif text-sm font-bold text-brass">New to the Beacon?</p>
-            <p className="font-serif text-xs text-ink-light mt-0.5">
-              Learn the rules in a guided walkthrough
-            </p>
-          </div>
-          <span className="font-serif text-sm text-brass opacity-60">&rarr;</span>
-        </Link>
-      </section>
+      <div className="w-full max-w-2xl flex flex-col gap-6">
 
-      {/* Puzzle grid */}
-      <section className="w-full max-w-2xl">
-        <h2 className="font-serif text-xl text-ink mb-4 border-b border-ink pb-1">
-          Puzzles
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {SAMPLE_PUZZLES.map((puzzle) => (
-            <PuzzleCard
-              key={puzzle.id}
-              puzzle={puzzle}
-              completed={completedIds.has(puzzle.id)}
+        {/* Daily Beacon — coming soon */}
+        <section>
+          <div className="flex items-center justify-between border border-ink border-opacity-30 bg-parchment px-4 py-3 rounded-sm opacity-50 cursor-not-allowed select-none">
+            <div>
+              <p className="font-serif text-sm font-bold text-ink">Daily Beacon</p>
+              <p className="font-serif text-xs text-ink-light mt-0.5 italic">
+                A new challenge every day — coming soon
+              </p>
+            </div>
+            <span className="font-serif text-xs text-ink-light border border-ink border-opacity-30 px-2 py-0.5 rounded-sm">
+              Soon
+            </span>
+          </div>
+        </section>
+
+        {/* Tutorial nudge */}
+        <section>
+          <Link
+            href="/tutorial"
+            className="flex items-center justify-between border border-brass bg-parchment hover:bg-parchment-dark transition-colors px-4 py-3 rounded-sm"
+          >
+            <div>
+              <p className="font-serif text-sm font-bold text-brass">New to the Beacon?</p>
+              <p className="font-serif text-xs text-ink-light mt-0.5">
+                Learn the rules in a guided walkthrough
+              </p>
+            </div>
+            <span className="font-serif text-sm text-brass opacity-60">&rarr;</span>
+          </Link>
+        </section>
+
+        {/* Campaign */}
+        <section>
+          <h2 className="font-serif text-xl text-ink border-b border-ink pb-1 mb-6">
+            Campaign
+          </h2>
+          {campaignGroups.map(([size, puzzles]) => (
+            <SizeSection
+              key={size}
+              size={size}
+              puzzles={puzzles}
+              completedIds={completedIds}
             />
           ))}
-        </div>
-      </section>
+        </section>
+
+        {/* Shattered Realms — only shown when puzzles exist */}
+        {shatteredGroups.length > 0 && (
+          <section>
+            <div className="border-b border-ink pb-1 mb-6">
+              <h2 className="font-serif text-xl text-ink">Shattered Realms</h2>
+              <p className="font-serif text-xs text-ink-light italic mt-0.5">
+                Territories may be scattered — one Watcher per color, wherever it falls
+              </p>
+            </div>
+            {shatteredGroups.map(([size, puzzles]) => (
+              <SizeSection
+                key={size}
+                size={size}
+                puzzles={puzzles}
+                completedIds={completedIds}
+              />
+            ))}
+          </section>
+        )}
+
+      </div>
     </main>
   );
 }
