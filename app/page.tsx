@@ -15,6 +15,7 @@ function difficultyColor(difficulty: Difficulty): string {
     case 'Occultist':   return 'text-red-ink border-red-ink';
     case 'High Priest': return 'text-red-ink border-red-ink opacity-80';
     case 'Eldritch':    return 'text-red-ink border-red-ink font-bold';
+    case 'Archon':      return 'text-red-ink border-red-ink font-bold opacity-90';
     default:            return 'text-ink border-ink';
   }
 }
@@ -87,6 +88,22 @@ export default function HomePage() {
         </p>
         <div className="w-24 border-t border-ink opacity-30 mt-1" />
       </div>
+
+      {/* Tutorial nudge */}
+      <section className="w-full max-w-2xl mb-6">
+        <Link
+          href="/tutorial"
+          className="flex items-center justify-between border border-brass bg-parchment hover:bg-parchment-dark transition-colors px-4 py-3 rounded-sm"
+        >
+          <div>
+            <p className="font-serif text-sm font-bold text-brass">New to the Beacon?</p>
+            <p className="font-serif text-xs text-ink-light mt-0.5">
+              Learn the rules in a guided walkthrough
+            </p>
+          </div>
+          <span className="font-serif text-sm text-brass opacity-60">&rarr;</span>
+        </Link>
+      </section>
 
       {/* Puzzle grid */}
       <section className="w-full max-w-2xl">

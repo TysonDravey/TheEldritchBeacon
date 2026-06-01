@@ -116,6 +116,9 @@ export function rateDifficulty(puzzle: Puzzle): Difficulty {
     applyDeductionToBoard(cells, d, n);
   }
 
+  // Any puzzle requiring hypothesis-based contradiction testing is Archon —
+  // qualitatively harder than forward-reasoning alone.
+  if (record.contradictionTest > 0) return 'Archon';
   return scoreTodifficulty(computeScore(record));
 }
 

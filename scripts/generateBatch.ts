@@ -12,6 +12,7 @@
  *   --per-size  Puzzles to add per board size (default: 10)
  *   --sizes     Comma-separated list of sizes (default: 5,6,7,8)
  *   --base      Base seed string (default: eldritch-v3)
+ *   --depth     Max solver depth (0 = forward only, 1 = hypothesis/Archon; default: 0)
  */
 
 import { generatePuzzle } from '../engine/generator';
@@ -86,13 +87,15 @@ function parseArgs() {
   let perSize = 10;
   let sizes = [5, 6, 7, 8];
   let base = 'eldritch-v3';
+  let depth = 0;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--per-size' && args[i + 1]) perSize = parseInt(args[++i]);
     if (args[i] === '--sizes'    && args[i + 1]) sizes = args[++i].split(',').map(Number);
     if (args[i] === '--base'     && args[i + 1]) base = args[++i];
+    if (args[i] === '--depth'    && args[i + 1]) depth = parseInt(args[++i]);
   }
-  return { perSize, sizes, base };
+  return { perSize, sizes, base, depth };
 }
 
 function nextIdNum(content: string, size: number): number {
@@ -114,7 +117,7 @@ function usedSeeds(content: string): Set<string> {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  const { perSize, sizes, base } = parseArgs();
+  const { perSize, sizes, base, depth } = parseArgs();
   const filePath = join(process.cwd(), 'data', 'samplePuzzles.ts');
 
   let content = readFileSync(filePath, 'utf-8');
@@ -134,9 +137,15 @@ async function main() {
 
       if (existingSeeds.has(seed)) continue;
 
-      const puzzle = generatePuzzle({ size, seed, maxAttempts: 500, maxDepth: 0 });
+      const puzzle = generatePuzzle({ size, seed, maxAttempts: depth > 0 ? 200 : 500, maxDepth: depth });
       if (!puzzle) {
         process.stderr.write(`  skip ${seed}: no puzzle\n`);
+        continue;
+      }
+
+      const diff = rateDifficulty(puzzle);
+      if (depth > 0 && diff !== 'Archon') {
+        process.stderr.write(`  skip ${seed}: solvable without hypothesis (${diff})\n`);
         continue;
       }
 
@@ -146,7 +155,7 @@ async function main() {
       const id     = `eb-${size}x${size}-${String(idNum).padStart(3, '0')}`;
       const title  = TITLE_POOL[(idNum - 1) % TITLE_POOL.length];
 
-      const { difficulty: _d, ...rest } = { ...puzzle, difficulty: rateDifficulty(puzzle) };
+      const { difficulty: _d, ...rest } = puzzle;
       const entry: Omit<Puzzle, 'difficulty'> = { ...rest, id, title };
 
       const insertPoint = content.lastIndexOf('\n];');
@@ -163,7 +172,7 @@ async function main() {
       writeFileSync(filePath, newContent, 'utf-8');
       existingSeeds.add(seed);
 
-      process.stderr.write(`  ✓ ${id} — ${rateDifficulty(puzzle)} (seed ${seed})\n`);
+      process.stderr.write(`  ✓ ${id} — ${diff} (seed ${seed})\n`);
       added++;
       totalAdded++;
     }
