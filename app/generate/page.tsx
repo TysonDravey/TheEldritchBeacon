@@ -136,13 +136,24 @@ type StepGroup = {
   key: string;
   // For Group Elimination: the territory pair that caused this cluster
   pairedTerritories?: number[];
+  // For Row/Column Confinement: the territory confined to one row/col
+  confinedTerritory?: number;
+  dimension?: 'row' | 'col';
+  dimensionValue?: number;
   steps: Array<{ step: TraceStep; si: number }>;
 };
 
 function stepGroupKey(step: TraceStep): string {
+  const d = step.deduction;
   if (step.technique === 'Group Elimination') {
-    const sorted = (step.deduction.pairedTerritories ?? []).slice().sort((a, b) => a - b);
+    const sorted = (d.pairedTerritories ?? []).slice().sort((a, b) => a - b);
     return `Group Elimination:${sorted.join(',')}`;
+  }
+  if (step.technique === 'Row Confinement' && d.confinedTerritory !== undefined) {
+    return `Row Confinement:${d.confinedTerritory}:${d.row}`;
+  }
+  if (step.technique === 'Column Confinement' && d.confinedTerritory !== undefined) {
+    return `Column Confinement:${d.confinedTerritory}:${d.col}`;
   }
   return step.technique;
 }
@@ -156,12 +167,18 @@ function groupSteps(steps: TraceStep[]): StepGroup[] {
     if (last && last.key === key) {
       last.steps.push({ step, si });
     } else {
+      const d = step.deduction;
+      const isRowConfinement = step.technique === 'Row Confinement' && d.confinedTerritory !== undefined;
+      const isColConfinement = step.technique === 'Column Confinement' && d.confinedTerritory !== undefined;
       groups.push({
         technique: step.technique,
         key,
         pairedTerritories: step.technique === 'Group Elimination'
-          ? (step.deduction.pairedTerritories ?? []).slice().sort((a, b) => a - b)
+          ? (d.pairedTerritories ?? []).slice().sort((a, b) => a - b)
           : undefined,
+        confinedTerritory: (isRowConfinement || isColConfinement) ? d.confinedTerritory : undefined,
+        dimension: isRowConfinement ? 'row' : isColConfinement ? 'col' : undefined,
+        dimensionValue: isRowConfinement ? d.row : isColConfinement ? d.col : undefined,
         steps: [{ step, si }],
       });
     }
@@ -210,6 +227,7 @@ function WavePanel({
                     {group.steps.length > 1 && (
                       <div className="flex items-center gap-1 flex-wrap mb-1">
                         {group.pairedTerritories ? (
+                          // Group Elimination: show paired territory chips
                           <>
                             {group.pairedTerritories.map(t => {
                               const c = TERRITORY_COLORS[t] ?? TERRITORY_COLORS[0];
@@ -224,7 +242,24 @@ function WavePanel({
                               × {group.steps.length}
                             </span>
                           </>
+                        ) : group.confinedTerritory !== undefined ? (
+                          // Row/Col Confinement: show confined territory chip + which row/col
+                          <>
+                            {(() => {
+                              const c = TERRITORY_COLORS[group.confinedTerritory] ?? TERRITORY_COLORS[0];
+                              return (
+                                <span className="text-[10px] px-1.5 py-px rounded-sm leading-tight"
+                                  style={{ backgroundColor: c.bg, color: c.text }}>
+                                  {TERRITORY_NAMES[group.confinedTerritory] ?? `T${group.confinedTerritory + 1}`}
+                                </span>
+                              );
+                            })()}
+                            <span className="text-[10px] opacity-75" style={{ color: groupColor }}>
+                              {group.dimension} {(group.dimensionValue ?? 0) + 1} × {group.steps.length}
+                            </span>
+                          </>
                         ) : (
+                          // Default: plain label
                           <span className="text-[10px] tracking-wider uppercase" style={{ color: groupColor, opacity: 0.75 }}>
                             {group.technique} × {group.steps.length}
                           </span>
