@@ -1,0 +1,222 @@
+'use client';
+
+import { useRef, useEffect, useCallback } from 'react';
+import type { Puzzle, CellState, ContradictionResult } from '@/engine/boardTypes';
+import Cell from './Cell';
+
+interface BoardProps {
+  puzzle: Puzzle;
+  playerCells: CellState[][];
+  onCellWard: (row: number, col: number) => void;
+  onCellWatcher: (row: number, col: number) => void;
+  highlightCells?: [number, number][];
+  highlightTerritories?: number[];
+  highlightRows?: number[];
+  highlightCols?: number[];
+  hintActive?: boolean;
+  contradiction?: ContradictionResult;
+  flashCells?: [number, number][];
+}
+
+function isCellHighlighted(
+  row: number, col: number, territory: number,
+  highlightCells?: [number, number][],
+  highlightTerritories?: number[],
+  highlightRows?: number[],
+  highlightCols?: number[],
+): boolean {
+  if (highlightCells?.some(([r, c]) => r === row && c === col)) return true;
+  if (highlightTerritories?.includes(territory)) return true;
+  if (highlightRows?.includes(row)) return true;
+  if (highlightCols?.includes(col)) return true;
+  return false;
+}
+
+function isCellContradiction(row: number, col: number, contradiction?: ContradictionResult): boolean {
+  if (!contradiction?.found) return false;
+  return contradiction.affectedCells?.some(([r, c]) => r === row && c === col) ?? false;
+}
+
+export default function Board({
+  puzzle,
+  playerCells,
+  onCellWard,
+  onCellWatcher,
+  highlightCells,
+  highlightTerritories,
+  highlightRows,
+  highlightCols,
+  hintActive = false,
+  contradiction,
+  flashCells,
+}: BoardProps) {
+  const { size, territoryMap } = puzzle;
+
+  // Keep latest versions in refs so stable handlers don't go stale
+  const onCellWardRef    = useRef(onCellWard);
+  const onCellWatcherRef = useRef(onCellWatcher);
+  const playerCellsRef   = useRef(playerCells);
+  useEffect(() => { onCellWardRef.current    = onCellWard;    }, [onCellWard]);
+  useEffect(() => { onCellWatcherRef.current = onCellWatcher; }, [onCellWatcher]);
+  useEffect(() => { playerCellsRef.current   = playerCells;   }, [playerCells]);
+
+  const pointerDownRef  = useRef(false);
+  const isDraggingRef   = useRef(false);
+  const startPosRef     = useRef({ x: 0, y: 0 });
+  const dragActionRef   = useRef<'place' | 'remove'>('place');
+  const lastDragCellRef = useRef(''); // "row,col" — skip re-entry on same cell
+  const clickTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingClickRef = useRef<{ row: number; col: number } | null>(null);
+
+  function getCellAtPoint(x: number, y: number): { row: number; col: number } | null {
+    const el = document.elementFromPoint(x, y) as HTMLElement | null;
+    const cell = el?.closest('[data-cell="true"]') as HTMLElement | null;
+    if (!cell) return null;
+    const row = parseInt(cell.dataset.row ?? '-1', 10);
+    const col = parseInt(cell.dataset.col ?? '-1', 10);
+    if (row < 0 || col < 0) return null;
+    return { row, col };
+  }
+
+  function applyDragWard(row: number, col: number) {
+    const key = `${row},${col}`;
+    if (lastDragCellRef.current === key) return;
+    lastDragCellRef.current = key;
+    const state = playerCellsRef.current[row]?.[col];
+    if (dragActionRef.current === 'place'  && state === 'empty') onCellWardRef.current(row, col);
+    if (dragActionRef.current === 'remove' && state === 'ward')  onCellWardRef.current(row, col);
+  }
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault(); // prevent text selection / touch scroll on the board
+    // Capture pointer so pointerup fires on this element even if mouse leaves the board
+    e.currentTarget.setPointerCapture(e.pointerId);
+    pointerDownRef.current  = true;
+    isDraggingRef.current   = false;
+    lastDragCellRef.current = '';
+    startPosRef.current     = { x: e.clientX, y: e.clientY };
+
+    const cell = getCellAtPoint(e.clientX, e.clientY);
+    if (cell) {
+      const state = playerCellsRef.current[cell.row]?.[cell.col];
+      dragActionRef.current = state === 'ward' ? 'remove' : 'place';
+    }
+  }, []);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!pointerDownRef.current) return;
+    const dx = e.clientX - startPosRef.current.x;
+    const dy = e.clientY - startPosRef.current.y;
+
+    if (!isDraggingRef.current && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+      isDraggingRef.current = true;
+      // Cancel any pending single-click
+      if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
+      pendingClickRef.current = null;
+      // Apply to the cell where the drag started
+      const origin = getCellAtPoint(startPosRef.current.x, startPosRef.current.y);
+      if (origin) applyDragWard(origin.row, origin.col);
+    }
+
+    if (isDraggingRef.current) {
+      const cell = getCellAtPoint(e.clientX, e.clientY);
+      if (cell) applyDragWard(cell.row, cell.col);
+    }
+  }, []);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    if (!pointerDownRef.current) return;
+    pointerDownRef.current = false;
+
+    if (isDraggingRef.current) {
+      isDraggingRef.current = false;
+      return;
+    }
+
+    const cell = getCellAtPoint(e.clientX, e.clientY);
+    if (!cell) return;
+
+    // Start single-click timer — fires ward toggle if no double-click cancels it
+    if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+    pendingClickRef.current = cell;
+    clickTimerRef.current = setTimeout(() => {
+      const pending = pendingClickRef.current;
+      if (pending) {
+        const state = playerCellsRef.current[pending.row]?.[pending.col];
+        if (state !== 'watcher') onCellWardRef.current(pending.row, pending.col);
+      }
+      pendingClickRef.current = null;
+      clickTimerRef.current   = null;
+    }, 280);
+  }, []);
+
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    // Cancel the single-click ward action
+    if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
+    pendingClickRef.current = null;
+
+    const cell = getCellAtPoint(e.clientX, e.clientY);
+    if (!cell) return;
+    const state = playerCellsRef.current[cell.row]?.[cell.col];
+    if (state !== 'ward') onCellWatcherRef.current(cell.row, cell.col);
+  }, []);
+
+  useEffect(() => () => { if (clickTimerRef.current) clearTimeout(clickTimerRef.current); }, []);
+
+  // Safety net: reset drag state whenever the pointer is released anywhere on the page.
+  // This catches releases outside the board that pointer capture may miss (e.g. browser
+  // chrome, iframe boundaries, or rapid focus changes).
+  useEffect(() => {
+    const onGlobalUp = () => {
+      if (!pointerDownRef.current) return;
+      pointerDownRef.current  = false;
+      isDraggingRef.current   = false;
+      lastDragCellRef.current = '';
+      if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
+      pendingClickRef.current = null;
+    };
+    window.addEventListener('pointerup', onGlobalUp);
+    return () => window.removeEventListener('pointerup', onGlobalUp);
+  }, []);
+
+  return (
+    <div
+      className="game-board inline-block border-2 border-ink cursor-pointer"
+      style={{ lineHeight: 0, touchAction: 'none' }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onDoubleClick={handleDoubleClick}
+    >
+      {Array.from({ length: size }, (_, row) => (
+        <div key={row} className="flex">
+          {Array.from({ length: size }, (_, col) => {
+            const territory = territoryMap[row][col];
+            const state     = playerCells[row]?.[col] ?? 'empty';
+
+            return (
+              <Cell
+                key={col}
+                row={row}
+                col={col}
+                territory={territory}
+                state={state}
+                isHighlighted={isCellHighlighted(row, col, territory, highlightCells, highlightTerritories, highlightRows, highlightCols)}
+                isDimmed={hintActive && !isCellHighlighted(row, col, territory, highlightCells, highlightTerritories, highlightRows, highlightCols)}
+                isPrimaryHint={highlightCells?.some(([r, c]) => r === row && c === col) ?? false}
+                isContradiction={isCellContradiction(row, col, contradiction)}
+                isFlash={flashCells?.some(([r, c]) => r === row && c === col) ?? false}
+                size={size}
+                thickTop={row === 0          || territoryMap[row - 1][col] !== territory}
+                thickBottom={row === size - 1 || territoryMap[row + 1][col] !== territory}
+                thickLeft={col === 0          || territoryMap[row][col - 1] !== territory}
+                thickRight={col === size - 1  || territoryMap[row][col + 1] !== territory}
+              />
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}

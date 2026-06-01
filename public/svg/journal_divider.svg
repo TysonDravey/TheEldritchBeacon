@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Journal Divider">
+  <title>Journal Divider</title>
+  <defs>
+    <filter id="roughen">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.6"/>
+    </filter>
+  </defs>
+
+  <g fill="none" stroke="#111111" stroke-linecap="round" stroke-linejoin="round" filter="url(#roughen)">
+    <path d="M5 50 C22 46, 35 46, 48 50 C62 54, 75 54, 95 50" stroke-width="2"/>
+    <path d="M12 43 C24 45, 35 44, 48 38 C62 44, 75 45, 88 43" stroke-width="1.2" opacity="0.7"/>
+    <circle cx="50" cy="50" r="8" stroke-width="2"/>
+    <circle cx="50" cy="50" r="3" fill="#8B1E24" stroke="none"/>
+    <path d="M35 50 L25 58" stroke-width="1.5"/>
+    <path d="M65 50 L75 58" stroke-width="1.5"/>
+  </g>
+
+</svg>

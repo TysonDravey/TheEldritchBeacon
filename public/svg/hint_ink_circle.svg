@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Red Ink Hint Circle">
+  <title>Red Ink Hint Circle</title>
+  <defs>
+    <filter id="roughen">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.6"/>
+    </filter>
+  </defs>
+
+  <g fill="none" stroke="#8B1E24" stroke-linecap="round" stroke-linejoin="round" filter="url(#roughen)">
+    <path d="M21 50 C18 30, 34 16, 53 18 C74 20, 86 36, 82 57 C78 77, 56 86, 36 79 C21 74, 14 61, 21 50 Z" stroke-width="5"/>
+    <path d="M28 51 C27 37, 38 26, 53 27 C68 28, 77 40, 74 55 C71 69, 56 76, 41 72 C31 69, 25 60, 28 51 Z" stroke-width="1.8" opacity="0.7"/>
+  </g>
+
+</svg>

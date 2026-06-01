@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Completion Stamp">
+  <title>Completion Stamp</title>
+  <defs>
+    <filter id="roughen">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.6"/>
+    </filter>
+  </defs>
+
+  <g fill="none" stroke="#8B1E24" stroke-linecap="round" stroke-linejoin="round" filter="url(#roughen)">
+    <circle cx="50" cy="50" r="42" stroke-width="5"/>
+    <circle cx="50" cy="50" r="31" stroke-width="2"/>
+    <path d="M25 53 L42 69 L76 31" stroke-width="8"/>
+  </g>
+
+</svg>

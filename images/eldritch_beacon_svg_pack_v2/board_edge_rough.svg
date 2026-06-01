@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Rough Board Edge">
+  <title>Rough Board Edge</title>
+  <defs>
+    <filter id="roughen">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.6"/>
+    </filter>
+  </defs>
+
+  <g fill="none" stroke="#111111" stroke-linecap="round" stroke-linejoin="round" opacity="0.8" filter="url(#roughen)">
+    <path d="M5 6 C25 3, 45 7, 62 5 C76 3, 88 5, 95 7" stroke-width="3"/>
+    <path d="M94 5 C98 28, 92 45, 96 62 C99 78, 94 88, 92 96" stroke-width="3"/>
+    <path d="M95 94 C75 99, 56 92, 38 96 C24 99, 14 94, 6 92" stroke-width="3"/>
+    <path d="M6 95 C2 75, 7 58, 4 40 C1 24, 6 14, 8 5" stroke-width="3"/>
+  </g>
+
+</svg>

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Beacon Eye">
+  <title>Beacon Eye</title>
+  <defs>
+    <filter id="roughen">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.6"/>
+    </filter>
+  </defs>
+
+  <g fill="none" stroke="#111111" stroke-linecap="round" stroke-linejoin="round" filter="url(#roughen)">
+    <path d="M12 50 C24 25, 76 25, 88 50 C76 75, 24 75, 12 50 Z" fill="#F2E9D8" stroke-width="5"/>
+    <circle cx="50" cy="50" r="17" fill="#8B1E24" stroke-width="4"/>
+    <circle cx="50" cy="50" r="8" fill="#111111" stroke-width="2"/>
+    <circle cx="56" cy="43" r="3" fill="#F2E9D8" stroke="none"/>
+    <path d="M21 42 C35 34, 65 34, 79 42" stroke-width="1.8" opacity="0.6"/>
+    <path d="M21 58 C35 66, 65 66, 79 58" stroke-width="1.8" opacity="0.6"/>
+  </g>
+
+</svg>

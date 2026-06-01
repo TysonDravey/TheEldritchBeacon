@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Contradiction Crack">
+  <title>Contradiction Crack</title>
+  <defs>
+    <filter id="roughen">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.6"/>
+    </filter>
+  </defs>
+
+  <g fill="none" stroke="#8B1E24" stroke-linecap="round" stroke-linejoin="round" filter="url(#roughen)">
+    <path d="M50 5 L43 24 L56 37 L45 52 L58 67 L49 95" stroke-width="5"/>
+    <path d="M43 24 L29 31" stroke-width="3"/>
+    <path d="M56 37 L74 29" stroke-width="3"/>
+    <path d="M45 52 L25 61" stroke-width="3"/>
+    <path d="M58 67 L78 77" stroke-width="3"/>
+  </g>
+
+</svg>

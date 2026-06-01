@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Ward sigil">
+  <title>Ward Sigil</title>
+  <defs>
+    <filter id="roughen">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.7"/>
+    </filter>
+  </defs>
+  <g fill="none" stroke="#111111" stroke-linecap="round" stroke-linejoin="round" filter="url(#roughen)">
+    <circle cx="50" cy="50" r="31" stroke-width="3"/>
+    <circle cx="50" cy="50" r="8" stroke-width="3"/>
+    <path d="M50 6 L58 42 L94 50 L58 58 L50 94 L42 58 L6 50 L42 42 Z" stroke-width="4"/>
+    <path d="M24 24 L76 76" stroke-width="2"/>
+    <path d="M76 24 L24 76" stroke-width="2"/>
+    <path d="M50 15 L50 32" stroke-width="2"/>
+    <path d="M50 68 L50 85" stroke-width="2"/>
+    <path d="M15 50 L32 50" stroke-width="2"/>
+    <path d="M68 50 L85 50" stroke-width="2"/>
+    <circle cx="50" cy="50" r="3" fill="#8B1E24" stroke="none"/>
+  </g>
+</svg>

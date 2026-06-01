@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Territory Pattern Coral">
+  <title>Territory Pattern Coral</title>
+  <defs>
+    <filter id="roughen">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.6"/>
+    </filter>
+  </defs>
+
+  <g fill="none" stroke="#111111" stroke-linecap="round" opacity="0.30">
+    <path d="M50 96 C50 70, 50 50, 50 20" stroke-width="2"/>
+    <path d="M50 68 C36 60, 29 49, 23 36" stroke-width="2"/>
+    <path d="M50 58 C64 49, 74 38, 80 22" stroke-width="2"/>
+    <path d="M50 40 C41 32, 36 23, 35 10" stroke-width="2"/>
+    <path d="M24 36 C19 29, 15 25, 10 22" stroke-width="1.5"/>
+    <path d="M79 22 C86 19, 91 15, 95 8" stroke-width="1.5"/>
+  </g>
+
+</svg>

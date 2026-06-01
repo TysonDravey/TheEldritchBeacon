@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Territory Pattern Fog">
+  <title>Territory Pattern Fog</title>
+  <defs>
+    <filter id="roughen">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.6"/>
+    </filter>
+  </defs>
+
+  <g fill="none" stroke="#111111" stroke-linecap="round" opacity="0.24">
+    <path d="M5 28 C25 16, 47 39, 68 26 C80 18, 91 21, 98 27" stroke-width="3"/>
+    <path d="M0 52 C22 41, 39 62, 58 53 C75 45, 88 47, 100 55" stroke-width="3"/>
+    <path d="M9 76 C28 68, 45 83, 67 74 C82 68, 91 70, 99 76" stroke-width="3"/>
+  </g>
+
+</svg>

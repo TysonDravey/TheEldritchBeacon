@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Watcher Loading Spinner">
+  <title>Watcher Loading Spinner</title>
+  <defs>
+    <filter id="roughen">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.6"/>
+    </filter>
+  </defs>
+
+  <style>
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .spin { transform-origin: 50px 50px; animation: spin 2.8s linear infinite; }
+  </style>
+  <g class="spin" fill="none" stroke="#111111" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M50 9 C59 18, 62 30, 58 42" stroke-width="4"/>
+    <path d="M78 21 C76 33, 69 43, 58 48" stroke-width="4"/>
+    <path d="M91 50 C82 59, 70 62, 58 58" stroke-width="4"/>
+    <path d="M79 78 C67 76, 57 69, 52 58" stroke-width="4"/>
+    <path d="M50 91 C41 82, 38 70, 42 58" stroke-width="4"/>
+    <path d="M22 79 C24 67, 31 57, 42 52" stroke-width="4"/>
+    <path d="M9 50 C18 41, 30 38, 42 42" stroke-width="4"/>
+    <path d="M21 22 C33 24, 43 31, 48 42" stroke-width="4"/>
+  </g>
+  <g fill="none" stroke="#111111" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M23 50 C31 37, 69 37, 77 50 C69 63, 31 63, 23 50 Z" fill="#F2E9D8" stroke-width="4"/>
+    <circle cx="50" cy="50" r="11" fill="#8B1E24" stroke-width="3"/>
+    <circle cx="50" cy="50" r="5" fill="#111111" stroke-width="2"/>
+  </g>
+
+</svg>
