@@ -79,7 +79,8 @@ export default function PuzzlePage() {
 
     function animateNextWatcher() {
       if (watcherIdx < watcherPositions.length) {
-        setCascadeGhosts(prev => [...prev, watcherPositions[watcherIdx]]);
+        const next = watcherPositions[watcherIdx];
+        if (next != null) setCascadeGhosts(prev => [...prev, next]);
         watcherIdx++;
         cascadeTimerRef.current = setTimeout(animateNextWatcher, 600);
       } else {
@@ -103,7 +104,8 @@ export default function PuzzlePage() {
 
     function animateNextVictimWard() {
       if (victimIdx < victimCells.length) {
-        setCascadeWards(prev => [...prev, victimCells[victimIdx]]);
+        const next = victimCells[victimIdx];
+        if (next != null) setCascadeWards(prev => [...prev, next]);
         victimIdx++;
         cascadeTimerRef.current = setTimeout(animateNextVictimWard, 350);
       }
