@@ -106,6 +106,8 @@ function parseArgs() {
   let depth = 0;
   let difficulty: string | null = null;
   let mode: PuzzleMode = 'initiate';
+  let bias: number | null = null;
+  let attempts: number | null = null;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--per-size'   && args[i + 1]) perSize = parseInt(args[++i]);
@@ -114,8 +116,10 @@ function parseArgs() {
     if (args[i] === '--depth'      && args[i + 1]) depth = parseInt(args[++i]);
     if (args[i] === '--difficulty' && args[i + 1]) difficulty = args[++i];
     if (args[i] === '--mode'       && args[i + 1]) mode = args[++i] as PuzzleMode;
+    if (args[i] === '--bias'       && args[i + 1]) bias = parseFloat(args[++i]);
+    if (args[i] === '--attempts'   && args[i + 1]) attempts = parseInt(args[++i]);
   }
-  return { perSize, sizes, base, depth, difficulty, mode };
+  return { perSize, sizes, base, depth, difficulty, mode, bias, attempts };
 }
 
 function nextIdNum(content: string, size: number): number {
@@ -137,7 +141,7 @@ function usedSeeds(content: string): Set<string> {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  const { perSize, sizes, base, depth, difficulty, mode } = parseArgs();
+  const { perSize, sizes, base, depth, difficulty, mode, bias, attempts } = parseArgs();
   const filePath = join(process.cwd(), 'data', 'samplePuzzles.ts');
 
   let content = readFileSync(filePath, 'utf-8');
@@ -157,7 +161,8 @@ async function main() {
 
       if (existingSeeds.has(seed)) continue;
 
-      const puzzle = generatePuzzle({ size, seed, maxAttempts: depth > 0 ? 200 : 500, maxDepth: depth, mode });
+      const maxAttempts = attempts ?? (depth > 0 ? 200 : 500);
+      const puzzle = generatePuzzle({ size, seed, maxAttempts, maxDepth: depth, mode, ...(bias != null && { biasStrength: bias }) });
       if (!puzzle) {
         process.stderr.write(`  skip ${seed}: no puzzle\n`);
         continue;

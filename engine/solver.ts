@@ -744,17 +744,23 @@ function contradictionTest(
   candidates: Map<number, [number, number][]>,
   depth: number = 1,
 ): DeductionResult | null {
-  // Collect all candidate cells across all territories
+  // Collect candidates, tightest territories first (fewer candidates → more likely to contradict).
+  // Cap at n*3 total hypotheses: sorted ordering means we test the most useful ones first,
+  // so this cut rarely misses real contradictions while keeping larger boards fast.
+  const n = puzzle.size;
   const seen = new Set<string>();
   const allCands: [number, number, number][] = []; // [row, col, territory]
-  for (const [t, cands] of candidates) {
+  const sorted = [...candidates.entries()].sort((a, b) => a[1].length - b[1].length);
+  for (const [t, cands] of sorted) {
     for (const [r, c] of cands) {
       const key = `${r},${c}`;
       if (!seen.has(key)) { seen.add(key); allCands.push([r, c, t]); }
     }
   }
+  const limit = Math.max(n * 3, 24); // never less than 24 so small boards stay fully explored
+  const testCands = allCands.slice(0, limit);
 
-  for (const [r, c, territory] of allCands) {
+  for (const [r, c, territory] of testCands) {
     const test = deepCopy(playerCells);
     applyDeduction(test, { type: 'watcher', row: r, col: c, reason: 'test' });
 
