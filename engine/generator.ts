@@ -43,15 +43,14 @@ function generateSolution(n: number, rng: () => number): [number, number][] | nu
 function generateTerritoryMap(
   n: number,
   solution: [number, number][],
-  rng: () => number
+  rng: () => number,
+  biasStrength: number = 0.75,
 ): number[][] {
   const map: number[][] = Array.from({ length: n }, () => Array(n).fill(-1));
 
   // Each territory grows biased toward a primary axis (row-stripe or col-stripe).
-  // This makes territories column- or row-confined, which the logical solver needs.
-  // A biasStrength of 1.0 → only grow along the preferred axis initially.
-  // A biasStrength of 0.0 → pure random BFS (original behaviour).
-  const biasStrength = 0.75;
+  // biasStrength=0.75 → confinement-friendly, good for forward-reasoning puzzles.
+  // biasStrength=0.25 → blob-like territories, more likely to need contradiction tests.
   const axes: ('row' | 'col')[] = solution.map(() => rng() < 0.5 ? 'row' : 'col');
 
   // Seed each territory with its watcher position
@@ -255,10 +254,17 @@ export interface GenerateOptions {
   mode?: PuzzleMode;
   id?: string;
   title?: string;
+  /** Axis bias for territory growth. 0.75=stripe (default), 0.25=blob (better for Archon). */
+  biasStrength?: number;
+  /** When true, skip puzzles solvable at depth-0 (targeting Archon difficulty only). */
+  requireContradict?: boolean;
 }
 
 export function generatePuzzle(opts: GenerateOptions): Puzzle | null {
-  const { size: n, seed, maxAttempts = 500, maxDepth = 0, mode = 'initiate' } = opts;
+  const {
+    size: n, seed, maxAttempts = 500, maxDepth = 0, mode = 'initiate',
+    biasStrength = 0.75, requireContradict = false,
+  } = opts;
   const rng = createRNG(seed);
 
   const isShattered = mode === 'shattered-realms';
@@ -271,7 +277,7 @@ export function generatePuzzle(opts: GenerateOptions): Puzzle | null {
     // 2. Build territory map
     const map = isShattered
       ? generateShatteredTerritoryMap(n, solution, rng)
-      : generateTerritoryMap(n, solution, rng);
+      : generateTerritoryMap(n, solution, rng, biasStrength);
 
     // 3. Verify no unassigned cells
     let mapValid = true;
@@ -288,7 +294,10 @@ export function generatePuzzle(opts: GenerateOptions): Puzzle | null {
       }
       if (!connected) continue;
 
-      // Confinement pre-filter (not meaningful for shattered territories)
+      // Confinement pre-filter (not meaningful for shattered territories).
+      // Standard mode: require many confined territories (forward-reasoning friendly).
+      // requireContradict mode: require FEW confined territories — blob-shaped territories
+      // resist confinement deductions and force contradiction-test reasoning (Archon).
       let confinedCount = 0;
       for (let t = 0; t < n; t++) {
         const rows = new Set<number>(), cols = new Set<number>();
@@ -297,7 +306,12 @@ export function generatePuzzle(opts: GenerateOptions): Puzzle | null {
             if (map[r][c] === t) { rows.add(r); cols.add(c); }
         if (rows.size <= 2 || cols.size <= 2) confinedCount++;
       }
-      if (confinedCount < Math.ceil(n / 2)) continue;
+      if (requireContradict) {
+        // Fewer than n/3 confined territories → balanced map more likely to need contradiction
+        if (confinedCount > Math.floor(n / 3)) continue;
+      } else {
+        if (confinedCount < Math.ceil(n / 2)) continue;
+      }
     }
 
     // 4. Build a candidate puzzle
@@ -315,8 +329,15 @@ export function generatePuzzle(opts: GenerateOptions): Puzzle | null {
 
     // 5. Gate: logical solver must crack it at the requested depth.
     // depth=0 (default): fast generation, works for most puzzles.
-    // depth=1: slow (2% hit rate for 8x8) but produces harder puzzles requiring
-    //          contradiction chains. Use the generateHard script for batch depth-1 runs.
+    // depth=1: produces puzzles requiring contradiction chains.
+    //
+    // When requireContradict=true: first verify depth-0 can NOT solve it — we
+    // specifically want puzzles that need contradiction tests (Archon difficulty).
+    if (requireContradict && maxDepth > 0) {
+      const easyResult = solveLogically(puzzle, 0);
+      if (easyResult) continue; // solvable without contradiction — skip
+    }
+
     const solverResult = solveLogically(puzzle, maxDepth);
     if (!solverResult) continue;
 

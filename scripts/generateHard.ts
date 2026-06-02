@@ -42,7 +42,7 @@ const HARD_TITLES = [
 
 function parseArgs(): { size: number; count: number; base: string; start: number } {
   const args = process.argv.slice(2);
-  let size = 8, count = 5, base = 'hard-v1', start = 1;
+  let size = 8, count = 5, base = 'archon-v2', start = 1;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--size'  && args[i+1]) size  = parseInt(args[++i]);
     if (args[i] === '--count' && args[i+1]) count = parseInt(args[++i]);
@@ -55,8 +55,8 @@ function parseArgs(): { size: number; count: number; base: string; start: number
 async function main() {
   const { size, count, base, start } = parseArgs();
 
-  process.stderr.write(`Generating ${count} hard ${size}×${size} puzzles (depth-1 solver)...\n`);
-  process.stderr.write(`This takes ~5–25s per puzzle. Grab a coffee.\n\n`);
+  process.stderr.write(`Generating ${count} Archon ${size}×${size} puzzles (blob territories + depth-1 solver)...\n`);
+  process.stderr.write(`Targeting contradiction-test-only puzzles. Hit Ctrl+C to stop early.\n\n`);
 
   const found: Puzzle[] = [];
   let seedIdx = 0;
@@ -74,11 +74,13 @@ async function main() {
       maxAttempts: 500,
       maxDepth: 1,
       mode: 'initiate',
+      biasStrength: 0.25,    // blob territories resist confinement → need contradiction
+      requireContradict: true, // pre-filter: skip anything depth-0 can solve
     });
     const elapsed = ((Date.now() - start_ms) / 1000).toFixed(1);
 
     if (!puzzle) {
-      process.stderr.write(`  seed ${seed}: no puzzle found\n`);
+      process.stderr.write(`  seed ${seed}: no candidate found (${elapsed}s)\n`);
       continue;
     }
 
@@ -94,8 +96,14 @@ async function main() {
       difficulty: rateDifficulty({ ...puzzle, id, title }),
     };
 
+    // Only count genuinely Archon puzzles (require contradiction-test reasoning)
+    if (finalPuzzle.difficulty !== 'Archon') {
+      process.stderr.write(`  seed ${seed}: skipped (${finalPuzzle.difficulty}, ${elapsed}s)\n`);
+      continue;
+    }
+
     found.push(finalPuzzle);
-    process.stderr.write(`  ✓ ${id} — ${finalPuzzle.difficulty} (${elapsed}s, seed ${seed})\n`);
+    process.stderr.write(`  ✓ ${id} — Archon (${elapsed}s, seed ${seed})\n`);
   }
 
   process.stderr.write(`\nDone. ${found.length} puzzles from ${attempts} seed attempts.\n\n`);
