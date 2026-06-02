@@ -86,10 +86,11 @@ function generateMixedTerritoryMap(
   const map: number[][] = Array.from({ length: n }, () => Array(n).fill(-1));
 
   // Assign "shape" to each territory.
-  // - "single": single cell — instant forced placement, kickstarts the cascade
-  // - "thin-row": few cells in same row → row confinement fires immediately
-  // - "thin-col": few cells in same col → col confinement fires immediately
-  // - "blob": BFS-grown territory, harder to constrain
+  // - "single": single cell — instant forced placement; one kickstart is OK,
+  //   two makes the puzzle trivial (player sees both 1-cell regions immediately).
+  // - "thin-row" / "thin-col": few cells in same row/col → confinement fires after
+  //   another nearby watcher is placed
+  // - "blob": BFS-grown territory
   type Shape = 'single' | 'thin-row' | 'thin-col' | 'blob';
   const shapes: Shape[] = solution.map(() => 'blob');
   const indices = Array.from({ length: n }, (_, i) => i);
@@ -97,13 +98,10 @@ function generateMixedTerritoryMap(
     const j = Math.floor(rng() * (i + 1));
     [indices[i], indices[j]] = [indices[j], indices[i]];
   }
-  // First 2 territories: single cell. Then thinCount more: thin row/col.
-  const singleCount = Math.min(2, thinCount);
   let assigned = 0;
-  for (let k = 0; k < singleCount && k < indices.length; k++) {
-    shapes[indices[assigned++]] = 'single';
-  }
-  for (let k = 0; k < thinCount - singleCount && assigned < indices.length; k++) {
+  // One single-cell kickstart territory (load-bearing for depth-1 cascade at n=10)
+  if (assigned < indices.length) shapes[indices[assigned++]] = 'single';
+  for (let k = 0; k < thinCount && assigned < indices.length; k++) {
     shapes[indices[assigned++]] = rng() < 0.5 ? 'thin-row' : 'thin-col';
   }
 
@@ -119,7 +117,7 @@ function generateMixedTerritoryMap(
   for (let t = 0; t < solution.length; t++) {
     if (shapes[t] !== 'thin-row' && shapes[t] !== 'thin-col') continue;
     const [wr, wc] = solution[t];
-    const targetSize = 2 + Math.floor(rng() * 3); // 2-4 cells
+    const targetSize = 2 + Math.floor(rng() * 2); // 2-3 cells
     const cells: [number, number][] = [[wr, wc]];
 
     if (shapes[t] === 'thin-row') {
@@ -261,17 +259,24 @@ function parseArgs() {
   let base = 'eb-10x10-c1';
   let thin = 3;
   let maxSeeds = 20000;
+  let minDifficulty: string | null = null;
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--count'    && args[i+1]) count = parseInt(args[++i]);
-    if (args[i] === '--base'     && args[i+1]) base  = args[++i];
-    if (args[i] === '--thin'     && args[i+1]) thin  = parseInt(args[++i]);
-    if (args[i] === '--max'      && args[i+1]) maxSeeds = parseInt(args[++i]);
+    if (args[i] === '--count'          && args[i+1]) count = parseInt(args[++i]);
+    if (args[i] === '--base'           && args[i+1]) base  = args[++i];
+    if (args[i] === '--thin'           && args[i+1]) thin  = parseInt(args[++i]);
+    if (args[i] === '--max'            && args[i+1]) maxSeeds = parseInt(args[++i]);
+    if (args[i] === '--min-difficulty' && args[i+1]) minDifficulty = args[++i];
   }
-  return { count, base, thin, maxSeeds };
+  return { count, base, thin, maxSeeds, minDifficulty };
 }
 
+const DIFFICULTY_RANK: Record<string, number> = {
+  Initiate: 1, Scholar: 2, Occultist: 3, 'High Priest': 4, Eldritch: 5, Harbinger: 6, Archon: 7,
+};
+
 async function main() {
-  const { count, base, thin, maxSeeds } = parseArgs();
+  const { count, base, thin, maxSeeds, minDifficulty } = parseArgs();
+  const minRank = minDifficulty ? DIFFICULTY_RANK[minDifficulty] ?? 0 : 0;
   const n = 10;
   const filePath = join(process.cwd(), 'data', 'samplePuzzles.ts');
   let fileContent = readFileSync(filePath, 'utf-8');
@@ -333,6 +338,11 @@ async function main() {
     const title = TITLES[(idNum - 1) % TITLES.length];
 
     const diff = rateDifficulty({ ...raw, id, title });
+    if (minRank > 0 && (DIFFICULTY_RANK[diff] ?? 0) < minRank) {
+      // Doesn't meet difficulty threshold — skip and don't mark this ID as used
+      if (process.env.DEBUG_DIFF) process.stderr.write(`  seed s${s}: ${diff} (below ${minDifficulty})\n`);
+      continue;
+    }
     const { difficulty: _d, ...rest } = raw;
     const entry = { ...rest, id, title };
 

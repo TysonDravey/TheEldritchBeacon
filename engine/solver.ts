@@ -757,7 +757,7 @@ function contradictionTest(
       if (!seen.has(key)) { seen.add(key); allCands.push([r, c, t]); }
     }
   }
-  const limit = Math.max(n * 3, 24); // never less than 24 so small boards stay fully explored
+  const limit = Math.max(n * 5, 24); // never less than 24 so small boards stay fully explored
   const testCands = allCands.slice(0, limit);
 
   for (const [r, c, territory] of testCands) {
