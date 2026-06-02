@@ -116,6 +116,108 @@ A split was made between puzzle generation tooling and the playable game.
 
 ---
 
+## Rendering Architecture
+
+### Core Rule
+
+The puzzle engine must never know how the board is rendered. The engine exposes only:
+
+- Board state
+- Territory data
+- Valid moves
+- Deductions
+- Hints
+- Puzzle metadata
+
+The renderer consumes that output. Possible renderers: SVG, HTML/CSS, Canvas, Three.js, or a future game engine. The engine remains unchanged regardless of renderer.
+
+Architecture:
+
+```
+Puzzle Engine → Board State → Rendering Layer
+```
+
+The engine must be capable of running entirely through unit tests without any rendering system attached.
+
+---
+
+### Phase 1 Rendering (current)
+
+**Goal:** Make the game playable.
+
+- SVG, React Components, Tailwind
+- Flat puzzle board, SVG Watchers, SVG Wards, parchment textures
+- Fade/scale animations, simple hint highlights
+
+Success condition: the game is fun even with placeholder visuals.
+
+---
+
+### Phase 2 Rendering
+
+**Goal:** Create depth and atmosphere.
+
+- Framer Motion, CSS transforms, SVG animation
+- Slight board perspective, layered paper effect, subtle depth
+- Watcher eye opening, tentacle unfurling, Ward drawing itself, red-ink hint animations, puzzle completion effects
+
+Visual style: the board should begin to feel like an artifact from a lighthouse journal.
+
+---
+
+### Phase 3 Rendering
+
+**Goal:** Create a living diorama around the puzzle.
+
+- Three.js, React Three Fiber
+- Puzzle exists on a physical chart table, slight camera movement, atmospheric lighting
+- Watchers emerge from cracks, tentacles move beneath the board, fog drifts, completion events affect the environment
+
+**Important:** the puzzle itself remains clear and readable. Visual spectacle must never reduce puzzle usability.
+
+---
+
+### Campaign Environment (future)
+
+Players ascend the Beacon. Each region represents a higher level of the lighthouse:
+
+- The Foundations → The Shore → The Fog → The Reefs → Deep Water → The Black Tide → The Lantern Room → The Watcher Beneath
+
+Each region may eventually have unique environment art, atmospheric effects, visual storytelling, and environmental progression.
+
+---
+
+### Environmental Storytelling (future)
+
+- Tentacles wrapped around stone walls
+- Strange charts pinned to walls, recovered journals
+- Blinking eyes hidden in shadows, fog through broken windows
+- Distant lighthouse machinery
+
+These elements enhance atmosphere without interrupting gameplay.
+
+---
+
+### Puzzle Completion Events (future)
+
+- Lighthouse rises from the completed board
+- Occult sigils form across the chart
+- Tentacles retreat into cracks
+- The Beacon's eye opens
+- Environmental changes reveal hidden lore
+
+Treated as rewards, not gameplay mechanics.
+
+---
+
+### Long-Term Vision
+
+The final version of The Eldritch Beacon should feel like solving forbidden charts within a living lighthouse. The player is not simply solving puzzles — they are ascending through a strange, impossible structure while uncovering the mystery of the Watchers and the thing that holds the Beacon in place.
+
+The puzzle remains the heart of the experience. The visuals exist to reinforce wonder, mystery, and atmosphere.
+
+---
+
 ## Phase 2 — Make the Game Good
 
 **Goal:** Procedural generation, full mode support, daily puzzle, stats, better hints.
