@@ -83,6 +83,7 @@ export interface HintResult {
   highlightRows?: number[];
   highlightCols?: number[];
   deduction?: DeductionResult;
+  cascadeSteps?: [number, number][];    // Level III hypothetical: forced watcher chain after hypothesis
 }
 
 export interface ContradictionResult {

@@ -27,9 +27,11 @@ export default function PuzzlePage() {
   const [contradiction,    setContradiction]    = useState<ContradictionResult>({ found: false });
   const [flashCells,       setFlashCells]       = useState<[number, number][]>([]);
   const [rejectionMessage, setRejectionMessage] = useState<string | null>(null);
+  const [cascadeGhosts,    setCascadeGhosts]    = useState<[number, number][]>([]);
   // Tracks how many hints player has asked without making a move — drives escalation
-  const hintDepthRef = useRef(0);
-  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hintDepthRef    = useRef(0);
+  const flashTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cascadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!puzzle) return;
@@ -41,6 +43,46 @@ export default function PuzzlePage() {
       setPlayerState(createFreshPlayerState(puzzle.id, puzzle.size));
     }
   }, [puzzle]);
+
+  // Animate cascade ghost watchers when a Level III hypothetical hint is shown
+  useEffect(() => {
+    if (cascadeTimerRef.current) {
+      clearTimeout(cascadeTimerRef.current);
+      cascadeTimerRef.current = null;
+    }
+
+    const steps = hintResult?.cascadeSteps;
+    const primary = hintResult?.primaryCell;
+
+    if (!steps || !primary) {
+      setCascadeGhosts([]);
+      return;
+    }
+
+    const allPositions: [number, number][] = [primary, ...steps];
+    setCascadeGhosts([allPositions[0]]);
+
+    let idx = 1;
+    function animateNext() {
+      if (idx < allPositions.length) {
+        const pos = allPositions[idx];
+        setCascadeGhosts(prev => [...prev, pos]);
+        idx++;
+        cascadeTimerRef.current = setTimeout(animateNext, 600);
+      }
+    }
+
+    if (allPositions.length > 1) {
+      cascadeTimerRef.current = setTimeout(animateNext, 600);
+    }
+
+    return () => {
+      if (cascadeTimerRef.current) {
+        clearTimeout(cascadeTimerRef.current);
+        cascadeTimerRef.current = null;
+      }
+    };
+  }, [hintResult]);
 
   // Shared logic for applying any cell state change
   const applyChange = useCallback(
@@ -222,6 +264,7 @@ export default function PuzzlePage() {
         hintActive={!!hintResult}
         contradiction={contradiction}
         flashCells={flashCells}
+        ghostCells={cascadeGhosts}
       />
 
       {/* Controls */}

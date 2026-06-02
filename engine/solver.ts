@@ -951,6 +951,53 @@ export function hasUniqueSolution(puzzle: Puzzle): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// computeCascadeSteps — for Level III hypothetical hint animation
+// ---------------------------------------------------------------------------
+
+/**
+ * Simulates placing a hypothetical watcher at [hypothRow, hypothCol] and
+ * propagates basic logic (no contradiction test), collecting each forced
+ * watcher placement that follows. Used by the hint engine to animate the
+ * chain of consequences that leads to contradiction.
+ */
+export function computeCascadeSteps(
+  puzzle: Puzzle,
+  playerCells: CellState[][],
+  hypothRow: number,
+  hypothCol: number,
+): [number, number][] {
+  const cells = deepCopy(playerCells);
+  applyDeduction(cells, { type: 'watcher', row: hypothRow, col: hypothCol, reason: 'cascade' });
+
+  const steps: [number, number][] = [];
+
+  for (let i = 0; i < 60 && steps.length < 8; i++) {
+    const contra = findContradictions(puzzle, cells);
+    if (contra.found) break;
+
+    const cands = getCandidates(puzzle, cells);
+
+    // Basic techniques only — no contradiction test (avoid slowness and circular logic)
+    const d =
+      adjacencyElimination(puzzle, cells, cands) ??
+      nakedSingle(puzzle, cells, cands) ??
+      rowConfinement(puzzle, cells, cands) ??
+      columnConfinement(puzzle, cells, cands) ??
+      pairElimination(puzzle, cells, cands) ??
+      hiddenSetElimination(puzzle, cells, cands);
+
+    if (!d || cells[d.row][d.col] !== 'empty') break;
+
+    if (d.type === 'watcher') {
+      steps.push([d.row, d.col]);
+    }
+    applyDeduction(cells, d);
+  }
+
+  return steps;
+}
+
+// ---------------------------------------------------------------------------
 // Utility: combinations
 // ---------------------------------------------------------------------------
 

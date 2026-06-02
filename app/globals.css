@@ -42,3 +42,13 @@ body {
 [data-ward-animate] .ward-sigil {
   animation: ward-appear 180ms ease-out both;
 }
+
+@keyframes ghost-appear {
+  0%   { transform: scale(0); opacity: 0; }
+  60%  { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.ghost-watcher {
+  animation: ghost-appear 320ms ease-out both;
+}

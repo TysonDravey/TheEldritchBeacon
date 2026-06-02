@@ -16,6 +16,7 @@ interface CellProps {
   isPrimaryHint: boolean;
   isContradiction: boolean;
   isFlash: boolean;
+  isGhost: boolean;
   size: number;
   thickTop?: boolean;
   thickRight?: boolean;
@@ -46,6 +47,7 @@ export default function Cell({
   isPrimaryHint,
   isContradiction,
   isFlash,
+  isGhost,
   size,
   thickTop,
   thickRight,
@@ -100,6 +102,17 @@ export default function Cell({
           className="absolute animate-pulse pointer-events-none"
           style={{ opacity: 0.35 }}
         />
+      )}
+      {isGhost && state === 'empty' && (
+        <div className="ghost-watcher absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div style={{ opacity: 0.55 }}>
+            <Watcher territory={territory} size={watcherSize} />
+          </div>
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{ background: 'rgba(139, 26, 26, 0.35)' }}
+          />
+        </div>
       )}
     </div>
   );

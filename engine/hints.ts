@@ -1,5 +1,5 @@
 import type { Puzzle, CellState, HintResult, DeductionResult } from './boardTypes';
-import { findContradictions, getNextDeduction, getCandidates } from './solver';
+import { findContradictions, getNextDeduction, getCandidates, computeCascadeSteps } from './solver';
 import { getWatcherPositions } from './rules';
 
 // ---------------------------------------------------------------------------
@@ -285,6 +285,7 @@ function buildWardHint(
       highlightRows: [row],
       highlightCols: [col],
       deduction: d,
+      cascadeSteps: computeCascadeSteps(puzzle, playerCells, row, col),
     };
   }
 
