@@ -307,8 +307,9 @@ export function generatePuzzle(opts: GenerateOptions): Puzzle | null {
         if (rows.size <= 2 || cols.size <= 2) confinedCount++;
       }
       if (requireContradict) {
-        // Fewer than n/3 confined territories → balanced map more likely to need contradiction
-        if (confinedCount > Math.floor(n / 3)) continue;
+        // Fewer confined territories = more likely to need contradiction tests.
+        // Require strictly fewer confined territories than standard mode demands.
+        if (confinedCount >= Math.ceil(n / 2)) continue;
       } else {
         if (confinedCount < Math.ceil(n / 2)) continue;
       }

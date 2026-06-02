@@ -55,8 +55,8 @@ function parseArgs(): { size: number; count: number; base: string; start: number
 async function main() {
   const { size, count, base, start } = parseArgs();
 
-  process.stderr.write(`Generating ${count} Archon ${size}×${size} puzzles (blob territories + depth-1 solver)...\n`);
-  process.stderr.write(`Targeting contradiction-test-only puzzles. Hit Ctrl+C to stop early.\n\n`);
+  process.stderr.write(`Generating ${count} Archon ${size}×${size} puzzles (depth-1 solver, medium territories)...\n`);
+  process.stderr.write(`Filtering for contradiction-test-required puzzles. Hit Ctrl+C to stop early.\n\n`);
 
   const found: Puzzle[] = [];
   let seedIdx = 0;
@@ -74,8 +74,7 @@ async function main() {
       maxAttempts: 500,
       maxDepth: 1,
       mode: 'initiate',
-      biasStrength: 0.25,    // blob territories resist confinement → need contradiction
-      requireContradict: true, // pre-filter: skip anything depth-0 can solve
+      biasStrength: 0.5,   // medium shape: not so stripe that depth-0 solves; not so blob that contradiction chains can't form
     });
     const elapsed = ((Date.now() - start_ms) / 1000).toFixed(1);
 
