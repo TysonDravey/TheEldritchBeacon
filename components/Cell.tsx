@@ -110,21 +110,12 @@ function Cell({
       )}
       {isGhost && state === 'empty' && (
         <div className="ghost-watcher absolute inset-0 flex items-center justify-center pointer-events-none">
-          <img
-            src="/svg/watcher_spinner.svg"
-            width={watcherSize}
-            height={watcherSize}
-            alt=""
-            draggable={false}
-            className="absolute animate-pulse"
-            style={{ opacity: 0.35 }}
-          />
-          <div style={{ opacity: 0.55 }}>
+          <div style={{ opacity: 0.9 }}>
             <Watcher territory={territory} size={watcherSize} />
           </div>
           <div
             className="absolute inset-0 pointer-events-none"
-            style={{ background: 'rgba(139, 26, 26, 0.35)' }}
+            style={{ background: 'rgba(139, 26, 26, 0.45)' }}
           />
         </div>
       )}

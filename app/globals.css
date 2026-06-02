@@ -49,8 +49,13 @@ body {
   100% { transform: scale(1); opacity: 1; }
 }
 
+@keyframes ghost-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.65; }
+}
+
 .ghost-watcher {
-  animation: ghost-appear 320ms ease-out both;
+  animation: ghost-pulse 1.4s ease-in-out infinite;
 }
 
 .ghost-ward {
