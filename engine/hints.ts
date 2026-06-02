@@ -279,7 +279,7 @@ function buildWardHint(
     }
     const constraintWaves = buildCascadeConstraintWaves(puzzle, playerCells, row, col);
     const constraintCovered = new Set(
-      ([] as [number, number][]).concat(...constraintWaves).map(([r, c]) => `${r},${c}`)
+      constraintWaves.flat().map(([r, c]) => `${r},${c}`)
     );
     const remainingVictimCells = victimCells.filter(([r, c]) => !constraintCovered.has(`${r},${c}`));
 

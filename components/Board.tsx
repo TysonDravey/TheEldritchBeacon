@@ -225,9 +225,9 @@ export default function Board({
               (secondaryHighlightCells?.some(([r, c]) => r === row && c === col) ?? false) ||
               (secondaryHighlightTerritories?.includes(territory) ?? false)
             );
-            const isGhost          = ghostCells?.some(([gr, gc]) => gr === row && gc === col) ?? false;
-            const isGhostWard      = ghostWardCells?.some(([gr, gc]) => gr === row && gc === col) ?? false;
-            const isConstraintWard = constraintWardCells?.some(([gr, gc]) => gr === row && gc === col) ?? false;
+            const isGhost          = ghostCells?.some((cell) => cell[0] === row && cell[1] === col) ?? false;
+            const isGhostWard      = ghostWardCells?.some((cell) => cell[0] === row && cell[1] === col) ?? false;
+            const isConstraintWard = constraintWardCells?.some((cell) => cell[0] === row && cell[1] === col) ?? false;
 
             return (
               <Cell

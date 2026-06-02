@@ -90,7 +90,10 @@ export default function PuzzlePage() {
     function animateNextConstraintWave() {
       if (constraintWaveIdx < constraintWaves.length) {
         const wave = constraintWaves[constraintWaveIdx];
-        setConstraintWards(prev => [...prev, ...wave]);
+        // Guard: only spread if wave is an array of [row,col] pairs (not a flat pair)
+        if (Array.isArray(wave) && wave.length > 0 && Array.isArray(wave[0])) {
+          setConstraintWards(prev => [...prev, ...(wave as [number, number][])]);
+        }
         constraintWaveIdx++;
         cascadeTimerRef.current = setTimeout(animateNextConstraintWave, 380);
       } else if (victimCells.length > 0) {
