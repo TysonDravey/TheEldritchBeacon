@@ -88,7 +88,7 @@ function applyDeductionToBoard(cells: CellState[][], d: DeductionResult, n: numb
  *   High Priest — pair elimination and/or several contradictions
  *   Eldritch  — heavy pair elimination and/or many contradictions
  */
-export function rateDifficulty(puzzle: Puzzle): Difficulty {
+function buildRecord(puzzle: Puzzle): TechniqueRecord {
   const n = puzzle.size;
   const cells: CellState[][] = Array.from({ length: n }, () =>
     Array.from({ length: n }, (): CellState => 'empty')
@@ -106,24 +106,31 @@ export function rateDifficulty(puzzle: Puzzle): Difficulty {
   let progress = true;
   while (progress) {
     progress = false;
-
     if (isSolved(puzzle, cells)) break;
     const contradiction = findContradictions(puzzle, cells);
     if (contradiction.found) break;
-
     const d = getNextDeduction(puzzle, cells);
     if (!d) break;
-
     record[classifyDeduction(d)]++;
     progress = true;
     applyDeductionToBoard(cells, d, n);
   }
 
+  return record;
+}
+
+export function rateDifficulty(puzzle: Puzzle): Difficulty {
+  const record = buildRecord(puzzle);
   // Any puzzle requiring hypothesis-based contradiction testing is Archon —
   // qualitatively harder than forward-reasoning alone.
   if (record.contradictionTest > 0) return 'Archon';
   if (record.hiddenSet > 0) return 'Harbinger';
   return scoreTodifficulty(computeScore(record));
+}
+
+/** Returns the raw numeric difficulty score for use in the UI. */
+export function scorePuzzle(puzzle: Puzzle): number {
+  return computeScore(buildRecord(puzzle));
 }
 
 function scoreTodifficulty(score: number): Difficulty {

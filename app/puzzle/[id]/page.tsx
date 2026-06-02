@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { getPuzzleById } from '@/data/samplePuzzles';
 import { loadPlayerState, savePlayerState, createFreshPlayerState } from '@/lib/storage';
 import { getHint } from '@/engine/hints';
+import { scorePuzzle } from '@/engine/difficulty';
 import { isSolved, canPlaceWatcher, watcherRejectionReason } from '@/engine/rules';
 import { findContradictions } from '@/engine/solver';
 import type { PlayerState, CellState, HintResult, ContradictionResult } from '@/engine/boardTypes';
@@ -281,6 +282,7 @@ export default function PuzzlePage() {
           <h1 className="font-serif text-2xl font-bold text-ink">{puzzle.title}</h1>
           <p className="font-serif text-sm text-ink-light mt-0.5">
             {puzzle.size}&times;{puzzle.size} &mdash; {puzzle.difficulty}
+            <span className="ml-2 text-xs opacity-60" title="Obscurity score">&#9670; {scorePuzzle(puzzle)}</span>
           </p>
         </div>
         <span

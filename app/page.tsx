@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { SAMPLE_PUZZLES } from '@/data/samplePuzzles';
+import { scorePuzzle } from '@/engine/difficulty';
 import type { Puzzle, Difficulty } from '@/engine/boardTypes';
 
 const STORAGE_KEY_PREFIX = 'eldritch_beacon_state_';
@@ -50,6 +51,9 @@ function PuzzleCard({ puzzle, completed }: { puzzle: Puzzle; completed: boolean 
             Shattered
           </span>
         )}
+        <span className="text-xs font-serif text-ink-light opacity-50" title="Obscurity score">
+          &#9670;&thinsp;{scorePuzzle(puzzle)}
+        </span>
       </div>
     </Link>
   );
