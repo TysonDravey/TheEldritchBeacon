@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import type { CellState } from '@/engine/boardTypes';
 import { TERRITORY_COLORS } from '@/theme/colors';
 import Watcher from './Watcher';
@@ -38,7 +39,7 @@ function cellPx(boardSize: number): number {
   }
 }
 
-export default function Cell({
+function Cell({
   row,
   col,
   territory,
@@ -162,3 +163,5 @@ export default function Cell({
     </div>
   );
 }
+
+export default memo(Cell);
