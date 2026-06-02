@@ -70,6 +70,8 @@ export default function PuzzlePage() {
       return;
     }
 
+    console.log('[cascade] primary:', primary, 'steps:', steps, 'waves:', watcherWaves, 'victims:', victimCells);
+
     const watcherPositions: [number, number][] = [primary, ...steps];
 
     // Show the hypothesis ghost watcher immediately

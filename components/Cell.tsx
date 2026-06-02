@@ -80,6 +80,8 @@ function Cell({
   let ringClass = '';
   if (isContradiction || isFlash) {
     ringClass = 'outline outline-2 outline-red-ink outline-offset-[-2px] shake';
+  } else if (isGhost) {
+    ringClass = 'outline outline-2 outline-red-ink outline-offset-[-2px] animate-pulse';
   } else if (isHighlighted) {
     ringClass = 'outline outline-2 outline-red-ink outline-offset-[-2px]';
   } else if (isSecondaryHighlighted) {
