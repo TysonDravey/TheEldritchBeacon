@@ -46,20 +46,22 @@ export default function PuzzlePage() {
     }
   }, [puzzle]);
 
-  // 3-phase cascade animation for Level III hypothetical hints:
-  //   Phase 1 — ghost watchers: hypothesis + any forced placements (600ms between)
-  //   Phase 2 — constraint waves: adj/row/col/territory/propagated wards (amber, 380ms between)
-  //   Phase 3 — victim wards: remaining victim cells not already shown (red, 350ms between)
+  // Interleaved cascade animation for Level III hypothetical hints:
+  //   For each watcher (hypothesis first, then each forced placement):
+  //     1. Ghost watcher appears
+  //     2. Its adj / row / col / territory waves appear (amber, 380ms between)
+  //   After all watchers: victim wards appear (red, 350ms between)
   useEffect(() => {
     if (cascadeTimerRef.current) {
       clearTimeout(cascadeTimerRef.current);
       cascadeTimerRef.current = null;
     }
 
-    const primary          = hintResult?.primaryCell;
-    const steps            = hintResult?.cascadeSteps ?? [];
-    const constraintWaves  = hintResult?.cascadeConstraintWaves ?? [];
-    const victimCells      = hintResult?.cascadeVictimCells ?? [];
+    const primary       = hintResult?.primaryCell;
+    const steps         = hintResult?.cascadeSteps ?? [];
+    // Per-watcher waves: watcherWaves[i] = waves for watcher i (hypothesis=0, forced=1,2,…)
+    const watcherWaves  = hintResult?.cascadeConstraintWaves ?? [];
+    const victimCells   = hintResult?.cascadeVictimCells ?? [];
 
     if (!primary) {
       setCascadeGhosts([]);
@@ -69,36 +71,37 @@ export default function PuzzlePage() {
     }
 
     const watcherPositions: [number, number][] = [primary, ...steps];
+
+    // Show the hypothesis ghost watcher immediately
     setCascadeGhosts([watcherPositions[0]]);
     setCascadeWards([]);
     setConstraintWards([]);
 
-    let watcherIdx      = 1;
-    let constraintWaveIdx = 0;
+    let watcherPhaseIdx = 0; // which watcher's waves we're currently showing
+    let wavePhaseIdx    = 0; // which wave within that watcher
     let victimIdx       = 0;
 
-    function animateNextWatcher() {
-      if (watcherIdx < watcherPositions.length) {
-        const next = watcherPositions[watcherIdx];
-        if (next != null) setCascadeGhosts(prev => [...prev, next]);
-        watcherIdx++;
-        cascadeTimerRef.current = setTimeout(animateNextWatcher, 600);
-      } else {
-        cascadeTimerRef.current = setTimeout(animateNextConstraintWave, 500);
-      }
-    }
-
-    function animateNextConstraintWave() {
-      if (constraintWaveIdx < constraintWaves.length) {
-        const wave = constraintWaves[constraintWaveIdx];
-        // Guard: only spread if wave is an array of [row,col] pairs (not a flat pair)
+    function animateCurrentWaves() {
+      const waves = watcherWaves[watcherPhaseIdx] ?? [];
+      if (wavePhaseIdx < waves.length) {
+        const wave = waves[wavePhaseIdx];
         if (Array.isArray(wave) && wave.length > 0 && Array.isArray(wave[0])) {
           setConstraintWards(prev => [...prev, ...(wave as [number, number][])]);
         }
-        constraintWaveIdx++;
-        cascadeTimerRef.current = setTimeout(animateNextConstraintWave, 380);
-      } else if (victimCells.length > 0) {
-        cascadeTimerRef.current = setTimeout(animateNextVictimWard, 450);
+        wavePhaseIdx++;
+        cascadeTimerRef.current = setTimeout(animateCurrentWaves, 380);
+      } else {
+        // Done with this watcher's waves — advance to next watcher
+        watcherPhaseIdx++;
+        wavePhaseIdx = 0;
+        if (watcherPhaseIdx < watcherPositions.length) {
+          // Show the next forced ghost watcher, then its waves
+          const next = watcherPositions[watcherPhaseIdx];
+          if (next != null) setCascadeGhosts(prev => [...prev, next]);
+          cascadeTimerRef.current = setTimeout(animateCurrentWaves, 500);
+        } else if (victimCells.length > 0) {
+          cascadeTimerRef.current = setTimeout(animateNextVictimWard, 450);
+        }
       }
     }
 
@@ -111,12 +114,8 @@ export default function PuzzlePage() {
       }
     }
 
-    // Kick off the first phase transition
-    if (watcherPositions.length > 1) {
-      cascadeTimerRef.current = setTimeout(animateNextWatcher, 600);
-    } else {
-      cascadeTimerRef.current = setTimeout(animateNextConstraintWave, 500);
-    }
+    // Kick off waves for the first watcher (hypothesis) after a brief pause
+    cascadeTimerRef.current = setTimeout(animateCurrentWaves, 500);
 
     return () => {
       if (cascadeTimerRef.current) {

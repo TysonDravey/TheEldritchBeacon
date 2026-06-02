@@ -84,7 +84,7 @@ export interface HintResult {
   highlightCols?: number[];
   deduction?: DeductionResult;
   cascadeSteps?: [number, number][];             // Level III hypothetical: forced watcher chain
-  cascadeConstraintWaves?: [number, number][][]; // Level III hypothetical: waves of cells claimed (adj/row/col/territory/propagated)
+  cascadeConstraintWaves?: [number, number][][][]; // Level III hypothetical: per-watcher waves [watcherIdx][waveIdx] = cells
   cascadeVictimCells?: [number, number][];       // Level III hypothetical: victim cells NOT covered by constraint waves
 }
 

@@ -277,9 +277,10 @@ function buildWardHint(
         highlightCols: [col],
       };
     }
-    const constraintWaves = buildCascadeConstraintWaves(puzzle, playerCells, row, col);
+    const forcedSteps      = computeCascadeSteps(puzzle, playerCells, row, col);
+    const constraintWaves  = buildCascadeConstraintWaves(puzzle, playerCells, row, col, forcedSteps);
     const constraintCovered = new Set(
-      constraintWaves.flat().map(([r, c]) => `${r},${c}`)
+      constraintWaves.flatMap(ww => ww.flat()).map(([r, c]) => `${r},${c}`)
     );
     const remainingVictimCells = victimCells.filter(([r, c]) => !constraintCovered.has(`${r},${c}`));
 
@@ -291,7 +292,7 @@ function buildWardHint(
       highlightRows: [row],
       highlightCols: [col],
       deduction: d,
-      cascadeSteps: computeCascadeSteps(puzzle, playerCells, row, col),
+      cascadeSteps: forcedSteps,
       cascadeConstraintWaves: constraintWaves,
       cascadeVictimCells: remainingVictimCells,
     };
