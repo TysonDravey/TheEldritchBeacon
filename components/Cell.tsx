@@ -92,7 +92,7 @@ export default function Cell({
       {state === 'watcher' && <Watcher territory={territory} size={watcherSize} />}
       {state === 'ward'    && <Ward size={wardSize} />}
       {isDimmed && <div className="absolute inset-0 bg-ink opacity-40 pointer-events-none" />}
-      {isPrimaryHint && state === 'empty' && (
+      {isPrimaryHint && state === 'empty' && !isGhost && (
         <img
           src="/svg/watcher_spinner.svg"
           width={watcherSize}
@@ -105,6 +105,15 @@ export default function Cell({
       )}
       {isGhost && state === 'empty' && (
         <div className="ghost-watcher absolute inset-0 flex items-center justify-center pointer-events-none">
+          <img
+            src="/svg/watcher_spinner.svg"
+            width={watcherSize}
+            height={watcherSize}
+            alt=""
+            draggable={false}
+            className="absolute animate-pulse"
+            style={{ opacity: 0.35 }}
+          />
           <div style={{ opacity: 0.55 }}>
             <Watcher territory={territory} size={watcherSize} />
           </div>
