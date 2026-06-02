@@ -52,3 +52,7 @@ body {
 .ghost-watcher {
   animation: ghost-appear 320ms ease-out both;
 }
+
+.ghost-ward {
+  animation: ghost-appear 280ms ease-out both;
+}

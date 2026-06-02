@@ -286,6 +286,7 @@ function buildWardHint(
       highlightCols: [col],
       deduction: d,
       cascadeSteps: computeCascadeSteps(puzzle, playerCells, row, col),
+      cascadeVictimCells: victimCells,
     };
   }
 

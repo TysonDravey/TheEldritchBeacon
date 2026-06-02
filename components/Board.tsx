@@ -20,6 +20,7 @@ interface BoardProps {
   contradiction?: ContradictionResult;
   flashCells?: [number, number][];
   ghostCells?: [number, number][];
+  ghostWardCells?: [number, number][];
 }
 
 // Red outline — only explicit cells and territories, NOT rows/cols
@@ -68,6 +69,7 @@ export default function Board({
   contradiction,
   flashCells,
   ghostCells,
+  ghostWardCells,
 }: BoardProps) {
   const { size, territoryMap } = puzzle;
 
@@ -221,7 +223,8 @@ export default function Board({
               (secondaryHighlightCells?.some(([r, c]) => r === row && c === col) ?? false) ||
               (secondaryHighlightTerritories?.includes(territory) ?? false)
             );
-            const isGhost = ghostCells?.some(([gr, gc]) => gr === row && gc === col) ?? false;
+            const isGhost     = ghostCells?.some(([gr, gc]) => gr === row && gc === col) ?? false;
+            const isGhostWard = ghostWardCells?.some(([gr, gc]) => gr === row && gc === col) ?? false;
 
             return (
               <Cell
@@ -232,11 +235,12 @@ export default function Board({
                 state={state}
                 isHighlighted={outlined}
                 isSecondaryHighlighted={secondaryHighlighted}
-                isDimmed={hintActive && !lit && !secondaryHighlighted && !isPrimary && !isGhost}
+                isDimmed={hintActive && !lit && !secondaryHighlighted && !isPrimary && !isGhost && !isGhostWard}
                 isPrimaryHint={isPrimary}
                 isContradiction={isCellContradiction(row, col, contradiction)}
                 isFlash={flashCells?.some(([r, c]) => r === row && c === col) ?? false}
                 isGhost={isGhost}
+                isGhostWard={isGhostWard}
                 size={size}
                 thickTop={row === 0          || territoryMap[row - 1][col] !== territory}
                 thickBottom={row === size - 1 || territoryMap[row + 1][col] !== territory}

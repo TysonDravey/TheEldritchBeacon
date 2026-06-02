@@ -83,7 +83,8 @@ export interface HintResult {
   highlightRows?: number[];
   highlightCols?: number[];
   deduction?: DeductionResult;
-  cascadeSteps?: [number, number][];    // Level III hypothetical: forced watcher chain after hypothesis
+  cascadeSteps?: [number, number][];       // Level III hypothetical: forced watcher chain after hypothesis
+  cascadeVictimCells?: [number, number][]; // Level III hypothetical: victim territory cells to ghost-ward out
 }
 
 export interface ContradictionResult {
