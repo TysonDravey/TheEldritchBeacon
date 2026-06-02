@@ -29,6 +29,7 @@ export default function PuzzlePage() {
   const [rejectionMessage, setRejectionMessage] = useState<string | null>(null);
   const [cascadeGhosts,    setCascadeGhosts]    = useState<[number, number][]>([]);
   const [cascadeWards,     setCascadeWards]     = useState<[number, number][]>([]);
+  const [constraintWards,  setConstraintWards]  = useState<[number, number][]>([]);
   // Tracks how many hints player has asked without making a move — drives escalation
   const hintDepthRef    = useRef(0);
   const flashTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -45,57 +46,71 @@ export default function PuzzlePage() {
     }
   }, [puzzle]);
 
-  // Animate cascade: ghost watchers (forced placements) then ghost wards (victim cells)
+  // 3-phase cascade animation for Level III hypothetical hints:
+  //   Phase 1 — ghost watchers: hypothesis + any forced placements (600ms between)
+  //   Phase 2 — constraint waves: adj/row/col/territory/propagated wards (amber, 380ms between)
+  //   Phase 3 — victim wards: remaining victim cells not already shown (red, 350ms between)
   useEffect(() => {
     if (cascadeTimerRef.current) {
       clearTimeout(cascadeTimerRef.current);
       cascadeTimerRef.current = null;
     }
 
-    const primary     = hintResult?.primaryCell;
-    const steps       = hintResult?.cascadeSteps ?? [];
-    const victimCells = hintResult?.cascadeVictimCells ?? [];
+    const primary          = hintResult?.primaryCell;
+    const steps            = hintResult?.cascadeSteps ?? [];
+    const constraintWaves  = hintResult?.cascadeConstraintWaves ?? [];
+    const victimCells      = hintResult?.cascadeVictimCells ?? [];
 
     if (!primary) {
       setCascadeGhosts([]);
       setCascadeWards([]);
+      setConstraintWards([]);
       return;
     }
 
-    // Phase 1: animate hypothesis watcher + any forced-placement watchers
     const watcherPositions: [number, number][] = [primary, ...steps];
     setCascadeGhosts([watcherPositions[0]]);
     setCascadeWards([]);
+    setConstraintWards([]);
 
-    let watcherIdx = 1;
-    let wardIdx    = 0;
+    let watcherIdx      = 1;
+    let constraintWaveIdx = 0;
+    let victimIdx       = 0;
 
     function animateNextWatcher() {
       if (watcherIdx < watcherPositions.length) {
-        const pos = watcherPositions[watcherIdx];
-        setCascadeGhosts(prev => [...prev, pos]);
+        setCascadeGhosts(prev => [...prev, watcherPositions[watcherIdx]]);
         watcherIdx++;
         cascadeTimerRef.current = setTimeout(animateNextWatcher, 600);
+      } else {
+        cascadeTimerRef.current = setTimeout(animateNextConstraintWave, 500);
+      }
+    }
+
+    function animateNextConstraintWave() {
+      if (constraintWaveIdx < constraintWaves.length) {
+        const wave = constraintWaves[constraintWaveIdx];
+        setConstraintWards(prev => [...prev, ...wave]);
+        constraintWaveIdx++;
+        cascadeTimerRef.current = setTimeout(animateNextConstraintWave, 380);
       } else if (victimCells.length > 0) {
-        // Phase 2: ghost-ward out victim territory cells one by one
-        cascadeTimerRef.current = setTimeout(animateNextWard, 500);
+        cascadeTimerRef.current = setTimeout(animateNextVictimWard, 450);
       }
     }
 
-    function animateNextWard() {
-      if (wardIdx < victimCells.length) {
-        const pos = victimCells[wardIdx];
-        setCascadeWards(prev => [...prev, pos]);
-        wardIdx++;
-        cascadeTimerRef.current = setTimeout(animateNextWard, 350);
+    function animateNextVictimWard() {
+      if (victimIdx < victimCells.length) {
+        setCascadeWards(prev => [...prev, victimCells[victimIdx]]);
+        victimIdx++;
+        cascadeTimerRef.current = setTimeout(animateNextVictimWard, 350);
       }
     }
 
+    // Kick off the first phase transition
     if (watcherPositions.length > 1) {
       cascadeTimerRef.current = setTimeout(animateNextWatcher, 600);
-    } else if (victimCells.length > 0) {
-      // No chain — go straight to victim wards after a short pause
-      cascadeTimerRef.current = setTimeout(animateNextWard, 500);
+    } else {
+      cascadeTimerRef.current = setTimeout(animateNextConstraintWave, 500);
     }
 
     return () => {
@@ -288,6 +303,7 @@ export default function PuzzlePage() {
         flashCells={flashCells}
         ghostCells={cascadeGhosts}
         ghostWardCells={cascadeWards}
+        constraintWardCells={constraintWards}
       />
 
       {/* Controls */}

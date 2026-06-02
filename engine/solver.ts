@@ -998,6 +998,106 @@ export function computeCascadeSteps(
 }
 
 // ---------------------------------------------------------------------------
+// buildCascadeConstraintWaves — for Level III hint cascade visualization
+// ---------------------------------------------------------------------------
+
+/**
+ * Builds the sequence of "constraint waves" that follow a hypothetical watcher
+ * placement. Each wave is a group of cells that get eliminated together:
+ *   wave 0 — adjacent cells (8-directional)
+ *   wave 1 — rest of the row
+ *   wave 2 — rest of the column
+ *   wave 3 — rest of the same territory
+ *   wave 4+ — any further wards produced by basic propagation
+ *
+ * Returns an array of cell groups. Cells are deduplicated across waves.
+ * The caller can filter victim cells against the returned set to avoid
+ * double-rendering.
+ */
+export function buildCascadeConstraintWaves(
+  puzzle: Puzzle,
+  playerCells: CellState[][],
+  hypothRow: number,
+  hypothCol: number,
+): [number, number][][] {
+  const n = puzzle.size;
+  const seen = new Set<string>([`${hypothRow},${hypothCol}`]);
+  const waves: [number, number][][] = [];
+
+  const available = (r: number, c: number) =>
+    r >= 0 && r < n && c >= 0 && c < n &&
+    playerCells[r][c] === 'empty' &&
+    !seen.has(`${r},${c}`);
+  const mark = (r: number, c: number) => seen.add(`${r},${c}`);
+
+  // Wave 0: adjacent (8-directional)
+  const adjWave: [number, number][] = [];
+  for (let dr = -1; dr <= 1; dr++) {
+    for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const nr = hypothRow + dr, nc = hypothCol + dc;
+      if (!available(nr, nc)) continue;
+      adjWave.push([nr, nc]); mark(nr, nc);
+    }
+  }
+  if (adjWave.length > 0) waves.push(adjWave);
+
+  // Wave 1: rest of the row
+  const rowWave: [number, number][] = [];
+  for (let c = 0; c < n; c++) {
+    if (!available(hypothRow, c)) continue;
+    rowWave.push([hypothRow, c]); mark(hypothRow, c);
+  }
+  if (rowWave.length > 0) waves.push(rowWave);
+
+  // Wave 2: rest of the column
+  const colWave: [number, number][] = [];
+  for (let r = 0; r < n; r++) {
+    if (!available(r, hypothCol)) continue;
+    colWave.push([r, hypothCol]); mark(r, hypothCol);
+  }
+  if (colWave.length > 0) waves.push(colWave);
+
+  // Wave 3: rest of the hypothesis watcher's own territory
+  const hypothTerritory = puzzle.territoryMap[hypothRow][hypothCol];
+  const terrWave: [number, number][] = [];
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      if (puzzle.territoryMap[r][c] !== hypothTerritory) continue;
+      if (!available(r, c)) continue;
+      terrWave.push([r, c]); mark(r, c);
+    }
+  }
+  if (terrWave.length > 0) waves.push(terrWave);
+
+  // Simulate the board after all direct constraints are applied
+  const cells = deepCopy(playerCells);
+  applyDeduction(cells, { type: 'watcher', row: hypothRow, col: hypothCol, reason: 'cascade' });
+  for (const [r, c] of terrWave) { if (cells[r][c] === 'empty') cells[r][c] = 'ward'; }
+
+  // Waves 4+: propagated wards from basic logic (no contradiction test)
+  for (let i = 0; i < 50; i++) {
+    if (findContradictions(puzzle, cells).found) break;
+    const cands = getCandidates(puzzle, cells);
+    const d =
+      adjacencyElimination(puzzle, cells, cands) ??
+      nakedSingle(puzzle, cells, cands) ??
+      rowConfinement(puzzle, cells, cands) ??
+      columnConfinement(puzzle, cells, cands) ??
+      pairElimination(puzzle, cells, cands) ??
+      hiddenSetElimination(puzzle, cells, cands);
+    if (!d || cells[d.row][d.col] !== 'empty') break;
+    if (d.type === 'ward') {
+      const key = `${d.row},${d.col}`;
+      if (!seen.has(key)) { waves.push([[d.row, d.col]]); seen.add(key); }
+    }
+    applyDeduction(cells, d);
+  }
+
+  return waves;
+}
+
+// ---------------------------------------------------------------------------
 // Utility: combinations
 // ---------------------------------------------------------------------------
 

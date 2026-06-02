@@ -18,6 +18,7 @@ interface CellProps {
   isFlash: boolean;
   isGhost: boolean;
   isGhostWard: boolean;
+  isConstraintWard: boolean;
   size: number;
   thickTop?: boolean;
   thickRight?: boolean;
@@ -50,6 +51,7 @@ export default function Cell({
   isFlash,
   isGhost,
   isGhostWard,
+  isConstraintWard,
   size,
   thickTop,
   thickRight,
@@ -122,6 +124,22 @@ export default function Cell({
           <div
             className="absolute inset-0 pointer-events-none"
             style={{ background: 'rgba(139, 26, 26, 0.35)' }}
+          />
+        </div>
+      )}
+      {isConstraintWard && state === 'empty' && (
+        <div className="ghost-ward absolute inset-0 flex items-center justify-center pointer-events-none">
+          <img
+            src="/svg/ward_sigil.svg"
+            width={wardSize}
+            height={wardSize}
+            alt=""
+            draggable={false}
+            style={{ opacity: 0.5 }}
+          />
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{ background: 'rgba(181, 134, 13, 0.3)' }}
           />
         </div>
       )}

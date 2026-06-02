@@ -1,5 +1,5 @@
 import type { Puzzle, CellState, HintResult, DeductionResult } from './boardTypes';
-import { findContradictions, getNextDeduction, getCandidates, computeCascadeSteps } from './solver';
+import { findContradictions, getNextDeduction, getCandidates, computeCascadeSteps, buildCascadeConstraintWaves } from './solver';
 import { getWatcherPositions } from './rules';
 
 // ---------------------------------------------------------------------------
@@ -277,6 +277,12 @@ function buildWardHint(
         highlightCols: [col],
       };
     }
+    const constraintWaves = buildCascadeConstraintWaves(puzzle, playerCells, row, col);
+    const constraintCovered = new Set(
+      ([] as [number, number][]).concat(...constraintWaves).map(([r, c]) => `${r},${c}`)
+    );
+    const remainingVictimCells = victimCells.filter(([r, c]) => !constraintCovered.has(`${r},${c}`));
+
     return {
       level: 3,
       message: `A Watcher here is impossible. It would claim row ${row + 1} and column ${col + 1} — but ${whySealed}. The ${tname(victim)} territory would be sealed off. Mark this cell with a Ward.`,
@@ -286,7 +292,8 @@ function buildWardHint(
       highlightCols: [col],
       deduction: d,
       cascadeSteps: computeCascadeSteps(puzzle, playerCells, row, col),
-      cascadeVictimCells: victimCells,
+      cascadeConstraintWaves: constraintWaves,
+      cascadeVictimCells: remainingVictimCells,
     };
   }
 
