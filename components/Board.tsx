@@ -205,8 +205,13 @@ export default function Board({
 
   return (
     <div
-      className="game-board inline-block border-2 border-ink cursor-pointer"
-      style={{ lineHeight: 0, touchAction: 'none' }}
+      className="game-board inline-block border-2 cursor-pointer"
+      style={{
+        lineHeight: 0,
+        touchAction: 'none',
+        borderColor: 'rgba(26, 18, 9, 0.55)',
+        boxShadow: '0 6px 18px rgba(26, 18, 9, 0.35), 0 1px 2px rgba(26, 18, 9, 0.25)',
+      }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}

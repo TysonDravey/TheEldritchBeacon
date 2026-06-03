@@ -74,12 +74,21 @@ function Cell({
   const watcherSize = Math.round(px * 0.8);
   const wardSize    = Math.round(px * 0.7);
 
+  // Territory borders: only the thick (between-territory) edges are drawn.
+  // Internal cell-to-cell lines are dropped — the tile's transparent corners
+  // already imply cell boundaries, so the rigid grid is gone. The remaining
+  // territory edges use a translucent sepia (not pure black) so they read as
+  // organic ink lines rather than a hard outline.
+  const TERRITORY_EDGE = 'rgba(45, 28, 14, 0.55)';
   const borderStyle: React.CSSProperties = {
-    borderTopWidth:    thickTop    ? '2px' : '1px',
-    borderRightWidth:  thickRight  ? '2px' : '1px',
-    borderBottomWidth: thickBottom ? '2px' : '1px',
-    borderLeftWidth:   thickLeft   ? '2px' : '1px',
-    borderColor:     '#1A1209',
+    borderTopWidth:    thickTop    ? '2px' : '0px',
+    borderRightWidth:  thickRight  ? '2px' : '0px',
+    borderBottomWidth: thickBottom ? '2px' : '0px',
+    borderLeftWidth:   thickLeft   ? '2px' : '0px',
+    borderTopColor:    thickTop    ? TERRITORY_EDGE : 'transparent',
+    borderRightColor:  thickRight  ? TERRITORY_EDGE : 'transparent',
+    borderBottomColor: thickBottom ? TERRITORY_EDGE : 'transparent',
+    borderLeftColor:   thickLeft   ? TERRITORY_EDGE : 'transparent',
     borderStyle:     'solid',
     width:  `${px}px`,
     height: `${px}px`,

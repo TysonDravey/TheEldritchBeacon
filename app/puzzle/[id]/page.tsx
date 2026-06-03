@@ -277,7 +277,10 @@ export default function PuzzlePage() {
       </div>
 
       {/* Puzzle header — fixed height, never changes */}
-      <div className="w-full max-w-2xl mb-6 flex items-start justify-between gap-4">
+      <div
+        className="w-full max-w-2xl mb-6 flex items-start justify-between gap-4 px-4 py-3 rounded-sm"
+        style={{ backgroundColor: 'rgba(242, 233, 216, 0.78)' }}
+      >
         <div>
           <h1 className="font-serif text-2xl font-bold text-ink">{puzzle.title}</h1>
           <p className="font-serif text-sm text-ink-light mt-0.5">
