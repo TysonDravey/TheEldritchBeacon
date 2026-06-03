@@ -115,7 +115,10 @@ function Cell({
       data-cell="true"
       data-row={row}
       data-col={col}
-      style={borderStyle}
+      style={{
+        ...borderStyle,
+        boxShadow: 'inset 0 -4px 0 rgba(26,18,9,0.65), inset -4px 0 0 rgba(26,18,9,0.5), 0 4px 0 rgba(26,18,9,0.75), 4px 0 0 rgba(26,18,9,0.55)',
+      }}
       className={`relative flex items-center justify-center select-none ${ringClass}`}
     >
       {/* Layer 1: territory color, masked by the tile's alpha so transparent

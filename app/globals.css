@@ -60,3 +60,19 @@ body {
 .ghost-ward {
   animation: ghost-appear 280ms ease-out both;
 }
+
+@keyframes tile-wiggle {
+  0%   { transform: translateZ(0px)  rotateX(0)      rotateY(0);     }
+  10%  { transform: translateZ(28px) rotateX(-10deg) rotateY(0);     }
+  28%  { transform: translateZ(22px) rotateX(4deg)   rotateY(-12deg);}
+  44%  { transform: translateZ(14px) rotateX(-3deg)  rotateY(8deg);  }
+  58%  { transform: translateZ(8px)  rotateX(2deg)   rotateY(-5deg); }
+  70%  { transform: translateZ(4px)  rotateX(-1deg)  rotateY(3deg);  }
+  82%  { transform: translateZ(1px)  rotateX(0)      rotateY(-1deg); }
+  100% { transform: translateZ(0px)  rotateX(0)      rotateY(0);     }
+}
+
+.tile-wiggle {
+  animation: tile-wiggle 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  transform-origin: center center;
+}

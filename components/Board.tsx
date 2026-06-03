@@ -101,13 +101,22 @@ export default function Board({
     return { row, col };
   }
 
+  function wiggleCell(row: number, col: number) {
+    const cellEl = document.querySelector(`[data-cell="true"][data-row="${row}"][data-col="${col}"]`);
+    if (cellEl) {
+      cellEl.classList.remove('tile-wiggle');
+      void (cellEl as HTMLElement).offsetWidth;
+      cellEl.classList.add('tile-wiggle');
+    }
+  }
+
   function applyDragWard(row: number, col: number) {
     const key = `${row},${col}`;
     if (lastDragCellRef.current === key) return;
     lastDragCellRef.current = key;
     const state = playerCellsRef.current[row]?.[col];
-    if (dragActionRef.current === 'place'  && state === 'empty') onCellWardRef.current(row, col);
-    if (dragActionRef.current === 'remove' && state === 'ward')  onCellWardRef.current(row, col);
+    if (dragActionRef.current === 'place'  && state === 'empty') { onCellWardRef.current(row, col); wiggleCell(row, col); }
+    if (dragActionRef.current === 'remove' && state === 'ward')  { onCellWardRef.current(row, col); wiggleCell(row, col); }
   }
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
@@ -160,6 +169,8 @@ export default function Board({
     const cell = getCellAtPoint(e.clientX, e.clientY);
     if (!cell) return;
 
+    wiggleCell(cell.row, cell.col);
+
     // Start single-click timer — fires ward toggle if no double-click cancels it
     if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
     pendingClickRef.current = cell;
@@ -204,13 +215,18 @@ export default function Board({
   }, []);
 
   return (
+    <div style={{ perspective: '700px', perspectiveOrigin: '50% 50%' }}>
     <div
       className="game-board inline-block border-2 cursor-pointer"
       style={{
         lineHeight: 0,
         touchAction: 'none',
-        borderColor: 'rgba(26, 18, 9, 0.55)',
-        boxShadow: '0 6px 18px rgba(26, 18, 9, 0.35), 0 1px 2px rgba(26, 18, 9, 0.25)',
+        borderColor: 'rgba(26, 18, 9, 0.75)',
+        boxShadow: '14px 40px 28px rgba(0, 0, 0, 0.9), 5px 12px 8px rgba(0, 0, 0, 0.75)',
+        transform: 'rotateX(18deg)',
+        transformOrigin: 'center center',
+        willChange: 'transform',
+        transformStyle: 'preserve-3d',
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -218,7 +234,7 @@ export default function Board({
       onDoubleClick={handleDoubleClick}
     >
       {Array.from({ length: size }, (_, row) => (
-        <div key={row} className="flex">
+        <div key={row} className="flex" style={{ transformStyle: 'preserve-3d' }}>
           {Array.from({ length: size }, (_, col) => {
             const territory = territoryMap[row][col];
             const state     = playerCells[row]?.[col] ?? 'empty';
@@ -260,6 +276,7 @@ export default function Board({
           })}
         </div>
       ))}
+    </div>
     </div>
   );
 }
