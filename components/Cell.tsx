@@ -81,7 +81,6 @@ function Cell({
     borderLeftWidth:   thickLeft   ? '2px' : '1px',
     borderColor:     '#1A1209',
     borderStyle:     'solid',
-    backgroundColor: colors.bg,
     width:  `${px}px`,
     height: `${px}px`,
   };
@@ -100,17 +99,37 @@ function Cell({
   const tileIdx = String(tileIndex(row, col) + 1).padStart(2, '0');
   const tileRot = tileRotation(row, col);
 
+  const tileUrl = `/tiles/processed/plain_tile_${tileIdx}.png`;
+
   return (
     <div
       data-cell="true"
       data-row={row}
       data-col={col}
       style={borderStyle}
-      className={`relative flex items-center justify-center select-none overflow-hidden ${ringClass}`}
+      className={`relative flex items-center justify-center select-none ${ringClass}`}
     >
-      {/* Grunge tile, multiplied against the territory color */}
+      {/* Layer 1: territory color, masked by the tile's alpha so transparent
+          edges of the tile show parchment underneath. Slight drop shadow
+          gives each cell a touch of organic lift. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundColor: colors.bg,
+          maskImage: `url(${tileUrl})`,
+          WebkitMaskImage: `url(${tileUrl})`,
+          maskSize: 'cover',
+          WebkitMaskSize: 'cover',
+          maskPosition: 'center',
+          WebkitMaskPosition: 'center',
+          transform: `rotate(${tileRot}deg)`,
+          filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.25))',
+        }}
+      />
+      {/* Layer 2: the tile texture itself, multiplied for grunge. */}
       <img
-        src={`/tiles/processed/plain_tile_${tileIdx}.png`}
+        src={tileUrl}
         alt=""
         draggable={false}
         aria-hidden
@@ -119,6 +138,7 @@ function Cell({
           objectFit: 'cover',
           transform: `rotate(${tileRot}deg)`,
           mixBlendMode: 'multiply',
+          opacity: 0.7,
         }}
       />
       {state === 'watcher' && <Watcher territory={territory} size={watcherSize} />}
