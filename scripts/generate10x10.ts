@@ -21,6 +21,7 @@ import { rateDifficulty } from '../engine/difficulty';
 import { isAdjacent } from '../engine/rules';
 import { createRNG } from '../lib/randomSeed';
 import type { Puzzle } from '../engine/boardTypes';
+import { nextUnusedTitle, existingTitles } from './titlePool';
 
 const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK ?? '';
 
@@ -34,19 +35,6 @@ async function discordPing(msg: string): Promise<void> {
     });
   } catch {}
 }
-
-const TITLES = [
-  'The Deepwell Codex',
-  'Throne of the Sunken Empire',
-  'The Final Cartography',
-  'Tides Beneath the Tenth Star',
-  'The Ossuary of Drowned Kings',
-  'Echoes of the Hundred Wards',
-  'The Loom of Forgotten Tides',
-  'Vault of the Pale Antiquarian',
-  'The Cipher of the Ten Veils',
-  'Hymnal of the Final Meridian',
-];
 
 // ---------------------------------------------------------------------------
 // Solution generation
@@ -335,7 +323,7 @@ async function main() {
     for (const m of fileContent.matchAll(pattern)) nums.push(parseInt(m[1]));
     const idNum = nums.length > 0 ? Math.max(...nums) + 1 : 1;
     const id = `eb-10x10-${String(idNum).padStart(3, '0')}`;
-    const title = TITLES[(idNum - 1) % TITLES.length];
+    const title = nextUnusedTitle(existingTitles(fileContent));
 
     const diff = rateDifficulty({ ...raw, id, title });
     if (minRank > 0 && (DIFFICULTY_RANK[diff] ?? 0) < minRank) {

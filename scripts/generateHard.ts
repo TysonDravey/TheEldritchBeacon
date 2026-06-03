@@ -20,25 +20,10 @@
 
 import { generatePuzzle } from '../engine/generator';
 import { rateDifficulty } from '../engine/difficulty';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import type { Puzzle } from '../engine/boardTypes';
-
-const HARD_TITLES = [
-  'The Obsidian Concordat',
-  'Shards of the Broken Astrolabe',
-  'The Warden of Sunken Light',
-  'Rite of the Seventh Tide',
-  'The Corroded Vigil',
-  'Echoes in the Abyssal Chart',
-  'The Leviathan Meridian',
-  'Codex of Drowned Stars',
-  'The Pale Congregation',
-  'Hymn of the Outer Dark',
-  'The Unmarked Reliquary',
-  'Depths of the Final Cartography',
-  'The Crumbling Zodiac',
-  'Voices from the Kelp Choir',
-  'The Architect of Forgotten Tides',
-];
+import { nextUnusedTitle, existingTitles } from './titlePool';
 
 function parseArgs(): { size: number; count: number; base: string; start: number } {
   const args = process.argv.slice(2);
@@ -86,7 +71,11 @@ async function main() {
     const idx = start + found.length;
     const idStr = String(idx).padStart(3, '0');
     const id = `eb-hard-${size}x${size}-${idStr}`;
-    const title = HARD_TITLES[(idx - 1) % HARD_TITLES.length];
+    // Pull a title from the shared pool that isn't already in samplePuzzles
+    // OR already used by this run's pending results.
+    const inFileTitles = existingTitles(readFileSync(join(process.cwd(), 'data', 'samplePuzzles.ts'), 'utf-8'));
+    for (const p of found) inFileTitles.add(p.title);
+    const title = nextUnusedTitle(inFileTitles);
 
     const finalPuzzle: Puzzle = {
       ...puzzle,

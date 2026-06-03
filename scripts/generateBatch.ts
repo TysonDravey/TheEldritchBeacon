@@ -22,6 +22,7 @@ import { rateDifficulty } from '../engine/difficulty';
 import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import type { Puzzle, PuzzleMode } from '../engine/boardTypes';
+import { nextUnusedTitle, existingTitles } from './titlePool';
 
 const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK ?? '';
 
@@ -36,63 +37,6 @@ async function discordPing(msg: string): Promise<void> {
     // non-fatal — don't interrupt generation if Discord is unreachable
   }
 }
-
-// ---------------------------------------------------------------------------
-// Title pool — enough for many runs
-// ---------------------------------------------------------------------------
-
-const TITLE_POOL = [
-  'The Hollowed Meridian',
-  'Covenant of the Sunken Chart',
-  'The Abyssal Warden',
-  'Hymn of Fractured Stars',
-  'The Tidal Concordat',
-  'Reliquary of the Drowned Eye',
-  'The Corroded Sigil',
-  'Rites of the Bone Shoal',
-  'The Whispering Astrolabe',
-  'Congregation of the Pale Deep',
-  'The Kelp Cathedral',
-  'Scrolls of the Outer Flood',
-  'The Unmarked Vigil',
-  'Litany of the Sunken Spire',
-  'The Ink-Black Compass',
-  'Voices from the Abyssal Chart',
-  'The Corroded Zodiac',
-  'Omen of the Second Tide',
-  'The Warden of Drowned Light',
-  'Codex of the Hollow Shore',
-  'The Pale Congregation',
-  'Echoes Below the Meridian',
-  'The Fractured Reliquary',
-  'Rite of the Outer Dark',
-  'The Leviathan Cartography',
-  'Shards of the Forgotten Flood',
-  'The Obsidian Vigil',
-  'Hymn of the Corroded Gate',
-  'The Second Congregation',
-  'Depths of the Bone Compass',
-  'The Warden of Seven Tides',
-  'Covenant of the Hollow Spire',
-  'The Tidal Reliquary',
-  'Scrolls of the Drowned Zodiac',
-  'The Crumbling Cartography',
-  'Litany of Sunken Stars',
-  'The Pale Sigil',
-  'Voices of the Outer Flood',
-  'The Ossified Concordat',
-  'Omen Below the Broken Shore',
-  'The Kelp Meridian',
-  'Rites of the Hollow Eye',
-  'The Sunken Vigil',
-  'Codex of the Abyssal Gate',
-  'The Second Cartography',
-  'Echoes of the Corroded Tide',
-  'The Fractured Zodiac',
-  'Hymn of the Bone Warden',
-  'The Pale Astrolabe',
-  'Congregation of Drowned Omens',
-];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -181,7 +125,7 @@ async function main() {
       content = readFileSync(filePath, 'utf-8');
       const idNum  = nextIdNum(content, size);
       const id     = `eb-${size}x${size}-${String(idNum).padStart(3, '0')}`;
-      const title  = TITLE_POOL[(idNum - 1) % TITLE_POOL.length];
+      const title  = nextUnusedTitle(existingTitles(content));
 
       const { difficulty: _d, ...rest } = puzzle;
       const entry: Omit<Puzzle, 'difficulty'> = { ...rest, id, title };
