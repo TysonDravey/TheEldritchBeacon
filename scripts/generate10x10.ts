@@ -270,6 +270,7 @@ function parseArgs() {
   let hard = false;
   let minContradictions = 0;
   let minScore = 0;
+  let minRunup = 0;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--count'              && args[i+1]) count = parseInt(args[++i]);
     if (args[i] === '--base'               && args[i+1]) base  = args[++i];
@@ -278,9 +279,10 @@ function parseArgs() {
     if (args[i] === '--min-difficulty'     && args[i+1]) minDifficulty = args[++i];
     if (args[i] === '--min-contradictions' && args[i+1]) minContradictions = parseInt(args[++i]);
     if (args[i] === '--min-score'          && args[i+1]) minScore = parseInt(args[++i]);
+    if (args[i] === '--min-runup'          && args[i+1]) minRunup = parseInt(args[++i]);
     if (args[i] === '--hard')                            hard = true;
   }
-  return { count, base, thin, maxSeeds, minDifficulty, hard, minContradictions, minScore };
+  return { count, base, thin, maxSeeds, minDifficulty, hard, minContradictions, minScore, minRunup };
 }
 
 const DIFFICULTY_RANK: Record<string, number> = {
@@ -288,11 +290,13 @@ const DIFFICULTY_RANK: Record<string, number> = {
 };
 
 /** Re-runs the depth-1 solver, recording technique counts and the first deduction kind. */
-function tracePuzzle(p: Puzzle): { firstDeduction: string; contradictions: number } {
+function tracePuzzle(p: Puzzle): { firstDeduction: string; contradictions: number; runupBeforeFirstNaked: number } {
   const n = p.size;
   const cells: CellState[][] = Array.from({ length: n }, () => Array.from({ length: n }, () => 'empty' as CellState));
   let firstDeduction = 'none';
   let contradictions = 0;
+  let runupBeforeFirstNaked = 0;
+  let seenNaked = false;
 
   function applyDed(d: DeductionResult): void {
     cells[d.row][d.col] = d.type === 'watcher' ? 'watcher' : 'ward';
@@ -321,13 +325,17 @@ function tracePuzzle(p: Puzzle): { firstDeduction: string; contradictions: numbe
     else if (d.reason.includes('confined to rows') || d.reason.includes('confined to columns')) kind = 'pair';
     else kind = 'other';
     if (firstDeduction === 'none') firstDeduction = kind;
+    if (!seenNaked) {
+      if (kind === 'naked') seenNaked = true;
+      else runupBeforeFirstNaked++;
+    }
     applyDed(d);
   }
-  return { firstDeduction, contradictions };
+  return { firstDeduction, contradictions, runupBeforeFirstNaked };
 }
 
 async function main() {
-  const { count, base, thin, maxSeeds, minDifficulty, hard, minContradictions, minScore } = parseArgs();
+  const { count, base, thin, maxSeeds, minDifficulty, hard, minContradictions, minScore, minRunup } = parseArgs();
   const minRank = minDifficulty ? DIFFICULTY_RANK[minDifficulty] ?? 0 : 0;
   const n = 10;
   const filePath = join(process.cwd(), 'data', 'samplePuzzles.ts');
@@ -396,11 +404,15 @@ async function main() {
     }
     // "Hard" filters: the player should not get a free first deduction, and the
     // puzzle should genuinely require contradiction reasoning.
-    if (minContradictions > 0 || minScore > 0 || hard) {
+    if (minContradictions > 0 || minScore > 0 || minRunup > 0 || hard) {
       const trace = tracePuzzle({ ...raw, id, title });
       const score = scorePuzzle({ ...raw, id, title });
       if (hard && trace.firstDeduction === 'naked') {
         if (process.env.DEBUG_DIFF) process.stderr.write(`  seed s${s}: first deduction is naked (rejected for --hard)\n`);
+        continue;
+      }
+      if (minRunup > 0 && trace.runupBeforeFirstNaked < minRunup) {
+        if (process.env.DEBUG_DIFF) process.stderr.write(`  seed s${s}: runup ${trace.runupBeforeFirstNaked} (need ${minRunup})\n`);
         continue;
       }
       if (minContradictions > 0 && trace.contradictions < minContradictions) {
