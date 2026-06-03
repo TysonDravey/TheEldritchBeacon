@@ -158,6 +158,24 @@ function generateMixedTerritoryMap(
     }
 
     for (const [r, c] of cells) map[r][c] = t;
+
+    // ~50% of thin-big bend one cell perpendicular at the end to break the
+    // "all territories are straight lines" feel. Aggressive bending fragments
+    // blob territories' BFS expansion (70% mapFails at 100%); leaving roughly
+    // half as straight lines keeps the map generator viable.
+    if ((shape === 'thin-big-row' || shape === 'thin-big-col') && rng() < 0.5) {
+      const tail = cells[cells.length - 1];
+      const perpendiculars: [number, number][] = isRow
+        ? [[tail[0] - 1, tail[1]], [tail[0] + 1, tail[1]]]
+        : [[tail[0], tail[1] - 1], [tail[0], tail[1] + 1]];
+      if (rng() < 0.5) perpendiculars.reverse();
+      for (const [nr, nc] of perpendiculars) {
+        if (nr >= 0 && nr < n && nc >= 0 && nc < n && map[nr][nc] === -1) {
+          map[nr][nc] = t;
+          break;
+        }
+      }
+    }
   }
 
   // Step 3: BFS-grow remaining territories from their watcher cells
