@@ -224,6 +224,12 @@ The puzzle remains the heart of the experience. The visuals exist to reinforce w
 
 **Success Criteria:** Game generates fair puzzles without manual work.
 
+### Pinned: Plan B — Solver-Backed 10×10 Generator
+
+Current state: `scripts/generate10x10.ts` uses constructive shape placement (single + thin + blobs) which produces line-heavy boards. Reducing thin count to get more visual variety drops the depth-1 solver's hit rate to ~0, so we're stuck shipping line-heavy 10×10s like eb-10x10-003 / -004.
+
+Plan B (to revisit): build a generator that constructs the territory map by *targeting solver behavior directly*. Approach: backtrack territory assignments, evaluate the trace (runup, contradiction count, technique mix) on each candidate, and prune paths that fail to meet the difficulty profile. Optionally introduce richer shape primitives (L, T, plus-sign, 2×3 block) that constrain rows/cols without being straight lines. Out of scope for the current pass — revisit when we want truly varied 10×10 hard packs.
+
 - [x] `engine/generator.ts` — Procedural puzzle generator
   - [x] Unique solution checker
   - [x] Logic-only validation (reject if solver can't crack it)

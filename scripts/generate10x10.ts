@@ -178,7 +178,7 @@ function generateMixedTerritoryMap(
     }
   }
 
-  // Step 3: BFS-grow remaining territories from their watcher cells
+  // Step 3: BFS-grow remaining (blob) territories from their watcher cells.
   const pending: Array<{ row: number; col: number; territory: number }> = [];
   for (let t = 0; t < solution.length; t++) {
     if (shapes[t] === 'blob') {
@@ -389,6 +389,15 @@ async function main() {
       if (!isConnected(map, n, t)) { allConnected = false; break; }
     }
     if (!allConnected) { connFails++; continue; }
+
+    // Reject maps with one giant blob — they feel uneven. Hard 8x8 Archons
+    // have blob sizes in the 6–14 range; allow up to 22 here to keep hit rate.
+    if (hard) {
+      const sizes = new Array(n).fill(0);
+      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) sizes[map[r][c]]++;
+      const maxSize = Math.max(...sizes);
+      if (maxSize > 22) { mapFails++; continue; }
+    }
 
     // Build candidate puzzle
     const raw: Puzzle = {
