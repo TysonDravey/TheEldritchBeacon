@@ -6,6 +6,15 @@ import { TERRITORY_COLORS } from '@/theme/colors';
 import Watcher from './Watcher';
 import Ward from './Ward';
 
+const TILE_COUNT = 10;
+// Pseudo-random but stable per (row, col): cheap hashes, no Math.random.
+function tileIndex(row: number, col: number): number {
+  return ((row * 31 + col * 17) % TILE_COUNT + TILE_COUNT) % TILE_COUNT;
+}
+function tileRotation(row: number, col: number): number {
+  return (((row * 13 + col * 19) % 4) + 4) % 4 * 90;
+}
+
 interface CellProps {
   row: number;
   col: number;
@@ -88,14 +97,30 @@ function Cell({
     ringClass = 'outline outline-2 outline-brass outline-offset-[-2px]';
   }
 
+  const tileIdx = String(tileIndex(row, col) + 1).padStart(2, '0');
+  const tileRot = tileRotation(row, col);
+
   return (
     <div
       data-cell="true"
       data-row={row}
       data-col={col}
       style={borderStyle}
-      className={`relative flex items-center justify-center select-none ${ringClass}`}
+      className={`relative flex items-center justify-center select-none overflow-hidden ${ringClass}`}
     >
+      {/* Grunge tile, multiplied against the territory color */}
+      <img
+        src={`/tiles/processed/plain_tile_${tileIdx}.png`}
+        alt=""
+        draggable={false}
+        aria-hidden
+        className="absolute inset-0 w-full h-full pointer-events-none select-none"
+        style={{
+          objectFit: 'cover',
+          transform: `rotate(${tileRot}deg)`,
+          mixBlendMode: 'multiply',
+        }}
+      />
       {state === 'watcher' && <Watcher territory={territory} size={watcherSize} />}
       {state === 'ward'    && <Ward size={wardSize} />}
       {isDimmed && <div className="absolute inset-0 bg-ink opacity-40 pointer-events-none" />}
