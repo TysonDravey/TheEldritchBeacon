@@ -137,7 +137,7 @@ export default function HomePage() {
   const shatteredGroups = groupBySize(shatteredPuzzles);
 
   return (
-    <main className="min-h-screen bg-parchment flex flex-col items-center px-4 py-12">
+    <main className="min-h-screen flex flex-col items-center px-4 py-12">
 
       {/* Header */}
       <div className="flex flex-col items-center gap-4 mb-10">

@@ -436,7 +436,7 @@ export default function GeneratePage() {
   const activeCells = activeStepObj?.newCells;
 
   return (
-    <main className="min-h-screen bg-parchment px-6 py-8 font-serif">
+    <main className="min-h-screen px-6 py-8 font-serif">
       <div className="max-w-5xl mx-auto">
 
         {/* Header */}

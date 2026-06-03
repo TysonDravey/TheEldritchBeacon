@@ -243,7 +243,7 @@ export default function PuzzlePage() {
 
   if (!puzzle) {
     return (
-      <main className="min-h-screen bg-parchment flex flex-col items-center justify-center px-4">
+      <main className="min-h-screen flex flex-col items-center justify-center px-4">
         <p className="font-serif text-lg text-ink mb-4">Puzzle not found.</p>
         <button
           onClick={() => router.push('/')}
@@ -257,14 +257,14 @@ export default function PuzzlePage() {
 
   if (!playerState) {
     return (
-      <main className="min-h-screen bg-parchment flex items-center justify-center">
+      <main className="min-h-screen flex items-center justify-center">
         <p className="font-serif text-ink opacity-60">Loading…</p>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-parchment flex flex-col items-center px-4 py-8">
+    <main className="min-h-screen flex flex-col items-center px-4 py-8">
 
       {/* Back link */}
       <div className="w-full max-w-2xl mb-4">

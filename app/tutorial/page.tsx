@@ -307,7 +307,7 @@ export default function TutorialPage() {
   const isDone = step.action.type === 'done';
 
   return (
-    <main className="min-h-screen bg-parchment flex flex-col items-center px-4 py-10">
+    <main className="min-h-screen flex flex-col items-center px-4 py-10">
 
       {/* Nav */}
       <div className="w-full max-w-2xl mb-8 flex items-center gap-2">
