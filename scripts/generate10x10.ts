@@ -16,8 +16,10 @@
 
 import { writeFileSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { solveLogically } from '../engine/solver';
-import { rateDifficulty } from '../engine/difficulty';
+import { solveLogically, getNextDeduction, findContradictions } from '../engine/solver';
+import { rateDifficulty, scorePuzzle } from '../engine/difficulty';
+import { isSolved } from '../engine/rules';
+import type { CellState, DeductionResult } from '../engine/boardTypes';
 import { isAdjacent } from '../engine/rules';
 import { createRNG } from '../lib/randomSeed';
 import type { Puzzle } from '../engine/boardTypes';
@@ -70,6 +72,7 @@ function generateMixedTerritoryMap(
   solution: [number, number][],
   rng: () => number,
   thinCount: number,
+  hard: boolean = false,
 ): number[][] | null {
   const map: number[][] = Array.from({ length: n }, () => Array(n).fill(-1));
 
@@ -88,13 +91,21 @@ function generateMixedTerritoryMap(
     [indices[i], indices[j]] = [indices[j], indices[i]];
   }
   let assigned = 0;
-  // One single-cell kickstart territory (load-bearing for depth-1 cascade at n=10)
-  if (assigned < indices.length) shapes[indices[assigned++]] = 'single';
-  // One small (2-cell) thin territory — still constraining without telegraphing
-  if (assigned < indices.length) shapes[indices[assigned++]] = 'thin-2';
-  // Remaining thin slots are bigger (4-5 cells) row/col stripes
-  for (let k = 0; k < thinCount - 2 && assigned < indices.length; k++) {
-    shapes[indices[assigned++]] = rng() < 0.5 ? 'thin-big-row' : 'thin-big-col';
+  if (!hard) {
+    // Soft mode: 1 single + 1 thin-2 + thin-big stripes — easier to find but
+    // the single-cell territory gives the player a free first deduction.
+    if (assigned < indices.length) shapes[indices[assigned++]] = 'single';
+    if (assigned < indices.length) shapes[indices[assigned++]] = 'thin-2';
+    for (let k = 0; k < thinCount - 2 && assigned < indices.length; k++) {
+      shapes[indices[assigned++]] = rng() < 0.5 ? 'thin-big-row' : 'thin-big-col';
+    }
+  } else {
+    // Hard mode: NO single-cell territory. Player must find a confinement
+    // deduction first instead of just spotting a one-cell region.
+    if (assigned < indices.length) shapes[indices[assigned++]] = 'thin-2';
+    for (let k = 0; k < thinCount - 1 && assigned < indices.length; k++) {
+      shapes[indices[assigned++]] = rng() < 0.5 ? 'thin-big-row' : 'thin-big-col';
+    }
   }
 
   // Step 1: place watcher seeds
@@ -256,22 +267,67 @@ function parseArgs() {
   let thin = 3;
   let maxSeeds = 20000;
   let minDifficulty: string | null = null;
+  let hard = false;
+  let minContradictions = 0;
+  let minScore = 0;
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--count'          && args[i+1]) count = parseInt(args[++i]);
-    if (args[i] === '--base'           && args[i+1]) base  = args[++i];
-    if (args[i] === '--thin'           && args[i+1]) thin  = parseInt(args[++i]);
-    if (args[i] === '--max'            && args[i+1]) maxSeeds = parseInt(args[++i]);
-    if (args[i] === '--min-difficulty' && args[i+1]) minDifficulty = args[++i];
+    if (args[i] === '--count'              && args[i+1]) count = parseInt(args[++i]);
+    if (args[i] === '--base'               && args[i+1]) base  = args[++i];
+    if (args[i] === '--thin'               && args[i+1]) thin  = parseInt(args[++i]);
+    if (args[i] === '--max'                && args[i+1]) maxSeeds = parseInt(args[++i]);
+    if (args[i] === '--min-difficulty'     && args[i+1]) minDifficulty = args[++i];
+    if (args[i] === '--min-contradictions' && args[i+1]) minContradictions = parseInt(args[++i]);
+    if (args[i] === '--min-score'          && args[i+1]) minScore = parseInt(args[++i]);
+    if (args[i] === '--hard')                            hard = true;
   }
-  return { count, base, thin, maxSeeds, minDifficulty };
+  return { count, base, thin, maxSeeds, minDifficulty, hard, minContradictions, minScore };
 }
 
 const DIFFICULTY_RANK: Record<string, number> = {
   Initiate: 1, Scholar: 2, Occultist: 3, 'High Priest': 4, Eldritch: 5, Harbinger: 6, Archon: 7,
 };
 
+/** Re-runs the depth-1 solver, recording technique counts and the first deduction kind. */
+function tracePuzzle(p: Puzzle): { firstDeduction: string; contradictions: number } {
+  const n = p.size;
+  const cells: CellState[][] = Array.from({ length: n }, () => Array.from({ length: n }, () => 'empty' as CellState));
+  let firstDeduction = 'none';
+  let contradictions = 0;
+
+  function applyDed(d: DeductionResult): void {
+    cells[d.row][d.col] = d.type === 'watcher' ? 'watcher' : 'ward';
+    if (d.type === 'watcher') {
+      for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        const nr = d.row + dr, nc = d.col + dc;
+        if (nr >= 0 && nr < n && nc >= 0 && nc < n && cells[nr][nc] === 'empty') cells[nr][nc] = 'ward';
+      }
+      for (let c = 0; c < n; c++) if (c !== d.col && cells[d.row][c] === 'empty') cells[d.row][c] = 'ward';
+      for (let r = 0; r < n; r++) if (r !== d.row && cells[r][d.col] === 'empty') cells[r][d.col] = 'ward';
+    }
+  }
+
+  for (let step = 0; step < 200; step++) {
+    if (isSolved(p, cells)) break;
+    if (findContradictions(p, cells).found) break;
+    const d = getNextDeduction(p, cells, 1);
+    if (!d) break;
+    let kind: string;
+    if (d.type === 'watcher') kind = 'naked';
+    else if (d.reasonType === 'hypothetical') { contradictions++; kind = 'contradiction'; }
+    else if (d.reasonType === 'hidden-set-row' || d.reasonType === 'hidden-set-col') kind = 'hidden';
+    else if (d.reason.includes('confined to row') || d.reason.includes('only place its Watcher in row') ||
+             d.reason.includes('confined to column') || d.reason.includes('only place its Watcher in column')) kind = 'confinement';
+    else if (d.reason.includes('confined to rows') || d.reason.includes('confined to columns')) kind = 'pair';
+    else kind = 'other';
+    if (firstDeduction === 'none') firstDeduction = kind;
+    applyDed(d);
+  }
+  return { firstDeduction, contradictions };
+}
+
 async function main() {
-  const { count, base, thin, maxSeeds, minDifficulty } = parseArgs();
+  const { count, base, thin, maxSeeds, minDifficulty, hard, minContradictions, minScore } = parseArgs();
   const minRank = minDifficulty ? DIFFICULTY_RANK[minDifficulty] ?? 0 : 0;
   const n = 10;
   const filePath = join(process.cwd(), 'data', 'samplePuzzles.ts');
@@ -298,7 +354,7 @@ async function main() {
     const solution = generateSolution(n, rng);
     if (!solution) { solFails++; continue; }
 
-    const map = generateMixedTerritoryMap(n, solution, rng, thin);
+    const map = generateMixedTerritoryMap(n, solution, rng, thin, hard);
     if (!map) { mapFails++; continue; }
 
     // Verify all territories connected
@@ -335,9 +391,26 @@ async function main() {
 
     const diff = rateDifficulty({ ...raw, id, title });
     if (minRank > 0 && (DIFFICULTY_RANK[diff] ?? 0) < minRank) {
-      // Doesn't meet difficulty threshold — skip and don't mark this ID as used
       if (process.env.DEBUG_DIFF) process.stderr.write(`  seed s${s}: ${diff} (below ${minDifficulty})\n`);
       continue;
+    }
+    // "Hard" filters: the player should not get a free first deduction, and the
+    // puzzle should genuinely require contradiction reasoning.
+    if (minContradictions > 0 || minScore > 0 || hard) {
+      const trace = tracePuzzle({ ...raw, id, title });
+      const score = scorePuzzle({ ...raw, id, title });
+      if (hard && trace.firstDeduction === 'naked') {
+        if (process.env.DEBUG_DIFF) process.stderr.write(`  seed s${s}: first deduction is naked (rejected for --hard)\n`);
+        continue;
+      }
+      if (minContradictions > 0 && trace.contradictions < minContradictions) {
+        if (process.env.DEBUG_DIFF) process.stderr.write(`  seed s${s}: only ${trace.contradictions} contradictions (need ${minContradictions})\n`);
+        continue;
+      }
+      if (minScore > 0 && score < minScore) {
+        if (process.env.DEBUG_DIFF) process.stderr.write(`  seed s${s}: score ${score} (need ${minScore})\n`);
+        continue;
+      }
     }
     const { difficulty: _d, ...rest } = raw;
     const entry = { ...rest, id, title };
