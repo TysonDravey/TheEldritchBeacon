@@ -150,11 +150,13 @@ function Cell({
           opacity: 0.7,
         }}
       />
-      {/* Foreground content sits in its own stacking context above the tile
-          layers (which create their own contexts via transform/mix-blend-mode). */}
-      {state === 'watcher' && <div className="relative z-10"><Watcher territory={territory} size={watcherSize} /></div>}
-      {state === 'ward'    && <div className="relative z-10"><Ward size={wardSize} /></div>}
+      {/* Layered stack from back to front:
+            z-10  dim overlay   — darkens the tile bg only
+            z-20  player content (watcher/ward) — always crisp on top of dim
+            z-30  hint overlays (spinner, ghost watchers, ghost/constraint wards) */}
       {isDimmed && <div className="absolute inset-0 bg-ink opacity-40 pointer-events-none z-10" />}
+      {state === 'watcher' && <div className="relative z-20"><Watcher territory={territory} size={watcherSize} /></div>}
+      {state === 'ward'    && <div className="relative z-20"><Ward size={wardSize} /></div>}
       {isPrimaryHint && state === 'empty' && !isGhost && (
         <img
           src="/svg/watcher_spinner.svg"
@@ -162,12 +164,12 @@ function Cell({
           height={watcherSize}
           alt=""
           draggable={false}
-          className="absolute animate-pulse pointer-events-none z-10"
+          className="absolute animate-pulse pointer-events-none z-30"
           style={{ opacity: 0.35 }}
         />
       )}
       {isGhost && state === 'empty' && (
-        <div className="ghost-watcher absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+        <div className="ghost-watcher absolute inset-0 flex items-center justify-center pointer-events-none z-30">
           <div style={{ opacity: 0.9 }}>
             <Watcher territory={territory} size={watcherSize} />
           </div>
@@ -178,7 +180,7 @@ function Cell({
         </div>
       )}
       {isConstraintWard && state === 'empty' && (
-        <div className="ghost-ward absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+        <div className="ghost-ward absolute inset-0 flex items-center justify-center pointer-events-none z-30">
           <img
             src="/svg/ward_sigil.svg"
             width={wardSize}
@@ -194,7 +196,7 @@ function Cell({
         </div>
       )}
       {isGhostWard && state === 'empty' && (
-        <div className="ghost-ward absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+        <div className="ghost-ward absolute inset-0 flex items-center justify-center pointer-events-none z-30">
           <img
             src="/svg/ward_sigil.svg"
             width={wardSize}
