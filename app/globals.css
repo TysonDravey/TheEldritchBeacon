@@ -12,7 +12,6 @@
 * { box-sizing: border-box; }
 
 body {
-  background-color: var(--parchment);
   color: var(--ink);
   font-family: Georgia, serif;
   min-height: 100vh;

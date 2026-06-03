@@ -26,13 +26,13 @@ export default function Backdrop() {
   return (
     <div
       aria-hidden
-      className="fixed inset-0 pointer-events-none"
+      className="fixed inset-0 pointer-events-none bg-parchment"
       style={{
         backgroundImage: `url(${url})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
-        zIndex: -10,
+        zIndex: -1,
       }}
     />
   );

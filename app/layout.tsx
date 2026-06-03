@@ -14,7 +14,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-parchment text-ink font-serif min-h-screen">
+      <body className="text-ink font-serif min-h-screen">
         <Backdrop />
         {children}
       </body>
