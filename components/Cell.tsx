@@ -141,9 +141,11 @@ function Cell({
           opacity: 0.7,
         }}
       />
-      {state === 'watcher' && <Watcher territory={territory} size={watcherSize} />}
-      {state === 'ward'    && <Ward size={wardSize} />}
-      {isDimmed && <div className="absolute inset-0 bg-ink opacity-40 pointer-events-none" />}
+      {/* Foreground content sits in its own stacking context above the tile
+          layers (which create their own contexts via transform/mix-blend-mode). */}
+      {state === 'watcher' && <div className="relative z-10"><Watcher territory={territory} size={watcherSize} /></div>}
+      {state === 'ward'    && <div className="relative z-10"><Ward size={wardSize} /></div>}
+      {isDimmed && <div className="absolute inset-0 bg-ink opacity-40 pointer-events-none z-10" />}
       {isPrimaryHint && state === 'empty' && !isGhost && (
         <img
           src="/svg/watcher_spinner.svg"
@@ -151,12 +153,12 @@ function Cell({
           height={watcherSize}
           alt=""
           draggable={false}
-          className="absolute animate-pulse pointer-events-none"
+          className="absolute animate-pulse pointer-events-none z-10"
           style={{ opacity: 0.35 }}
         />
       )}
       {isGhost && state === 'empty' && (
-        <div className="ghost-watcher absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="ghost-watcher absolute inset-0 flex items-center justify-center pointer-events-none z-10">
           <div style={{ opacity: 0.9 }}>
             <Watcher territory={territory} size={watcherSize} />
           </div>
@@ -167,7 +169,7 @@ function Cell({
         </div>
       )}
       {isConstraintWard && state === 'empty' && (
-        <div className="ghost-ward absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="ghost-ward absolute inset-0 flex items-center justify-center pointer-events-none z-10">
           <img
             src="/svg/ward_sigil.svg"
             width={wardSize}
@@ -183,7 +185,7 @@ function Cell({
         </div>
       )}
       {isGhostWard && state === 'empty' && (
-        <div className="ghost-ward absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="ghost-ward absolute inset-0 flex items-center justify-center pointer-events-none z-10">
           <img
             src="/svg/ward_sigil.svg"
             width={wardSize}
