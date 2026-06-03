@@ -73,13 +73,14 @@ function generateMixedTerritoryMap(
 ): number[][] | null {
   const map: number[][] = Array.from({ length: n }, () => Array(n).fill(-1));
 
-  // Assign "shape" to each territory.
-  // - "single": single cell — instant forced placement; one kickstart is OK,
-  //   two makes the puzzle trivial (player sees both 1-cell regions immediately).
-  // - "thin-row" / "thin-col": few cells in same row/col → confinement fires after
-  //   another nearby watcher is placed
-  // - "blob": BFS-grown territory
-  type Shape = 'single' | 'thin-row' | 'thin-col' | 'blob';
+  // Assign "shape" to each territory. Tiny territories (1- and 2-cell) are
+  // capped at one each — more than that makes the puzzle feel trivial since
+  // the player can scan for tiny regions and place watchers immediately.
+  // - "single":   1 cell        (max 1)
+  // - "thin-2":   2 cells       (max 1)
+  // - "thin-big": 4–5 cells in a row/col → confinement after a neighbour fires
+  // - "blob":     BFS-grown
+  type Shape = 'single' | 'thin-2' | 'thin-big-row' | 'thin-big-col' | 'blob';
   const shapes: Shape[] = solution.map(() => 'blob');
   const indices = Array.from({ length: n }, (_, i) => i);
   for (let i = indices.length - 1; i > 0; i--) {
@@ -89,8 +90,11 @@ function generateMixedTerritoryMap(
   let assigned = 0;
   // One single-cell kickstart territory (load-bearing for depth-1 cascade at n=10)
   if (assigned < indices.length) shapes[indices[assigned++]] = 'single';
-  for (let k = 0; k < thinCount && assigned < indices.length; k++) {
-    shapes[indices[assigned++]] = rng() < 0.5 ? 'thin-row' : 'thin-col';
+  // One small (2-cell) thin territory — still constraining without telegraphing
+  if (assigned < indices.length) shapes[indices[assigned++]] = 'thin-2';
+  // Remaining thin slots are bigger (4-5 cells) row/col stripes
+  for (let k = 0; k < thinCount - 2 && assigned < indices.length; k++) {
+    shapes[indices[assigned++]] = rng() < 0.5 ? 'thin-big-row' : 'thin-big-col';
   }
 
   // Step 1: place watcher seeds
@@ -103,12 +107,16 @@ function generateMixedTerritoryMap(
   // adjacent to the watcher. Contiguity matters: scattered thin cells fragment
   // the remaining grid and force blob territories to become disconnected.
   for (let t = 0; t < solution.length; t++) {
-    if (shapes[t] !== 'thin-row' && shapes[t] !== 'thin-col') continue;
+    const shape = shapes[t];
+    if (shape !== 'thin-2' && shape !== 'thin-big-row' && shape !== 'thin-big-col') continue;
     const [wr, wc] = solution[t];
-    const targetSize = 2 + Math.floor(rng() * 2); // 2-3 cells
+    const targetSize =
+      shape === 'thin-2' ? 2 :
+      3 + Math.floor(rng() * 2); // 3-4 cells for thin-big
+    const isRow = shape === 'thin-big-row' || (shape === 'thin-2' && rng() < 0.5);
     const cells: [number, number][] = [[wr, wc]];
 
-    if (shapes[t] === 'thin-row') {
+    if (isRow) {
       // Grow contiguously left and right from (wr, wc), preferring one direction
       const goLeftFirst = rng() < 0.5;
       let left = wc - 1, right = wc + 1;
@@ -123,7 +131,7 @@ function generateMixedTerritoryMap(
         } else break;
       }
     } else {
-      // thin-col
+      // column
       const goUpFirst = rng() < 0.5;
       let up = wr - 1, down = wr + 1;
       while (cells.length < targetSize && (up >= 0 || down < n)) {

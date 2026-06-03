@@ -611,3 +611,242 @@ Puzzle difficulty is determined by the techniques required to solve it. The solv
 | Watcher Network   | 8     |
 
 Aggregate technique scores map to difficulty ratings: Initiate → Scholar → Occultist → High Priest → Eldritch.
+
+---
+
+## Future Expansion Mechanic: Impossible Geometry
+
+The Eldritch Beacon should support future puzzle modes that explore impossible geometry and non-Euclidean space.
+
+These mechanics should be treated as advanced expansion content and should not appear in the core onboarding experience.
+
+The goal is to create new logical challenges without introducing randomness or guesswork.
+
+All geometry-based mechanics must remain fully deterministic and solvable through logic.
+
+---
+
+### Design Philosophy
+
+The board should never change unexpectedly during puzzle solving.
+
+Instead, the player's understanding of the board changes.
+
+The puzzle remains fair.
+
+The rules remain consistent.
+
+The geometry is unusual.
+
+This distinction is critical.
+
+The game should never violate player trust.
+
+---
+
+### Wrapped Space
+
+Certain puzzle modes may exist on surfaces that wrap around themselves.
+
+Examples:
+
+* horizontal wrap
+* vertical wrap
+* full toroidal wrap
+
+The board appears finite.
+
+The space it occupies is not.
+
+---
+
+### Horizontal Wrap
+
+The left and right edges of the board are connected.
+
+Example:
+
+The cell on the far left of a row is adjacent to the cell on the far right of that same row.
+
+Implications:
+
+* Watcher influence crosses the seam.
+* Territories may span the seam.
+* Rows become continuous loops.
+
+---
+
+### Vertical Wrap
+
+The top and bottom edges of the board are connected.
+
+Implications:
+
+* Columns become continuous loops.
+* Watcher influence crosses vertical boundaries.
+* Territory layouts become more unusual.
+
+---
+
+### Toroidal Geometry
+
+The board wraps in both directions.
+
+The board effectively behaves as a torus.
+
+Properties:
+
+* no true edges
+* no true corners
+* all rows loop
+* all columns loop
+
+This should be considered one of the most advanced puzzle modes in the game.
+
+---
+
+### Interactive Chart Navigation
+
+Future puzzle modes may allow the player to shift their view of the board.
+
+Example:
+
+Dragging the chart horizontally rotates the visible board.
+
+The board state does not change.
+
+Only the viewing position changes.
+
+Example:
+
+ABCDE
+
+becomes
+
+EABCD
+
+The puzzle remains identical.
+
+The player is simply viewing a different section of the same continuous surface.
+
+---
+
+### Seam Awareness
+
+The UI should clearly communicate when space wraps.
+
+Potential visual approaches:
+
+* matching symbols on opposite edges
+* connecting nautical rope motifs
+* chart markings
+* glowing boundary indicators
+* lighthouse beam projections
+
+Players should never be confused about whether wrapping is active.
+
+---
+
+### Geometry-Based Techniques
+
+Future expansions may introduce deduction techniques based on wrapped space.
+
+Examples:
+
+**Looped Horizon**
+
+A deduction involving a row that wraps around itself.
+
+**Endless Current**
+
+A deduction involving a wrapped column.
+
+**Beacon Meridian**
+
+A territory spanning a seam.
+
+**Closed Horizon**
+
+A deduction unique to toroidal space.
+
+---
+
+### Campaign Integration
+
+Impossible geometry should be introduced gradually through lore and environmental storytelling.
+
+Early campaign:
+
+The world appears normal.
+
+Mid campaign:
+
+Subtle inconsistencies appear.
+
+Examples:
+
+* maps that do not align
+* repeated floor numbers
+* contradictory diagrams
+
+Late campaign:
+
+The player discovers that space around the Beacon does not behave normally.
+
+Only after this realization should geometry-based puzzle modes be introduced.
+
+---
+
+### Lore Interpretation
+
+The Beacon does not distort reality through magic.
+
+Reality simply behaves differently near the Beacon.
+
+Human observers interpret these inconsistencies through familiar concepts such as:
+
+* floors
+* rooms
+* staircases
+* maps
+
+These interpretations are often incorrect.
+
+The player slowly learns that the Beacon cannot be accurately described using conventional geometry.
+
+---
+
+### Expansion Potential
+
+Possible future expansion titles:
+
+* The Drowned Archive
+* The Black Tide
+* The Endless Shore
+* The Beacon's Skin
+
+These expansions may introduce:
+
+* wrapped geometry
+* toroidal boards
+* impossible territories
+* advanced deduction techniques
+* new visual storytelling systems
+
+without altering the core puzzle engine.
+
+---
+
+### Design Goal
+
+Impossible geometry should create wonder rather than confusion.
+
+The player should feel:
+
+> "I understand the rules."
+
+while simultaneously feeling:
+
+> "The space itself should not exist."
+
+The challenge comes from learning a new geometry, not from hidden information or changing rules.
