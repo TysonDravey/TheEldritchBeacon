@@ -99,10 +99,6 @@ function Cell({
     ringClass = 'outline outline-2 outline-red-ink outline-offset-[-2px] shake';
   } else if (isGhost) {
     ringClass = 'outline outline-2 outline-red-ink outline-offset-[-2px] animate-pulse';
-  } else if (isHighlighted) {
-    ringClass = 'outline outline-2 outline-red-ink outline-offset-[-2px]';
-  } else if (isSecondaryHighlighted) {
-    ringClass = 'outline outline-2 outline-brass outline-offset-[-2px]';
   }
 
   const tileIdx = String(tileIndex(row, col) + 1).padStart(2, '0');
@@ -118,6 +114,7 @@ function Cell({
       style={{
         ...borderStyle,
         boxShadow: 'inset 0 -4px 0 rgba(26,18,9,0.65), inset -4px 0 0 rgba(26,18,9,0.5), 0 4px 0 rgba(26,18,9,0.75), 4px 0 0 rgba(26,18,9,0.55)',
+        willChange: 'transform',
       }}
       className={`relative flex items-center justify-center select-none ${ringClass}`}
     >
@@ -157,9 +154,20 @@ function Cell({
             z-10  dim overlay   — darkens the tile bg only
             z-20  player content (watcher/ward) — always crisp on top of dim
             z-30  hint overlays (spinner, ghost watchers, ghost/constraint wards) */}
+      {/* Directional light from top-left — matches board shadow direction */}
+      <div
+        aria-hidden
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: 'linear-gradient(145deg, rgba(255,255,255,0.07) 0%, transparent 45%, rgba(0,0,0,0.1) 100%)',
+          zIndex: 3,
+        }}
+      />
       {isDimmed && <div className="absolute inset-0 bg-ink opacity-40 pointer-events-none z-10" />}
+      {isHighlighted          && <div className="absolute inset-0 pointer-events-none z-10 hint-glow-red" />}
+      {isSecondaryHighlighted && <div className="absolute inset-0 pointer-events-none z-10 hint-glow-brass" />}
       {state === 'watcher' && <div className="relative z-20"><Watcher territory={territory} size={watcherSize} /></div>}
-      {state === 'ward'    && <div className="relative z-20"><Ward size={wardSize} /></div>}
+      {state === 'ward'    && <div className="relative z-20"><Ward territory={territory} size={wardSize} /></div>}
       {isPrimaryHint && state === 'empty' && !isGhost && (
         <img
           src="/svg/watcher_spinner.svg"

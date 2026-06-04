@@ -21,16 +21,30 @@ export const TERRITORY_COLORS: Record<number, { bg: string; border: string; text
 
 // SVG watcher filenames per territory index
 export const WATCHER_SVGS: Record<number, string> = {
-  0: '/svg/watcher_crimson.svg',
-  1: '/svg/watcher_ochre.svg',
-  2: '/svg/watcher_sea_green.svg',
-  3: '/svg/watcher_bone.svg',
-  4: '/svg/watcher_storm_grey.svg',
-  5: '/svg/watcher_faded_indigo.svg',
-  6: '/svg/watcher_emerald.svg',
-  7: '/svg/watcher_violet.svg',
-  8: '/svg/watcher_copper.svg',
-  9: '/svg/watcher_rose.svg',
+  0: '/tiles/watchers/watcher_red_02.png',
+  1: '/tiles/watchers/watcher_ochre_01.png',
+  2: '/tiles/watchers/watcher_seagreen_01.png',
+  3: '/tiles/watchers/watcher_bone_01.png',
+  4: '/tiles/watchers/watcher_storm_01.png',
+  5: '/tiles/watchers/watcher_indigo_01.png',
+  6: '/tiles/watchers/watcher_emerald_01.png',
+  7: '/tiles/watchers/watcher_violet_01.png',
+  8: '/tiles/watchers/watcher_copper_01.png',
+  9: '/tiles/watchers/watcher_rose_01.png',
+};
+
+// Ward rune PNGs per territory index
+export const WARD_PNGS: Record<number, string> = {
+  0: '/tiles/wards/ward_crimson_03.png',
+  1: '/tiles/wards/ward_ochre_01.png',
+  2: '/tiles/wards/ward_seagreen_01.png',
+  3: '/tiles/wards/ward_bone_01.png',
+  4: '/tiles/wards/ward_storm_01.png',
+  5: '/tiles/wards/ward_indigo_01.png',
+  6: '/tiles/wards/ward_emerald_01.png',
+  7: '/tiles/wards/ward_violet_01.png',
+  8: '/tiles/wards/ward_copper_01.png',
+  9: '/tiles/wards/ward_rose_01.png',
 };
 
 // Territory texture pattern SVGs (for accessibility — not color-only)

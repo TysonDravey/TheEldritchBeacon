@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Image from 'next/image';
+import NextImage from 'next/image';
 import { getPuzzleById } from '@/data/samplePuzzles';
 import { loadPlayerState, savePlayerState, createFreshPlayerState } from '@/lib/storage';
 import { getHint } from '@/engine/hints';
@@ -25,6 +25,7 @@ export default function PuzzlePage() {
   const [playerState,      setPlayerState]      = useState<PlayerState | null>(null);
   const [hintResult,       setHintResult]       = useState<HintResult | null>(null);
   const [showCompletion,   setShowCompletion]   = useState(false);
+  const [tilesReady,       setTilesReady]       = useState(false);
   const [contradiction,    setContradiction]    = useState<ContradictionResult>({ found: false });
   const [flashCells,       setFlashCells]       = useState<[number, number][]>([]);
   const [rejectionMessage, setRejectionMessage] = useState<string | null>(null);
@@ -32,9 +33,20 @@ export default function PuzzlePage() {
   const [cascadeWards,     setCascadeWards]     = useState<[number, number][]>([]);
   const [constraintWards,  setConstraintWards]  = useState<[number, number][]>([]);
   // Tracks how many hints player has asked without making a move — drives escalation
-  const hintDepthRef    = useRef(0);
-  const flashTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cascadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hintDepthRef      = useRef(0);
+  const flashTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cascadeTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isDraggingRef     = useRef(false);
+  const preDragCellsRef   = useRef<CellState[][] | null>(null);
+
+  useEffect(() => {
+    const srcs = Array.from({ length: 10 }, (_, i) =>
+      `/tiles/processed/plain_tile_${String(i + 1).padStart(2, '0')}.png`
+    );
+    Promise.all(
+      srcs.map(src => { const img = new Image(); img.src = src; return img.decode().catch(() => {}); })
+    ).then(() => setTilesReady(true));
+  }, []);
 
   useEffect(() => {
     if (!puzzle) return;
@@ -136,10 +148,10 @@ export default function PuzzlePage() {
       const newCells: CellState[][] = playerState.cells.map((r) => [...r]);
       newCells[row][col] = next;
 
-      const newUndoStack = [
-        ...playerState.undoStack,
-        playerState.cells.map((r) => [...r]),
-      ].slice(-UNDO_LIMIT);
+      // During a drag, don't push individual cells — onDragStart already snapshotted
+      const newUndoStack = isDraggingRef.current
+        ? playerState.undoStack
+        : [...playerState.undoStack, playerState.cells.map((r) => [...r])].slice(-UNDO_LIMIT);
 
       hintDepthRef.current = 0; // any move resets hint escalation
       setHintResult(null);      // dismiss active hint on any move
@@ -160,6 +172,24 @@ export default function PuzzlePage() {
     },
     [playerState, puzzle],
   );
+
+  const handleDragStart = useCallback(() => {
+    if (!playerState) return;
+    isDraggingRef.current   = true;
+    preDragCellsRef.current = playerState.cells.map((r) => [...r]);
+    // Push the pre-drag snapshot now so one undo reverses the whole drag
+    const newState = {
+      ...playerState,
+      undoStack: [...playerState.undoStack, playerState.cells.map((r) => [...r])].slice(-UNDO_LIMIT),
+    };
+    setPlayerState(newState);
+    savePlayerState(newState);
+  }, [playerState]);
+
+  const handleDragEnd = useCallback(() => {
+    isDraggingRef.current   = false;
+    preDragCellsRef.current = null;
+  }, []);
 
   // Single click → ward toggle (empty↔ward; ignore watcher cells)
   const handleCellWard = useCallback(
@@ -297,11 +327,14 @@ export default function PuzzlePage() {
       </div>
 
       {/* Board — always in the same position */}
+      <div style={{ opacity: tilesReady ? 1 : 0, transition: 'opacity 0.3s ease' }}>
       <Board
         puzzle={puzzle}
         playerCells={playerState.cells}
         onCellWard={handleCellWard}
         onCellWatcher={handleCellWatcher}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
         primaryCell={hintResult?.primaryCell}
         highlightCells={hintResult?.highlightCells}
         secondaryHighlightCells={hintResult?.secondaryHighlightCells}
@@ -316,6 +349,7 @@ export default function PuzzlePage() {
         ghostWardCells={cascadeWards}
         constraintWardCells={constraintWards}
       />
+      </div>
 
       {/* Controls */}
       <div className="mt-6">
@@ -333,7 +367,7 @@ export default function PuzzlePage() {
       <div className="mt-4 w-full max-w-2xl space-y-3">
         {showCompletion && (
           <div className="border-2 border-brass bg-parchment px-6 py-4 flex items-center gap-4 rounded-sm">
-            <Image src="/svg/completion_stamp.svg" alt="Completed" width={48} height={48} />
+            <NextImage src="/svg/completion_stamp.svg" alt="Completed" width={48} height={48} />
             <div>
               <p className="font-serif text-lg font-bold text-ink">Beacon Restored</p>
               <p className="font-serif text-sm text-ink-light italic">
