@@ -27,6 +27,7 @@ export interface Puzzle {
   difficulty: Difficulty;
   seed: string;
   createdAt: string;
+  generatorCmd?: string;  // exact CLI invocation that produced this puzzle
 }
 
 export interface PlayerState {
@@ -54,6 +55,8 @@ export type DeductionReasonType =
   | 'naked-single-territory'
   | 'naked-single-row'
   | 'naked-single-col'
+  | 'dual-confinement'
+  | 'territory-dead-end'
   | 'hypothetical';
 
 export interface DeductionResult {

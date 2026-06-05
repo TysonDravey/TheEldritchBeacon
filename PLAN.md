@@ -7,7 +7,7 @@
 ## Status: Phase 1 In Progress
 
 **Phase:** 1 — Core Built, Dev Server Running  
-**Last Updated:** 2026-05-30
+**Last Updated:** 2026-06-05
 
 ---
 
@@ -241,6 +241,13 @@ Plan B (to revisit): build a generator that constructs the territory map by *tar
 - [ ] Achievement event hooks (`onPuzzleSolved`, `onHintUsed`, etc.) — wired but inert
 - [ ] PlayerProgress model (separate from puzzle definitions)
 - [ ] 9×9 and 10×10 puzzle generation (requires deeper contradiction solver — 2-level chains; current solver tops out at 8×8)
+### Engine: Solver Instrumentation & New Techniques
+
+- [x] **Solver instrumentation** — log technique frequency per puzzle (how often each technique fires, in what order); use output to understand what 9×9/10×10 puzzles actually require and calibrate generation difficulty filters
+- [x] **Territory Dead-End** — when placing a watcher at cell X would immediately reduce another territory to 0 candidates, X can be eliminated as a Ward without hypothesis testing; faster than full contradiction test
+- [x] **Dual Confinement** — detect when a territory's remaining candidates fall within a single row AND a single column simultaneously; the cell at their intersection is a forced Watcher placement
+- [x] **Forced Territory Chain** — depth-2 propagation: if placing X forces deduction Y (through forward-only logic), and Y creates a contradiction, then X is eliminated; generalises the current hypothesis pass one level deeper
+
 - [ ] Twin Watchers mode (2 per territory/row/col)
 - [ ] Shattered Realms mode (disconnected color islands)
 - [ ] Daily Beacon puzzle (local seed Phase 2, server seed Phase 3)
@@ -528,6 +535,12 @@ These should appear in Expert puzzles.
 **Beacon Pair** — Difficulty: 3  
 Two territories share a limited pair of candidate locations. The placement of one directly constrains the other.
 
+**Territory Dead-End** — Difficulty: 3  
+Placing a Watcher at this location would immediately eliminate all candidates from another territory, making the board unsolvable. This cell can be eliminated as a Ward without a full hypothesis test — faster and shallower than contradiction testing.
+
+**Dual Confinement** — Difficulty: 3  
+A territory's remaining candidates fall within exactly one row and one column simultaneously. The cell at their intersection becomes a forced Watcher placement.
+
 **Mutual Exclusion** — Difficulty: 4  
 If Territory A uses a candidate location, Territory B becomes impossible. Therefore Territory A cannot use that candidate.
 
@@ -542,6 +555,10 @@ Several territories form a chain of constraints. A deduction in one territory cr
 ### Tier 4: Expert Techniques
 
 These should define Eldritch difficulty puzzles.
+
+**Forced Territory Chain** — Difficulty: 6  
+A placement triggers a cascade of forced deductions that ends in contradiction. Unlike a simple contradiction test, the chain passes through multiple territories before failing, requiring depth-2 propagation.  
+*Example: Placing A forces B to be the only option for its territory → B forces C → C makes another territory impossible. Therefore A is eliminated.*
 
 **Chain of Madness** — Difficulty: 6  
 A multi-step contradiction chain.  
@@ -598,23 +615,26 @@ This system functions as an in-game tutorial and knowledge base.
 
 Puzzle difficulty is determined by the techniques required to solve it. The solver records every technique used during validation; difficulty is generated automatically.
 
-| Technique         | Score |
-|-------------------|-------|
-| Last Refuge       | 1     |
-| Full Row          | 1     |
-| Full Column       | 1     |
-| Touching Shadows  | 1     |
-| Territory Lock    | 2     |
-| Column Lock       | 2     |
-| Narrow Channel    | 2     |
-| Shared Horizon    | 3     |
-| Beacon Pair       | 3     |
-| Mutual Exclusion  | 4     |
-| Forbidden Tide    | 4     |
-| Territory Network | 5     |
-| Chain of Madness  | 6     |
-| Deep Current      | 7     |
-| Watcher Network   | 8     |
+| Technique               | Score |
+|-------------------------|-------|
+| Last Refuge             | 1     |
+| Full Row                | 1     |
+| Full Column             | 1     |
+| Touching Shadows        | 1     |
+| Territory Lock          | 2     |
+| Column Lock             | 2     |
+| Narrow Channel          | 2     |
+| Shared Horizon          | 3     |
+| Beacon Pair             | 3     |
+| Territory Dead-End      | 3     |
+| Dual Confinement        | 3     |
+| Mutual Exclusion        | 4     |
+| Forbidden Tide          | 4     |
+| Territory Network       | 5     |
+| Forced Territory Chain  | 6     |
+| Chain of Madness        | 6     |
+| Deep Current            | 7     |
+| Watcher Network         | 8     |
 
 Aggregate technique scores map to difficulty ratings: Initiate → Scholar → Occultist → High Priest → Eldritch.
 

@@ -73,6 +73,7 @@ function generateMixedTerritoryMap(
   rng: () => number,
   thinCount: number,
   hard: boolean = false,
+  maxBlobSize: number = 999,
 ): number[][] | null {
   const map: number[][] = Array.from({ length: n }, () => Array(n).fill(-1));
 
@@ -179,10 +180,15 @@ function generateMixedTerritoryMap(
   }
 
   // Step 3: BFS-grow remaining (blob) territories from their watcher cells.
+  // Per-territory size tracking lets us cap each blob so no single territory
+  // dominates. Cells left unclaimed (when all neighbours hit the cap) are
+  // picked up by the overflow fill in Step 4.
+  const blobSizes: Record<number, number> = {};
   const pending: Array<{ row: number; col: number; territory: number }> = [];
   for (let t = 0; t < solution.length; t++) {
     if (shapes[t] === 'blob') {
       const [r, c] = solution[t];
+      blobSizes[t] = 1; // seed cell already placed
       pending.push({ row: r, col: c, territory: t });
     }
   }
@@ -195,6 +201,7 @@ function generateMixedTerritoryMap(
   while (pending.length > 0) {
     const idx = Math.floor(rng() * Math.min(pending.length, 3));
     const { row, col, territory } = pending.splice(idx, 1)[0];
+    if ((blobSizes[territory] ?? 0) >= maxBlobSize) continue; // cap reached
     const neighbors: [number, number][] = [[row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]];
     for (let i = neighbors.length - 1; i > 0; i--) {
       const j = Math.floor(rng() * (i + 1));
@@ -204,6 +211,7 @@ function generateMixedTerritoryMap(
       if (nr < 0 || nr >= n || nc < 0 || nc >= n) continue;
       if (map[nr][nc] !== -1) continue;
       map[nr][nc] = territory;
+      blobSizes[territory] = (blobSizes[territory] ?? 0) + 1;
       pending.push({ row: nr, col: nc, territory });
     }
   }
@@ -274,6 +282,83 @@ function isConnected(map: number[][], n: number, territory: number): boolean {
   return visited.size === total;
 }
 
+// Returns true if `territory` remains connected when cell (er,ec) is removed.
+function isConnectedWithout(map: number[][], n: number, territory: number, er: number, ec: number): boolean {
+  let start: [number, number] | null = null;
+  for (let r = 0; r < n && !start; r++) {
+    for (let c = 0; c < n; c++) {
+      if (map[r][c] === territory && !(r === er && c === ec)) { start = [r, c]; break; }
+    }
+  }
+  if (!start) return false; // territory would become empty
+  const visited = new Set<string>();
+  const stack = [start];
+  visited.add(`${start[0]},${start[1]}`);
+  while (stack.length > 0) {
+    const [r, c] = stack.pop()!;
+    for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+      const nr = r + dr, nc = c + dc;
+      if (nr < 0 || nr >= n || nc < 0 || nc >= n) continue;
+      if (map[nr][nc] !== territory) continue;
+      if (nr === er && nc === ec) continue;
+      const key = `${nr},${nc}`;
+      if (!visited.has(key)) { visited.add(key); stack.push([nr, nc]); }
+    }
+  }
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      if (map[r][c] === territory && !(r === er && c === ec) && !visited.has(`${r},${c}`)) return false;
+    }
+  }
+  return true;
+}
+
+// Repeatedly move single boundary cells between adjacent territories, accepting
+// only moves that keep the puzzle uniquely solvable. Each accepted step slightly
+// organicises the territory shapes without breaking the solver cascade.
+function applyBorderMutations(
+  map: number[][],
+  solution: [number, number][],
+  n: number,
+  puzzle: Puzzle,
+  rng: () => number,
+  attempts: number,
+): { map: number[][], accepted: number } {
+  let cur = map;
+  let accepted = 0;
+  const dirs: [number,number][] = [[-1,0],[1,0],[0,-1],[0,1]];
+
+  for (let i = 0; i < attempts; i++) {
+    // Collect all movable boundary cells: non-watcher cells that border a different territory
+    const candidates: [number, number, number, number][] = []; // [r, c, fromT, toT]
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        const t = cur[r][c];
+        if (solution[t][0] === r && solution[t][1] === c) continue; // watcher cell — never move
+        for (const [dr, dc] of dirs) {
+          const nr = r + dr, nc = c + dc;
+          if (nr < 0 || nr >= n || nc < 0 || nc >= n) continue;
+          const nt = cur[nr][nc];
+          if (nt !== t) { candidates.push([r, c, t, nt]); break; }
+        }
+      }
+    }
+    if (candidates.length === 0) break;
+
+    const [r, c, fromT, toT] = candidates[Math.floor(rng() * candidates.length)];
+    if (!isConnectedWithout(cur, n, fromT, r, c)) continue; // would disconnect source
+
+    const next = cur.map(row => [...row]);
+    next[r][c] = toT;
+
+    if (solveLogically({ ...puzzle, territoryMap: next }, 1)) {
+      cur = next;
+      accepted++;
+    }
+  }
+  return { map: cur, accepted };
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -289,18 +374,22 @@ function parseArgs() {
   let minContradictions = 0;
   let minScore = 0;
   let minRunup = 0;
+  let maxBlobSize = 999; // default uncapped; use --max-blob-size N to experiment
+  let mutateAttempts = 150; // border mutation steps after each valid puzzle is found
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--count'              && args[i+1]) count = parseInt(args[++i]);
-    if (args[i] === '--base'               && args[i+1]) base  = args[++i];
-    if (args[i] === '--thin'               && args[i+1]) thin  = parseInt(args[++i]);
-    if (args[i] === '--max'                && args[i+1]) maxSeeds = parseInt(args[++i]);
-    if (args[i] === '--min-difficulty'     && args[i+1]) minDifficulty = args[++i];
+    if (args[i] === '--count'              && args[i+1]) count             = parseInt(args[++i]);
+    if (args[i] === '--base'               && args[i+1]) base              = args[++i];
+    if (args[i] === '--thin'               && args[i+1]) thin              = parseInt(args[++i]);
+    if (args[i] === '--max'                && args[i+1]) maxSeeds          = parseInt(args[++i]);
+    if (args[i] === '--min-difficulty'     && args[i+1]) minDifficulty     = args[++i];
     if (args[i] === '--min-contradictions' && args[i+1]) minContradictions = parseInt(args[++i]);
-    if (args[i] === '--min-score'          && args[i+1]) minScore = parseInt(args[++i]);
-    if (args[i] === '--min-runup'          && args[i+1]) minRunup = parseInt(args[++i]);
-    if (args[i] === '--hard')                            hard = true;
+    if (args[i] === '--min-score'          && args[i+1]) minScore          = parseInt(args[++i]);
+    if (args[i] === '--min-runup'          && args[i+1]) minRunup          = parseInt(args[++i]);
+    if (args[i] === '--max-blob-size'      && args[i+1]) maxBlobSize       = parseInt(args[++i]);
+    if (args[i] === '--mutate'             && args[i+1]) mutateAttempts    = parseInt(args[++i]);
+    if (args[i] === '--hard')                            hard              = true;
   }
-  return { count, base, thin, maxSeeds, minDifficulty, hard, minContradictions, minScore, minRunup };
+  return { count, base, thin, maxSeeds, minDifficulty, hard, minContradictions, minScore, minRunup, maxBlobSize, mutateAttempts };
 }
 
 const DIFFICULTY_RANK: Record<string, number> = {
@@ -335,12 +424,13 @@ function tracePuzzle(p: Puzzle): { firstDeduction: string; contradictions: numbe
     const d = getNextDeduction(p, cells, 1);
     if (!d) break;
     let kind: string;
-    if (d.type === 'watcher') kind = 'naked';
+    if (d.type === 'watcher' && d.reasonType !== 'dual-confinement') kind = 'naked';
     else if (d.reasonType === 'hypothetical') { contradictions++; kind = 'contradiction'; }
     else if (d.reasonType === 'hidden-set-row' || d.reasonType === 'hidden-set-col') kind = 'hidden';
-    else if (d.reason.includes('confined to row') || d.reason.includes('only place its Watcher in row') ||
-             d.reason.includes('confined to column') || d.reason.includes('only place its Watcher in column')) kind = 'confinement';
-    else if (d.reason.includes('confined to rows') || d.reason.includes('confined to columns')) kind = 'pair';
+    else if (d.reasonType === 'dual-confinement') kind = 'dual';
+    else if (d.reasonType === 'territory-dead-end') kind = 'dead-end';
+    else if (d.reasonType === 'row-confinement' || d.reasonType === 'col-confinement') kind = 'confinement';
+    else if (d.reasonType === 'pair-row' || d.reasonType === 'pair-col') kind = 'pair';
     else kind = 'other';
     if (firstDeduction === 'none') firstDeduction = kind;
     if (!seenNaked) {
@@ -353,7 +443,7 @@ function tracePuzzle(p: Puzzle): { firstDeduction: string; contradictions: numbe
 }
 
 async function main() {
-  const { count, base, thin, maxSeeds, minDifficulty, hard, minContradictions, minScore, minRunup } = parseArgs();
+  const { count, base, thin, maxSeeds, minDifficulty, hard, minContradictions, minScore, minRunup, maxBlobSize, mutateAttempts } = parseArgs();
   const minRank = minDifficulty ? DIFFICULTY_RANK[minDifficulty] ?? 0 : 0;
   const n = 10;
   const filePath = join(process.cwd(), 'data', 'samplePuzzles.ts');
@@ -363,7 +453,7 @@ async function main() {
   const usedSeeds = new Set<string>();
   for (const m of fileContent.matchAll(/"seed":"([^"]+)"/g)) usedSeeds.add(m[1]);
 
-  process.stderr.write(`Constructive 10x10 generator: ${count} puzzles, thin=${thin}, max seeds=${maxSeeds}\n`);
+  process.stderr.write(`Constructive 10x10 generator: ${count} puzzles, thin=${thin}, maxBlobSize=${maxBlobSize}, max seeds=${maxSeeds}\n`);
   await discordPing(`▶ Starting 10x10 constructive generation (target=${count}, thin=${thin})`);
 
   let found = 0;
@@ -380,7 +470,7 @@ async function main() {
     const solution = generateSolution(n, rng);
     if (!solution) { solFails++; continue; }
 
-    const map = generateMixedTerritoryMap(n, solution, rng, thin, hard);
+    const map = generateMixedTerritoryMap(n, solution, rng, thin, hard, maxBlobSize);
     if (!map) { mapFails++; continue; }
 
     // Verify all territories connected
@@ -390,14 +480,6 @@ async function main() {
     }
     if (!allConnected) { connFails++; continue; }
 
-    // Reject maps with one giant blob — they feel uneven. Hard 8x8 Archons
-    // have blob sizes in the 6–14 range; allow up to 22 here to keep hit rate.
-    if (hard) {
-      const sizes = new Array(n).fill(0);
-      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) sizes[map[r][c]]++;
-      const maxSize = Math.max(...sizes);
-      if (maxSize > 22) { mapFails++; continue; }
-    }
 
     // Build candidate puzzle
     const raw: Puzzle = {
@@ -407,13 +489,20 @@ async function main() {
       difficulty: 'Initiate',
     };
 
-    // Test depth-1 solvability
+    // Test depth-1 solvability (forward + hypothesis chains).
     const solved = solveLogically(raw, 1);
     if (!solved) {
       solveFails++;
       if (s % 100 === 0 && s > 0) process.stderr.write(`  seed ${s}: still searching (solveFails=${solveFails})\n`);
       continue;
     }
+
+    // Border mutation pass — organicise territory shapes while preserving solvability.
+    // Each step moves one boundary cell between adjacent territories and re-runs the
+    // solver; only moves that keep the puzzle uniquely solvable are accepted.
+    const { map: mutMap, accepted: mutAccepted } = applyBorderMutations(map, solution, n, raw, rng, mutateAttempts);
+    const finalRaw: Puzzle = { ...raw, territoryMap: mutMap };
+    process.stderr.write(`  seed s${s}: solver pass — ${mutAccepted}/${mutateAttempts} border mutations accepted\n`);
 
     // Find next available eb-10x10 ID
     fileContent = readFileSync(filePath, 'utf-8');
@@ -424,7 +513,7 @@ async function main() {
     const id = `eb-10x10-${String(idNum).padStart(3, '0')}`;
     const title = nextUnusedTitle(existingTitles(fileContent));
 
-    const diff = rateDifficulty({ ...raw, id, title });
+    const diff = rateDifficulty({ ...finalRaw, id, title });
     if (minRank > 0 && (DIFFICULTY_RANK[diff] ?? 0) < minRank) {
       if (process.env.DEBUG_DIFF) process.stderr.write(`  seed s${s}: ${diff} (below ${minDifficulty})\n`);
       continue;
@@ -432,8 +521,8 @@ async function main() {
     // "Hard" filters: the player should not get a free first deduction, and the
     // puzzle should genuinely require contradiction reasoning.
     if (minContradictions > 0 || minScore > 0 || minRunup > 0 || hard) {
-      const trace = tracePuzzle({ ...raw, id, title });
-      const score = scorePuzzle({ ...raw, id, title });
+      const trace = tracePuzzle({ ...finalRaw, id, title });
+      const score = scorePuzzle({ ...finalRaw, id, title });
       if (hard && trace.firstDeduction === 'naked') {
         if (process.env.DEBUG_DIFF) process.stderr.write(`  seed s${s}: first deduction is naked (rejected for --hard)\n`);
         continue;
@@ -451,8 +540,21 @@ async function main() {
         continue;
       }
     }
-    const { difficulty: _d, ...rest } = raw;
-    const entry = { ...rest, id, title };
+    const cmd = [
+      'generate10x10',
+      `--base ${base}`,
+      `--thin ${thin}`,
+      `--mutate ${mutateAttempts}`,
+      ...(hard               ? ['--hard']                              : []),
+      ...(maxBlobSize < 999  ? [`--max-blob-size ${maxBlobSize}`]      : []),
+      ...(minDifficulty      ? [`--min-difficulty ${minDifficulty}`]   : []),
+      ...(minRunup > 0       ? [`--min-runup ${minRunup}`]             : []),
+      ...(minContradictions > 0 ? [`--min-contradictions ${minContradictions}`] : []),
+      ...(minScore > 0       ? [`--min-score ${minScore}`]             : []),
+    ].join(' ');
+
+    const { difficulty: _d, ...rest } = finalRaw;
+    const entry = { ...rest, id, title, generatorCmd: cmd };
 
     // Insert into samplePuzzles.ts before `\n];`
     const insertPoint = fileContent.lastIndexOf('\n];');

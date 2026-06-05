@@ -14,7 +14,9 @@ interface TechniqueRecord {
   naked: number;
   rowConfinement: number;
   columnConfinement: number;
+  dualConfinement: number;
   pairElimination: number;
+  territoryDeadEnd: number;
   hiddenSet: number;
   contradictionTest: number;
 }
@@ -22,16 +24,12 @@ interface TechniqueRecord {
 function classifyDeduction(d: DeductionResult): keyof TechniqueRecord {
   if (d.type === 'watcher') return 'naked';
   if (d.reasonType === 'hypothetical') return 'contradictionTest';
+  if (d.reasonType === 'dual-confinement') return 'dualConfinement';
+  if (d.reasonType === 'territory-dead-end') return 'territoryDeadEnd';
   if (d.reasonType === 'hidden-set-row' || d.reasonType === 'hidden-set-col') return 'hiddenSet';
-  if (d.reason.includes('confined to row') || d.reason.includes('only place its Watcher in row')) {
-    return 'rowConfinement';
-  }
-  if (d.reason.includes('confined to column') || d.reason.includes('only place its Watcher in column')) {
-    return 'columnConfinement';
-  }
-  if (d.reason.includes('confined to rows') || d.reason.includes('confined to columns')) {
-    return 'pairElimination';
-  }
+  if (d.reasonType === 'row-confinement') return 'rowConfinement';
+  if (d.reasonType === 'col-confinement') return 'columnConfinement';
+  if (d.reasonType === 'pair-row' || d.reasonType === 'pair-col') return 'pairElimination';
   return 'naked';
 }
 
@@ -40,7 +38,10 @@ function computeScore(record: TechniqueRecord): number {
     record.naked * 1 +
     record.rowConfinement * 2 +
     record.columnConfinement * 2 +
+    record.dualConfinement * 3 +
     record.pairElimination * 3 +
+    record.territoryDeadEnd * 4 +
+    record.hiddenSet * 4 +
     record.contradictionTest * 5
   );
 }
@@ -98,7 +99,9 @@ function buildRecord(puzzle: Puzzle): TechniqueRecord {
     naked: 0,
     rowConfinement: 0,
     columnConfinement: 0,
+    dualConfinement: 0,
     pairElimination: 0,
+    territoryDeadEnd: 0,
     hiddenSet: 0,
     contradictionTest: 0,
   };

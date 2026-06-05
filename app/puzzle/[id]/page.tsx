@@ -161,10 +161,22 @@ export default function PuzzlePage() {
       const newCells: CellState[][] = playerState.cells.map((r) => [...r]);
       newCells[row][col] = next;
 
-      // During a drag, don't push individual cells — onDragStart already snapshotted
-      const newUndoStack = isDraggingRef.current
-        ? playerState.undoStack
-        : [...playerState.undoStack, playerState.cells.map((r) => [...r])].slice(-UNDO_LIMIT);
+      // Build undo stack entry:
+      // - Single click: push current cells as snapshot
+      // - First cell of a drag: push the pre-drag snapshot stored in preDragCellsRef, then clear it
+      // - Subsequent drag cells: no push (snapshot already pushed on first cell)
+      // NOTE: snapshot must be pushed here, not in handleDragStart, because handleDragStart
+      // runs in the same event tick as the first applyChange — pushing in handleDragStart
+      // causes a stale-closure race where applyChange's setPlayerState overwrites it.
+      let newUndoStack: CellState[][][];
+      if (isDraggingRef.current && preDragCellsRef.current) {
+        newUndoStack = [...playerState.undoStack, preDragCellsRef.current].slice(-UNDO_LIMIT);
+        preDragCellsRef.current = null; // only push once per drag gesture
+      } else if (isDraggingRef.current) {
+        newUndoStack = playerState.undoStack; // subsequent drag cells — no new snapshot
+      } else {
+        newUndoStack = [...playerState.undoStack, playerState.cells.map((r) => [...r])].slice(-UNDO_LIMIT);
+      }
 
       hintDepthRef.current = 0; // any move resets hint escalation
       setHintResult(null);      // dismiss active hint on any move
@@ -190,13 +202,7 @@ export default function PuzzlePage() {
     if (!playerState) return;
     isDraggingRef.current   = true;
     preDragCellsRef.current = playerState.cells.map((r) => [...r]);
-    // Push the pre-drag snapshot now so one undo reverses the whole drag
-    const newState = {
-      ...playerState,
-      undoStack: [...playerState.undoStack, playerState.cells.map((r) => [...r])].slice(-UNDO_LIMIT),
-    };
-    setPlayerState(newState);
-    savePlayerState(newState);
+    // Snapshot is pushed by the first applyChange call during this drag (avoids stale-closure race)
   }, [playerState]);
 
   const handleDragEnd = useCallback(() => {
@@ -309,13 +315,19 @@ export default function PuzzlePage() {
   return (
     <main className="min-h-screen flex flex-col items-center px-4 py-8">
 
-      {/* Back link */}
+      {/* Back button */}
       <div className="w-full max-w-2xl mb-4">
         <button
           onClick={() => router.push('/')}
-          className="font-serif text-sm text-ink-light hover:text-ink border-b border-transparent hover:border-ink transition-colors"
+          className="transition-all duration-100 hover:brightness-110 active:scale-95"
+          title="Back to all puzzles"
         >
-          &larr; All Puzzles
+          <img
+            src="/buttons/left_button_01.png"
+            alt="All Puzzles"
+            draggable={false}
+            style={{ height: 64, display: 'block' }}
+          />
         </button>
       </div>
 

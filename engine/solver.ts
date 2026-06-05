@@ -424,6 +424,57 @@ function columnConfinement(
 }
 
 /**
+ * Technique 3b: Dual confinement.
+ * Considers the simultaneous effect of ALL other territories' row and col
+ * confinements on a specific territory T. If every candidate for T falls in
+ * a row or column claimed by another territory, only one position survives —
+ * which is a forced Watcher placement.
+ *
+ * This collapses what the sequential solver resolves across many individual
+ * confinement steps into a single deduction, and fires before pair elimination.
+ */
+function dualConfinement(
+  puzzle: Puzzle,
+  playerCells: CellState[][],
+  candidates: Map<number, [number, number][]>
+): DeductionResult | null {
+  const watchers = getWatcherPositions(playerCells);
+  const watcherRows = new Set(watchers.map(([r]) => r));
+  const watcherCols = new Set(watchers.map(([, c]) => c));
+
+  for (const [t, cands] of candidates) {
+    if (cands.length <= 1) continue; // naked single or already satisfied — handled elsewhere
+
+    // Build the set of rows and cols blocked FOR territory t by other territories:
+    // a row is blocked if some other (unsatisfied) territory has ALL its candidates in that row.
+    const blockedRows = new Set<number>(watcherRows);
+    const blockedCols = new Set<number>(watcherCols);
+
+    for (const [ot, ocands] of candidates) {
+      if (ot === t || ocands.length === 0) continue;
+      const orows = new Set(ocands.map(([r]) => r));
+      const ocols = new Set(ocands.map(([, c]) => c));
+      if (orows.size === 1) blockedRows.add([...orows][0]);
+      if (ocols.size === 1) blockedCols.add([...ocols][0]);
+    }
+
+    const surviving = cands.filter(([r, c]) => !blockedRows.has(r) && !blockedCols.has(c));
+
+    if (surviving.length === 1) {
+      const [r, c] = surviving[0];
+      return {
+        type: 'watcher', row: r, col: c,
+        reason: `All other cells for territory ${t + 1} are blocked by surrounding territories' row and column constraints.`,
+        reasonType: 'dual-confinement',
+        affectedTerritories: [t],
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
  * Technique 4: Row/col pair elimination.
  * If two (or more) territories are collectively confined to the same N rows,
  * those rows cannot be used by any other territory.
@@ -627,11 +678,16 @@ export function getNextDeduction(
   const ns = nakedSingle(puzzle, playerCells, candidates);
   if (ns) return ns;
 
-  // Technique 2: Row confinement
+  // Technique 2: Dual confinement (before individual confinements so it can
+  // batch the joint effect in one step instead of waiting for the cascade)
+  const dc = dualConfinement(puzzle, playerCells, candidates);
+  if (dc) return dc;
+
+  // Technique 3: Row confinement
   const rc = rowConfinement(puzzle, playerCells, candidates);
   if (rc) return rc;
 
-  // Technique 3: Column confinement
+  // Technique 4: Column confinement
   const cc = columnConfinement(puzzle, playerCells, candidates);
   if (cc) return cc;
 
@@ -639,11 +695,15 @@ export function getNextDeduction(
   const pe = pairElimination(puzzle, playerCells, candidates);
   if (pe) return pe;
 
-  // Technique 5: Hidden set elimination
+  // Technique 5: Territory dead-end
+  const tde = territoryDeadEnd(puzzle, playerCells, candidates);
+  if (tde) return tde;
+
+  // Technique 6: Hidden set elimination
   const hs = hiddenSetElimination(puzzle, playerCells, candidates);
   if (hs) return hs;
 
-  // Technique 6: Contradiction test (depth controlled by maxDepth)
+  // Technique 7: Contradiction test (depth controlled by maxDepth)
   const ct = contradictionTest(puzzle, playerCells, candidates, maxDepth);
   if (ct) return ct;
 
@@ -651,7 +711,80 @@ export function getNextDeduction(
 }
 
 /**
- * Technique 5: Hidden set elimination (dual of pair elimination).
+ * Technique 5: Territory dead-end.
+ * For each candidate cell (r,c): apply the watcher's direct consequences
+ * (row/col block + adjacency wards) WITHOUT any further propagation.
+ * If any unsatisfied territory ends up with 0 candidates, (r,c) is a ward.
+ *
+ * This is strictly weaker than contradictionTest (no propagation chain)
+ * but fires much earlier and catches cases where a placement would wipe out
+ * a territory whose candidates happen to all share the same row, column,
+ * or adjacency neighbourhood as (r,c).
+ */
+function territoryDeadEnd(
+  puzzle: Puzzle,
+  _playerCells: CellState[][],
+  candidates: Map<number, [number, number][]>
+): DeductionResult | null {
+  const n = puzzle.size;
+
+  // Pre-compute which territories are already satisfied
+  const satisfiedTerritories = new Set<number>();
+  for (const [t, cands] of candidates) {
+    if (cands.length === 0) satisfiedTerritories.add(t);
+  }
+
+  // For each candidate cell, check if the direct consequences of placing a
+  // watcher there would kill another territory's candidate list.
+  for (const [territory, cands] of candidates) {
+    if (cands.length === 0) continue;
+
+    for (const [r, c] of cands) {
+      // Build the set of cells that a watcher at (r,c) would immediately ward:
+      // adjacency (8-directional) + entire row + entire col.
+      // (Own-territory cells are also warded, but those are already excluded
+      // from other territories' candidate lists.)
+      const wardsRow = r;
+      const wardsCol = c;
+      const adjSet = new Set<string>();
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          const nr = r + dr, nc = c + dc;
+          if (nr >= 0 && nr < n && nc >= 0 && nc < n) adjSet.add(`${nr},${nc}`);
+        }
+      }
+
+      for (const [t2, tc] of candidates) {
+        if (t2 === territory) continue;
+        if (satisfiedTerritories.has(t2)) continue;
+        if (tc.length === 0) continue;
+
+        // Check if every candidate for t2 is eliminated by the watcher at (r,c)
+        const allKilled = tc.every(([r2, c2]) =>
+          r2 === wardsRow ||
+          c2 === wardsCol ||
+          adjSet.has(`${r2},${c2}`)
+        );
+
+        if (allKilled) {
+          return {
+            type: 'ward', row: r, col: c,
+            reason: `Placing a Watcher here would immediately remove all valid cells from territory ${t2 + 1}.`,
+            reasonType: 'territory-dead-end',
+            confinedTerritory: t2,
+            affectedTerritories: [territory, t2],
+          };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Technique 6: Hidden set elimination (dual of pair elimination).
  * If N rows (or columns) collectively contain candidates for only N territories,
  * those N territories must go in those N rows → eliminate their candidates elsewhere.
  */
@@ -728,25 +861,28 @@ function hiddenSetElimination(
 }
 
 /**
- * Technique 6: Contradiction test (hypothetical elimination).
+ * Technique 6: Contradiction test (hypothetical elimination / Forced Territory Chain).
  * For each candidate cell (r,c), try placing a watcher there and propagating.
  * If any territory ends up with 0 candidates, (r,c) must be a ward.
  *
- * depth=0: propagate with basic techniques only (fast, original behaviour).
- * depth=1: after basic propagation stalls, run a sub-contradiction pass (depth=0)
- *          on the hypothesis board. Any ward it finds is applied and basic
- *          propagation restarts. This unlocks chains like:
- *          "placing A forces B which eliminates C's last refuge → A is impossible."
+ * depth=0: propagate with ALL forward techniques (dual, adj, naked, confine,
+ *          pair, TDE) until stable, then check for 0-candidate territories.
+ * depth=1: after full-forward propagation stalls, run a sub-contradiction pass
+ *          (depth=0). Any ward it finds is applied and propagation restarts.
+ *          This is the "Forced Territory Chain": placing A forces B via pair/TDE/dual,
+ *          which then causes a contradiction elsewhere → A is impossible.
  */
 function contradictionTest(
   puzzle: Puzzle,
   playerCells: CellState[][],
   candidates: Map<number, [number, number][]>,
   depth: number = 1,
+  limitOverride?: number,  // when set, overrides the default candidate limit
 ): DeductionResult | null {
   // Collect candidates, tightest territories first (fewer candidates → more likely to contradict).
-  // Cap at n*3 total hypotheses: sorted ordering means we test the most useful ones first,
-  // so this cut rarely misses real contradictions while keeping larger boards fast.
+  // The outer call (depth=1) uses n*3 to get good coverage.
+  // Inner sub-calls (depth=0 inside depth=1) use n to reduce the quadratic cost:
+  // 30 outer × 10 inner = 300 pairs vs 30×30 = 900 without the limitOverride.
   const n = puzzle.size;
   const seen = new Set<string>();
   const allCands: [number, number, number][] = []; // [row, col, territory]
@@ -757,7 +893,7 @@ function contradictionTest(
       if (!seen.has(key)) { seen.add(key); allCands.push([r, c, t]); }
     }
   }
-  const limit = Math.max(n * 5, 24); // never less than 24 so small boards stay fully explored
+  const limit = limitOverride ?? Math.max(n, 12);
   const testCands = allCands.slice(0, limit);
 
   for (const [r, c, territory] of testCands) {
@@ -791,9 +927,12 @@ function contradictionTest(
         }
         const propagate =
           adjacencyElimination(puzzle, test, testCands) ??
+          dualConfinement(puzzle, test, testCands) ??
           nakedSingle(puzzle, test, testCands) ??
           rowConfinement(puzzle, test, testCands) ??
-          columnConfinement(puzzle, test, testCands);
+          columnConfinement(puzzle, test, testCands) ??
+          pairElimination(puzzle, test, testCands) ??
+          territoryDeadEnd(puzzle, test, testCands);
         if (propagate && test[propagate.row][propagate.col] === 'empty') {
           applyDeduction(test, propagate);
           innerChanged = true;
@@ -803,7 +942,8 @@ function contradictionTest(
       // --- After basic propagation stalls, try a sub-contradiction pass ---
       if (depth > 0) {
         const testCands = getCandidates(puzzle, test);
-        const sub = contradictionTest(puzzle, test, testCands, depth - 1);
+        // Use a smaller inner limit to avoid quadratic blowup (outer n*3 × inner n).
+        const sub = contradictionTest(puzzle, test, testCands, depth - 1, puzzle.size);
         if (sub && test[sub.row][sub.col] === 'empty') {
           applyDeduction(test, sub);
           outerChanged = true; // re-run basic propagation with the new ward applied
@@ -849,6 +989,40 @@ export function solveLogically(
   }
 
   return isSolved(puzzle, cells) ? cells : null;
+}
+
+// ---------------------------------------------------------------------------
+// solveWithTrace
+// ---------------------------------------------------------------------------
+
+/**
+ * Runs the full logical solver and returns every deduction made, in order.
+ * Useful for technique frequency analysis — each DeductionResult carries
+ * a `reasonType` that identifies which technique produced it.
+ */
+export function solveWithTrace(
+  puzzle: Puzzle,
+  maxDepth: number = 1,
+): { solved: boolean; steps: DeductionResult[] } {
+  const n = puzzle.size;
+  const cells: CellState[][] = Array.from({ length: n }, () =>
+    Array.from({ length: n }, (): CellState => 'empty')
+  );
+  const steps: DeductionResult[] = [];
+
+  let progress = true;
+  while (progress) {
+    progress = false;
+    if (isSolved(puzzle, cells)) return { solved: true, steps };
+    if (findContradictions(puzzle, cells).found) return { solved: false, steps };
+    const d = getNextDeduction(puzzle, cells, maxDepth);
+    if (d) {
+      steps.push(d);
+      applyDeduction(cells, d);
+      progress = true;
+    }
+  }
+  return { solved: isSolved(puzzle, cells), steps };
 }
 
 // ---------------------------------------------------------------------------
@@ -983,13 +1157,15 @@ export function computeCascadeSteps(
 
     const cands = getCandidates(puzzle, cells);
 
-    // Basic techniques only — no contradiction test (avoid slowness and circular logic)
+    // All forward techniques, no contradiction test (avoid circular logic)
     const d =
       adjacencyElimination(puzzle, cells, cands) ??
+      dualConfinement(puzzle, cells, cands) ??
       nakedSingle(puzzle, cells, cands) ??
       rowConfinement(puzzle, cells, cands) ??
       columnConfinement(puzzle, cells, cands) ??
       pairElimination(puzzle, cells, cands) ??
+      territoryDeadEnd(puzzle, cells, cands) ??
       hiddenSetElimination(puzzle, cells, cands);
 
     if (!d || cells[d.row][d.col] !== 'empty') break;

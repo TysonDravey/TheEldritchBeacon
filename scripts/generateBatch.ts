@@ -127,8 +127,19 @@ async function main() {
       const id     = `eb-${size}x${size}-${String(idNum).padStart(3, '0')}`;
       const title  = nextUnusedTitle(existingTitles(content));
 
+      const cmd = [
+        'generateBatch',
+        `--base ${base}`,
+        `--sizes ${size}`,
+        ...(depth > 0    ? [`--depth ${depth}`]          : []),
+        ...(difficulty   ? [`--difficulty ${difficulty}`] : []),
+        ...(mode !== 'initiate' ? [`--mode ${mode}`]      : []),
+        ...(bias != null ? [`--bias ${bias}`]             : []),
+        ...(attempts != null ? [`--attempts ${attempts}`] : []),
+      ].join(' ');
+
       const { difficulty: _d, ...rest } = puzzle;
-      const entry: Omit<Puzzle, 'difficulty'> = { ...rest, id, title };
+      const entry: Omit<Puzzle, 'difficulty'> = { ...rest, id, title, generatorCmd: cmd };
 
       const insertPoint = content.lastIndexOf('\n];');
       if (insertPoint === -1) {
