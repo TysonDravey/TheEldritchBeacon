@@ -170,7 +170,7 @@ function Cell({
       {isHighlighted          && <div className="absolute inset-0 pointer-events-none z-10 hint-glow-red" />}
       {isSecondaryHighlighted && <div className="absolute inset-0 pointer-events-none z-10 hint-glow-brass" />}
       {state === 'watcher' && (
-        <div className="relative z-20" style={{ perspective: '300px' }}>
+        <div className="relative z-20">
           <Watcher territory={territory} size={watcherSize} awakenDelay={isCompleted ? awakenDelay : undefined} />
         </div>
       )}
