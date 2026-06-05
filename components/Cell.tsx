@@ -2,7 +2,7 @@
 
 import { memo } from 'react';
 import type { CellState } from '@/engine/boardTypes';
-import { TERRITORY_COLORS } from '@/theme/colors';
+import { TERRITORY_COLORS, WARD_PNG } from '@/theme/colors';
 import Watcher from './Watcher';
 import Ward from './Ward';
 
@@ -29,6 +29,7 @@ interface CellProps {
   isGhost: boolean;
   isGhostWard: boolean;
   isConstraintWard: boolean;
+  isCompleted: boolean;
   size: number;
   thickTop?: boolean;
   thickRight?: boolean;
@@ -62,6 +63,7 @@ function Cell({
   isGhost,
   isGhostWard,
   isConstraintWard,
+  isCompleted,
   size,
   thickTop,
   thickRight,
@@ -71,8 +73,9 @@ function Cell({
   const px = cellPx(size);
   const colors = TERRITORY_COLORS[territory] ?? TERRITORY_COLORS[0];
 
-  const watcherSize = Math.round(px * 0.8);
-  const wardSize    = Math.round(px * 0.7);
+  const watcherSize  = Math.round(px * 0.8);
+  const wardSize     = Math.round(px * 0.5);
+  const awakenDelay  = (row + col) * 80;
 
   // Territory borders: only the thick (between-territory) edges are drawn.
   // Internal cell-to-cell lines are dropped — the tile's transparent corners
@@ -166,7 +169,11 @@ function Cell({
       {isDimmed && <div className="absolute inset-0 bg-ink opacity-40 pointer-events-none z-10" />}
       {isHighlighted          && <div className="absolute inset-0 pointer-events-none z-10 hint-glow-red" />}
       {isSecondaryHighlighted && <div className="absolute inset-0 pointer-events-none z-10 hint-glow-brass" />}
-      {state === 'watcher' && <div className="relative z-20"><Watcher territory={territory} size={watcherSize} /></div>}
+      {state === 'watcher' && (
+        <div className="relative z-20" style={{ perspective: '300px' }}>
+          <Watcher territory={territory} size={watcherSize} awakenDelay={isCompleted ? awakenDelay : undefined} />
+        </div>
+      )}
       {state === 'ward'    && <div className="relative z-20"><Ward territory={territory} size={wardSize} /></div>}
       {isPrimaryHint && state === 'empty' && !isGhost && (
         <img
@@ -193,7 +200,7 @@ function Cell({
       {isConstraintWard && state === 'empty' && (
         <div className="ghost-ward absolute inset-0 flex items-center justify-center pointer-events-none z-30">
           <img
-            src="/svg/ward_sigil.svg"
+            src={WARD_PNG}
             width={wardSize}
             height={wardSize}
             alt=""
@@ -209,7 +216,7 @@ function Cell({
       {isGhostWard && state === 'empty' && (
         <div className="ghost-ward absolute inset-0 flex items-center justify-center pointer-events-none z-30">
           <img
-            src="/svg/ward_sigil.svg"
+            src={WARD_PNG}
             width={wardSize}
             height={wardSize}
             alt=""

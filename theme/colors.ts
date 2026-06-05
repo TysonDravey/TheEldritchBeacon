@@ -34,18 +34,7 @@ export const WATCHER_SVGS: Record<number, string> = {
 };
 
 // Ward rune PNGs per territory index
-export const WARD_PNGS: Record<number, string> = {
-  0: '/tiles/wards/ward_crimson_03.png',
-  1: '/tiles/wards/ward_ochre_01.png',
-  2: '/tiles/wards/ward_seagreen_01.png',
-  3: '/tiles/wards/ward_bone_01.png',
-  4: '/tiles/wards/ward_storm_01.png',
-  5: '/tiles/wards/ward_indigo_01.png',
-  6: '/tiles/wards/ward_emerald_01.png',
-  7: '/tiles/wards/ward_violet_01.png',
-  8: '/tiles/wards/ward_copper_01.png',
-  9: '/tiles/wards/ward_rose_01.png',
-};
+export const WARD_PNG = '/tiles/wards/genericward_01.png';
 
 // Territory texture pattern SVGs (for accessibility — not color-only)
 export const TERRITORY_PATTERNS: Record<number, string | null> = {

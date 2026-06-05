@@ -348,6 +348,7 @@ export default function PuzzlePage() {
         ghostCells={cascadeGhosts}
         ghostWardCells={cascadeWards}
         constraintWardCells={constraintWards}
+        isCompleted={playerState.completed}
       />
       </div>
 

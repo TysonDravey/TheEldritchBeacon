@@ -24,6 +24,7 @@ interface BoardProps {
   ghostCells?: [number, number][];
   ghostWardCells?: [number, number][];
   constraintWardCells?: [number, number][];
+  isCompleted?: boolean;
 }
 
 // Red outline — only explicit cells and territories, NOT rows/cols
@@ -76,6 +77,7 @@ export default function Board({
   ghostCells,
   ghostWardCells,
   constraintWardCells,
+  isCompleted = false,
 }: BoardProps) {
   const { size, territoryMap } = puzzle;
 
@@ -180,17 +182,26 @@ export default function Board({
     }
 
     if (isDraggingRef.current) {
-      // Interpolate between previous and current position to catch skipped cells
-      const px = prevDragPosRef.current.x, py = prevDragPosRef.current.y;
-      const cx = e.clientX, cy = e.clientY;
-      const dist  = Math.sqrt((cx - px) ** 2 + (cy - py) ** 2);
-      const steps = Math.max(1, Math.ceil(dist / 12));
-      for (let i = 1; i <= steps; i++) {
-        const t = i / steps;
-        const cell = getCellAtPoint(px + (cx - px) * t, py + (cy - py) * t);
+      // Use coalesced events for the actual pointer path, fall back to interpolation
+      const rawEvents = e.nativeEvent.getCoalescedEvents?.() ?? [];
+      const points: { x: number; y: number }[] = rawEvents.length > 0
+        ? rawEvents.map(ev => ({ x: ev.clientX, y: ev.clientY }))
+        : (() => {
+            const px = prevDragPosRef.current.x, py = prevDragPosRef.current.y;
+            const cx = e.clientX, cy = e.clientY;
+            const dist  = Math.sqrt((cx - px) ** 2 + (cy - py) ** 2);
+            const steps = Math.max(1, Math.ceil(dist / 6));
+            return Array.from({ length: steps }, (_, i) => ({
+              x: px + (cx - px) * ((i + 1) / steps),
+              y: py + (cy - py) * ((i + 1) / steps),
+            }));
+          })();
+
+      for (const pt of points) {
+        const cell = getCellAtPoint(pt.x, pt.y);
         if (cell) applyDragWard(cell.row, cell.col);
       }
-      prevDragPosRef.current = { x: cx, y: cy };
+      prevDragPosRef.current = { x: e.clientX, y: e.clientY };
     }
   }, []);
 
@@ -295,6 +306,7 @@ export default function Board({
                 col={col}
                 territory={territory}
                 state={state}
+                isCompleted={isCompleted}
                 isHighlighted={outlined}
                 isSecondaryHighlighted={secondaryHighlighted}
                 isDimmed={hintActive && !lit && !secondaryHighlighted && !isPrimary && !isGhost && !isGhostWard && !isConstraintWard}

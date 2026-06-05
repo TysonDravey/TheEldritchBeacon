@@ -105,6 +105,79 @@ body {
 }
 
 
+/* Per-territory watcher pulse — resting state has only depth shadow, peak flares territory color */
+@keyframes watcher-glow-0 {
+  0%,100% { filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+  50%     { filter: drop-shadow(0 0 8px #C9736B) drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+}
+@keyframes watcher-glow-1 {
+  0%,100% { filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+  50%     { filter: drop-shadow(0 0 8px #C9A85C) drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+}
+@keyframes watcher-glow-2 {
+  0%,100% { filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+  50%     { filter: drop-shadow(0 0 8px #6B9E8E) drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+}
+@keyframes watcher-glow-3 {
+  0%,100% { filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+  50%     { filter: drop-shadow(0 0 8px #D4C9A8) drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+}
+@keyframes watcher-glow-4 {
+  0%,100% { filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+  50%     { filter: drop-shadow(0 0 8px #9BA4AF) drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+}
+@keyframes watcher-glow-5 {
+  0%,100% { filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+  50%     { filter: drop-shadow(0 0 8px #7B8EC4) drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+}
+@keyframes watcher-glow-6 {
+  0%,100% { filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+  50%     { filter: drop-shadow(0 0 8px #5E9E6B) drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+}
+@keyframes watcher-glow-7 {
+  0%,100% { filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+  50%     { filter: drop-shadow(0 0 8px #9B7BB8) drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+}
+@keyframes watcher-glow-8 {
+  0%,100% { filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+  50%     { filter: drop-shadow(0 0 8px #B87333) drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+}
+@keyframes watcher-glow-9 {
+  0%,100% { filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+  50%     { filter: drop-shadow(0 0 8px #C98B9E) drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+}
+
+.watcher-glow-0 { animation: watcher-glow-0 2.1s ease-in-out infinite; }
+.watcher-glow-1 { animation: watcher-glow-1 1.8s ease-in-out infinite; }
+.watcher-glow-2 { animation: watcher-glow-2 2.4s ease-in-out infinite; }
+.watcher-glow-3 { animation: watcher-glow-3 2.0s ease-in-out infinite; }
+.watcher-glow-4 { animation: watcher-glow-4 1.9s ease-in-out infinite; }
+.watcher-glow-5 { animation: watcher-glow-5 2.3s ease-in-out infinite; }
+.watcher-glow-6 { animation: watcher-glow-6 2.6s ease-in-out infinite; }
+.watcher-glow-7 { animation: watcher-glow-7 2.2s ease-in-out infinite; }
+.watcher-glow-8 { animation: watcher-glow-8 1.7s ease-in-out infinite; }
+.watcher-glow-9 { animation: watcher-glow-9 2.5s ease-in-out infinite; }
+
+@keyframes ward-pulse {
+  0%,100% { filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); opacity: 0.7; }
+  50%     { filter: drop-shadow(0 0 8px rgba(255,255,255,0.6)) drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); opacity: 1; }
+}
+
+.ward-pulse {
+  animation: ward-pulse 2.8s ease-in-out infinite;
+}
+
+/* Win awakening — lift, spin, settle. Stagger delay set inline per watcher. */
+@keyframes watcher-awaken {
+  0%   { transform: translateY(-4px)  rotateY(0deg)   scale(1);    }
+  25%  { transform: translateY(-24px) rotateY(90deg)  scale(1.25); }
+  50%  { transform: translateY(-24px) rotateY(180deg) scale(1.3);  }
+  65%  { transform: translateY(-24px) rotateY(270deg) scale(1.3);  }
+  80%  { transform: translateY(-24px) rotateY(360deg) scale(1.25); }
+  90%  { transform: translateY(-10px) rotateY(360deg) scale(1.05); }
+  100% { transform: translateY(-4px)  rotateY(360deg) scale(1);    }
+}
+
 .tile-wiggle {
   animation: tile-wiggle 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   transform-origin: center center;

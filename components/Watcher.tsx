@@ -5,39 +5,29 @@ import { WATCHER_SVGS } from '@/theme/colors';
 interface WatcherProps {
   territory: number;
   size: number;
+  awakenDelay?: number;
 }
 
-export default function Watcher({ territory, size }: WatcherProps) {
+export default function Watcher({ territory, size, awakenDelay }: WatcherProps) {
   const src = WATCHER_SVGS[territory] ?? WATCHER_SVGS[0];
+  const pulseAnim   = `watcher-glow-${territory}`;
+  const pulseTime   = [2.1,1.8,2.4,2.0,1.9,2.3,2.6,2.2,1.7,2.5][territory] ?? 2.0;
+  const baseDelay   = 400; // let the win banner register before animating
+  const animation   = awakenDelay !== undefined
+    ? `${pulseAnim} ${pulseTime}s ease-in-out infinite, watcher-awaken 2s ease-in-out ${baseDelay + awakenDelay}ms both`
+    : `${pulseAnim} ${pulseTime}s ease-in-out infinite`;
+
   return (
-    <div
+    <img
+      src={src}
+      width={size}
+      height={size}
+      alt="Watcher"
+      draggable={false}
       style={{
-        position: 'relative',
-        width: size,
-        height: size,
-        isolation: 'isolate',
-        transform: 'translateY(-4px)',
-        filter: 'drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6))',
+        animation,
+        transform: awakenDelay !== undefined ? undefined : 'translateY(-4px)',
       }}
-    >
-      <img
-        src={src}
-        width={size}
-        height={size}
-        alt="Watcher"
-        draggable={false}
-        style={{ display: 'block' }}
-      />
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'linear-gradient(135deg, rgba(255,255,255,0.45) 0%, transparent 55%)',
-          mixBlendMode: 'overlay',
-          pointerEvents: 'none',
-        }}
-      />
-    </div>
+    />
   );
 }
