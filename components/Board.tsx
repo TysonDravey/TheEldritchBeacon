@@ -99,10 +99,11 @@ export default function Board({
   const prevDragPosRef  = useRef({ x: 0, y: 0 });
   const dragActionRef   = useRef<'place' | 'remove'>('place');
   const lastDragCellRef = useRef(''); // "row,col" — skip re-entry on same cell
-  const clickTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingClickRef   = useRef<{ row: number; col: number } | null>(null);
-  const lastTapRef        = useRef<{ x: number; y: number; time: number } | null>(null);
-  const doubletapFiredRef = useRef(false);
+  const clickTimerRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingClickRef    = useRef<{ row: number; col: number } | null>(null);
+  const lastTapRef         = useRef<{ x: number; y: number; time: number } | null>(null);
+  const doubletapFiredRef  = useRef(false);
+  const boardHandledUpRef  = useRef(false);
 
   function getCellAtPoint(x: number, y: number): { row: number; col: number } | null {
     const el = document.elementFromPoint(x, y) as HTMLElement | null;
@@ -211,7 +212,7 @@ export default function Board({
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     if (!pointerDownRef.current) return;
-    e.stopPropagation(); // prevent global safety-net from cancelling the click timer
+    boardHandledUpRef.current = true;
     pointerDownRef.current = false;
 
     if (isDraggingRef.current) {
@@ -261,8 +262,13 @@ export default function Board({
       pointerDownRef.current  = false;
       isDraggingRef.current   = false;
       lastDragCellRef.current = '';
-      if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
-      pendingClickRef.current = null;
+      // Only cancel the pending click if the board's own handler didn't fire —
+      // if it did, the timer is intentional and must not be cleared here.
+      if (!boardHandledUpRef.current) {
+        if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
+        pendingClickRef.current = null;
+      }
+      boardHandledUpRef.current = false;
     };
     window.addEventListener('pointerup', onGlobalUp);
     return () => window.removeEventListener('pointerup', onGlobalUp);
