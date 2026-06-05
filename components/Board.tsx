@@ -101,7 +101,7 @@ export default function Board({
   const lastDragCellRef = useRef(''); // "row,col" — skip re-entry on same cell
   const clickTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingClickRef   = useRef<{ row: number; col: number } | null>(null);
-  const lastTapRef        = useRef<{ row: number; col: number; time: number } | null>(null);
+  const lastTapRef        = useRef<{ x: number; y: number; time: number } | null>(null);
   const doubletapFiredRef = useRef(false);
 
   function getCellAtPoint(x: number, y: number): { row: number; col: number } | null {
@@ -145,18 +145,22 @@ export default function Board({
     const cell = getCellAtPoint(e.clientX, e.clientY);
     if (!cell) return;
 
-    // Detect double-tap: lastTapRef is set in pointerUp so both the double-click
-    // window and the ward timer start from the same moment — no race condition.
+    // Detect double-tap by proximity (not exact cell) — finger position varies on mobile.
+    // Both window and ward timer start from the same pointerUp, so no race condition.
     const now  = Date.now();
     const last = lastTapRef.current;
-    if (last && last.row === cell.row && last.col === cell.col && now - last.time < 500) {
-      doubletapFiredRef.current = true;
-      lastTapRef.current = null;
-      if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
-      pendingClickRef.current = null;
-      const state = playerCellsRef.current[cell.row]?.[cell.col];
-      if (state !== 'ward') onCellWatcherRef.current(cell.row, cell.col);
-      return;
+    if (last) {
+      const dx = e.clientX - last.x, dy = e.clientY - last.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 40 && now - last.time < 300) {
+        doubletapFiredRef.current = true;
+        lastTapRef.current = null;
+        if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
+        pendingClickRef.current = null;
+        const state = playerCellsRef.current[cell.row]?.[cell.col];
+        if (state !== 'ward') onCellWatcherRef.current(cell.row, cell.col);
+        return;
+      }
     }
 
     const state = playerCellsRef.current[cell.row]?.[cell.col];
@@ -168,7 +172,7 @@ export default function Board({
     const dx = e.clientX - startPosRef.current.x;
     const dy = e.clientY - startPosRef.current.y;
 
-    if (!isDraggingRef.current && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+    if (!isDraggingRef.current && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
       isDraggingRef.current = true;
       onDragStartRef.current?.();
       // Cancel any pending single-click
@@ -207,6 +211,7 @@ export default function Board({
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     if (!pointerDownRef.current) return;
+    e.stopPropagation(); // prevent global safety-net from cancelling the click timer
     pointerDownRef.current = false;
 
     if (isDraggingRef.current) {
@@ -226,11 +231,10 @@ export default function Board({
       return;
     }
 
-    // Record tap time here (not pointerDown) so the ward timer and double-click
-    // window share the exact same start point — guarantees clear-on-doubletap wins.
-    lastTapRef.current = { row: cell.row, col: cell.col, time: Date.now() };
+    // Record screen position (not cell) so double-tap detection tolerates finger drift.
+    lastTapRef.current = { x: e.clientX, y: e.clientY, time: Date.now() };
 
-    // Start single-click timer — fires ward toggle if no double-tap comes within 500ms
+    // Start single-click timer — fires ward toggle if no double-tap within 300ms
     if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
     pendingClickRef.current = cell;
     clickTimerRef.current = setTimeout(() => {
@@ -242,7 +246,7 @@ export default function Board({
       pendingClickRef.current = null;
       clickTimerRef.current   = null;
       lastTapRef.current      = null;
-    }, 500);
+    }, 300);
   }, []);
 
 

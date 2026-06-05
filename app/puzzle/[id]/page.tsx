@@ -13,6 +13,7 @@ import type { PlayerState, CellState, HintResult, ContradictionResult } from '@/
 import Board from '@/components/Board';
 import GameControls from '@/components/GameControls';
 import HintOverlay from '@/components/HintOverlay';
+import { WATCHER_SVGS, WARD_PNG } from '@/theme/colors';
 
 const UNDO_LIMIT = 50;
 
@@ -26,6 +27,7 @@ export default function PuzzlePage() {
   const [hintResult,       setHintResult]       = useState<HintResult | null>(null);
   const [showCompletion,   setShowCompletion]   = useState(false);
   const [tilesReady,       setTilesReady]       = useState(false);
+  const [loadProgress,     setLoadProgress]     = useState(0);
   const [contradiction,    setContradiction]    = useState<ContradictionResult>({ found: false });
   const [flashCells,       setFlashCells]       = useState<[number, number][]>([]);
   const [rejectionMessage, setRejectionMessage] = useState<string | null>(null);
@@ -40,11 +42,22 @@ export default function PuzzlePage() {
   const preDragCellsRef   = useRef<CellState[][] | null>(null);
 
   useEffect(() => {
-    const srcs = Array.from({ length: 10 }, (_, i) =>
-      `/tiles/processed/plain_tile_${String(i + 1).padStart(2, '0')}.png`
-    );
+    const srcs = [
+      ...Array.from({ length: 10 }, (_, i) =>
+        `/tiles/processed/plain_tile_${String(i + 1).padStart(2, '0')}.png`
+      ),
+      ...Object.values(WATCHER_SVGS).filter(s => s.endsWith('.png')),
+      WARD_PNG,
+    ];
+    let loaded = 0;
+    const total = srcs.length;
+    const onLoad = () => { loaded++; setLoadProgress(Math.round((loaded / total) * 100)); };
     Promise.all(
-      srcs.map(src => { const img = new Image(); img.src = src; return img.decode().catch(() => {}); })
+      srcs.map(src => {
+        const img = new Image();
+        img.src = src;
+        return img.decode().catch(() => {}).then(onLoad);
+      })
     ).then(() => setTilesReady(true));
   }, []);
 
@@ -327,7 +340,20 @@ export default function PuzzlePage() {
       </div>
 
       {/* Board — always in the same position */}
-      <div style={{ opacity: tilesReady ? 1 : 0, transition: 'opacity 0.3s ease' }}>
+      <div style={{ opacity: tilesReady ? 1 : 0, transition: 'opacity 0.4s ease', position: 'relative' }}>
+      {!tilesReady && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center z-50 gap-3"
+          style={{ minWidth: 200 }}>
+          <p className="font-serif text-sm text-ink opacity-60 italic">Summoning the Watchers…</p>
+          <div className="w-48 h-2 rounded-full overflow-hidden" style={{ background: 'rgba(26,18,9,0.15)' }}>
+            <div
+              className="h-full rounded-full transition-all duration-200"
+              style={{ width: `${loadProgress}%`, background: 'rgba(139,26,26,0.7)' }}
+            />
+          </div>
+          <p className="font-serif text-xs opacity-40">{loadProgress}%</p>
+        </div>
+      )}
       <Board
         puzzle={puzzle}
         playerCells={playerState.cells}
