@@ -121,62 +121,19 @@ body {
 }
 
 
-/* Per-territory watcher pulse — resting state has only depth shadow, peak flares territory color */
-@keyframes watcher-glow-0 {
-  0%,100% { filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
-  50%     { filter: drop-shadow(0 0 8px #C9736B) drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+/* Watcher eye pulse — brightness/saturate boost makes the iris flare without outer glow */
+@keyframes watcher-glow {
+  0%, 100% {
+    filter: brightness(1.0) saturate(1.0) drop-shadow(3px 6px 4px rgba(0,0,0,0.95)) drop-shadow(1px 2px 2px rgba(0,0,0,0.75));
+  }
+  50% {
+    filter: brightness(1.45) saturate(1.35) drop-shadow(3px 6px 4px rgba(0,0,0,0.9)) drop-shadow(1px 2px 2px rgba(0,0,0,0.7));
+  }
 }
-@keyframes watcher-glow-1 {
-  0%,100% { filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
-  50%     { filter: drop-shadow(0 0 8px #C9A85C) drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
-}
-@keyframes watcher-glow-2 {
-  0%,100% { filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
-  50%     { filter: drop-shadow(0 0 8px #6B9E8E) drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
-}
-@keyframes watcher-glow-3 {
-  0%,100% { filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
-  50%     { filter: drop-shadow(0 0 8px #D4C9A8) drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
-}
-@keyframes watcher-glow-4 {
-  0%,100% { filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
-  50%     { filter: drop-shadow(0 0 8px #9BA4AF) drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
-}
-@keyframes watcher-glow-5 {
-  0%,100% { filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
-  50%     { filter: drop-shadow(0 0 8px #7B8EC4) drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
-}
-@keyframes watcher-glow-6 {
-  0%,100% { filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
-  50%     { filter: drop-shadow(0 0 8px #5E9E6B) drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
-}
-@keyframes watcher-glow-7 {
-  0%,100% { filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
-  50%     { filter: drop-shadow(0 0 8px #9B7BB8) drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
-}
-@keyframes watcher-glow-8 {
-  0%,100% { filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
-  50%     { filter: drop-shadow(0 0 8px #B87333) drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
-}
-@keyframes watcher-glow-9 {
-  0%,100% { filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
-  50%     { filter: drop-shadow(0 0 8px #C98B9E) drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
-}
-
-.watcher-glow-0 { animation: watcher-glow-0 2.1s ease-in-out infinite; }
-.watcher-glow-1 { animation: watcher-glow-1 1.8s ease-in-out infinite; }
-.watcher-glow-2 { animation: watcher-glow-2 2.4s ease-in-out infinite; }
-.watcher-glow-3 { animation: watcher-glow-3 2.0s ease-in-out infinite; }
-.watcher-glow-4 { animation: watcher-glow-4 1.9s ease-in-out infinite; }
-.watcher-glow-5 { animation: watcher-glow-5 2.3s ease-in-out infinite; }
-.watcher-glow-6 { animation: watcher-glow-6 2.6s ease-in-out infinite; }
-.watcher-glow-7 { animation: watcher-glow-7 2.2s ease-in-out infinite; }
-.watcher-glow-8 { animation: watcher-glow-8 1.7s ease-in-out infinite; }
-.watcher-glow-9 { animation: watcher-glow-9 2.5s ease-in-out infinite; }
 
 @keyframes ward-pulse {
-  0%,100% { filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); opacity: 0.7; }
-  50%     { filter: drop-shadow(0 0 8px rgba(255,255,255,0.6)) drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6)); opacity: 1; }
+  0%,100% { filter: drop-shadow(3px 6px 4px rgba(0,0,0,0.95)) drop-shadow(1px 2px 2px rgba(0,0,0,0.75)); opacity: 0.7; }
+  50%     { filter: drop-shadow(3px 6px 4px rgba(0,0,0,0.95)) drop-shadow(1px 2px 2px rgba(0,0,0,0.75)); opacity: 1; }
 }
 
 .ward-pulse {
@@ -187,7 +144,7 @@ body {
 @keyframes watcher-rise-slam {
   0%   {
     transform: translateY(-4px)  rotateZ(0deg)   scale(1);
-    filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6));
+    filter: brightness(1.0) saturate(1.0) drop-shadow(3px 6px 4px rgba(0,0,0,0.95)) drop-shadow(1px 2px 2px rgba(0,0,0,0.75));
   }
   12%  {
     transform: translateY(-12px) rotateZ(55deg)  scale(1.04);
@@ -214,12 +171,12 @@ body {
   /* Bounce */
   88%  {
     transform: translateY(-9px)  rotateZ(358deg) scale(1.03);
-    filter: drop-shadow(0 4px 9px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6));
+    filter: brightness(1.0) saturate(1.0) drop-shadow(3px 5px 3px rgba(0,0,0,0.9)) drop-shadow(1px 2px 2px rgba(0,0,0,0.7));
   }
   /* Settle — end at 360deg so fill-mode leaves watcher upright */
   100% {
     transform: translateY(-4px)  rotateZ(360deg) scale(1);
-    filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6));
+    filter: brightness(1.0) saturate(1.0) drop-shadow(3px 6px 4px rgba(0,0,0,0.95)) drop-shadow(1px 2px 2px rgba(0,0,0,0.75));
   }
 }
 

@@ -10,7 +10,7 @@ interface WatcherProps {
 
 export default function Watcher({ territory, size, isFreshWin }: WatcherProps) {
   const src = WATCHER_SVGS[territory] ?? WATCHER_SVGS[0];
-  const pulseAnim = `watcher-glow-${territory}`;
+  const pulseAnim = `watcher-glow`;
   const pulseTime = [2.1,1.8,2.4,2.0,1.9,2.3,2.6,2.2,1.7,2.5][territory] ?? 2.0;
 
   // Fresh win: all watchers rise together (no stagger), slam, then resume glow pulse.
