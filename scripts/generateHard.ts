@@ -26,6 +26,19 @@ import { join } from 'path';
 import type { Puzzle } from '../engine/boardTypes';
 import { nextUnusedTitle, existingTitles } from './titlePool';
 
+const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK ?? '';
+
+async function discordPing(msg: string): Promise<void> {
+  if (!DISCORD_WEBHOOK) return;
+  try {
+    await fetch(DISCORD_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: msg }),
+    });
+  } catch { /* non-fatal */ }
+}
+
 function parseArgs(): { size: number; count: number; base: string; start: number } {
   const args = process.argv.slice(2);
   let size = 8, count = 5, base = 'archon-v2', start = 1;
@@ -43,6 +56,7 @@ async function main() {
 
   process.stderr.write(`Generating ${count} Archon ${size}×${size} puzzles (depth-1 solver, medium territories)...\n`);
   process.stderr.write(`Filtering for contradiction-test-required puzzles. Hit Ctrl+C to stop early.\n\n`);
+  await discordPing(`▶ Starting Archon ${size}×${size} generation (target=${count}, base=${base})`);
 
   const found: Puzzle[] = [];
   let seedIdx = 0;
@@ -93,9 +107,11 @@ async function main() {
 
     found.push(finalPuzzle);
     process.stderr.write(`  ✓ ${id} — Archon (${elapsed}s, seed ${seed})\n`);
+    await discordPing(`✓ ${id} — Archon (${elapsed}s)`);
   }
 
   process.stderr.write(`\nDone. ${found.length} puzzles from ${attempts} seed attempts.\n\n`);
+  await discordPing(`@here 🔔 Archon ${size}×${size} complete: ${found.length}/${count} puzzles in ${attempts} seed attempts.`);
   process.stderr.write(`Paste the following lines into data/samplePuzzles.ts:\n\n`);
 
   for (const p of found) {

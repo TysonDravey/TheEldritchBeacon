@@ -208,17 +208,17 @@ body {
   }
   /* Fast slam */
   80%  {
-    transform: translateY(5px)   rotateZ(395deg) scale(0.93);
+    transform: translateY(5px)   rotateZ(355deg) scale(0.93);
     filter: drop-shadow(0 1px 3px rgba(0,0,0,0.95));
   }
   /* Bounce */
   88%  {
-    transform: translateY(-9px)  rotateZ(400deg) scale(1.03);
+    transform: translateY(-9px)  rotateZ(358deg) scale(1.03);
     filter: drop-shadow(0 4px 9px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6));
   }
-  /* Settle */
+  /* Settle — end at 360deg so fill-mode leaves watcher upright */
   100% {
-    transform: translateY(-4px)  rotateZ(405deg) scale(1);
+    transform: translateY(-4px)  rotateZ(360deg) scale(1);
     filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6));
   }
 }

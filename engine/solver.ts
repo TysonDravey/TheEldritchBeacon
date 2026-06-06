@@ -925,14 +925,13 @@ function contradictionTest(
             };
           }
         }
+        // Only the O(n) techniques inside the hypothesis loop — pairElimination
+        // (O(2^n)) is too expensive here and handled by the outer deduction chain.
         const propagate =
           adjacencyElimination(puzzle, test, testCands) ??
-          dualConfinement(puzzle, test, testCands) ??
           nakedSingle(puzzle, test, testCands) ??
           rowConfinement(puzzle, test, testCands) ??
-          columnConfinement(puzzle, test, testCands) ??
-          pairElimination(puzzle, test, testCands) ??
-          territoryDeadEnd(puzzle, test, testCands);
+          columnConfinement(puzzle, test, testCands);
         if (propagate && test[propagate.row][propagate.col] === 'empty') {
           applyDeduction(test, propagate);
           innerChanged = true;
@@ -942,7 +941,8 @@ function contradictionTest(
       // --- After basic propagation stalls, try a sub-contradiction pass ---
       if (depth > 0) {
         const testCands = getCandidates(puzzle, test);
-        const sub = contradictionTest(puzzle, test, testCands, depth - 1);
+        // Use a smaller inner limit to avoid quadratic blowup (outer n*3 × inner n).
+        const sub = contradictionTest(puzzle, test, testCands, depth - 1, puzzle.size);
         if (sub && test[sub.row][sub.col] === 'empty') {
           applyDeduction(test, sub);
           outerChanged = true; // re-run basic propagation with the new ward applied
