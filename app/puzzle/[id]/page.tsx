@@ -40,10 +40,12 @@ export default function PuzzlePage() {
   const [cascadeGhosts,    setCascadeGhosts]    = useState<[number, number][]>([]);
   const [cascadeWards,     setCascadeWards]     = useState<[number, number][]>([]);
   const [constraintWards,  setConstraintWards]  = useState<[number, number][]>([]);
+  const [isFreshWin,       setIsFreshWin]       = useState(false);
   // Tracks how many hints player has asked without making a move — drives escalation
   const hintDepthRef      = useRef(0);
   const flashTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cascadeTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const winTimersRef      = useRef<ReturnType<typeof setTimeout>[]>([]);
   const isDraggingRef     = useRef(false);
   const preDragCellsRef   = useRef<CellState[][] | null>(null);
 
@@ -159,6 +161,8 @@ export default function PuzzlePage() {
     };
   }, [hintResult]);
 
+  useEffect(() => () => { winTimersRef.current.forEach(clearTimeout); }, []);
+
   // Shared logic for applying any cell state change
   const applyChange = useCallback(
     (row: number, col: number, next: CellState) => {
@@ -199,7 +203,38 @@ export default function PuzzlePage() {
       setContradiction(contra);
       setPlayerState(newState);
       savePlayerState(newState);
-      if (solved) setShowCompletion(true);
+      if (solved) {
+        setShowCompletion(true);
+        setIsFreshWin(true);
+        // Ward cascade: wiggle each ward once, radiating from watcher positions.
+        // Watchers all slam at ~200ms base + 1760ms slam point = ~1960ms.
+        const SLAM_DELAY = 2000;
+        const STEP_MS    = 60;
+        winTimersRef.current.forEach(clearTimeout);
+        winTimersRef.current = [];
+        const watcherCells: [number, number][] = [];
+        for (let r = 0; r < puzzle.size; r++) {
+          for (let c = 0; c < puzzle.size; c++) {
+            if (newCells[r][c] === 'watcher') watcherCells.push([r, c]);
+          }
+        }
+        for (let r = 0; r < puzzle.size; r++) {
+          for (let c = 0; c < puzzle.size; c++) {
+            if (newCells[r][c] === 'ward') {
+              const dist = Math.min(...watcherCells.map(([wr, wc]) => Math.abs(wr - r) + Math.abs(wc - c)));
+              const t = setTimeout(() => {
+                const el = document.querySelector(`[data-cell="true"][data-row="${r}"][data-col="${c}"]`);
+                if (el) {
+                  el.classList.remove('tile-wiggle');
+                  void (el as HTMLElement).offsetWidth;
+                  el.classList.add('tile-wiggle');
+                }
+              }, SLAM_DELAY + dist * STEP_MS);
+              winTimersRef.current.push(t);
+            }
+          }
+        }
+      }
     },
     [playerState, puzzle],
   );
@@ -284,6 +319,9 @@ export default function PuzzlePage() {
     savePlayerState(newState);
     setContradiction(findContradictions(puzzle!, prevCells));
     setShowCompletion(false);
+    setIsFreshWin(false);
+    winTimersRef.current.forEach(clearTimeout);
+    winTimersRef.current = [];
   }, [playerState, puzzle]);
 
   const handleRestart = useCallback(() => {
@@ -293,12 +331,15 @@ export default function PuzzlePage() {
     savePlayerState(fresh);
     setContradiction({ found: false });
     setShowCompletion(false);
+    setIsFreshWin(false);
     setHintResult(null);
+    winTimersRef.current.forEach(clearTimeout);
+    winTimersRef.current = [];
   }, [puzzle]);
 
   if (!puzzle) {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center px-4">
+      <main className="min-h-screen flex flex-col items-center justify-center px-6">
         <p className="font-serif text-lg text-ink mb-4">Puzzle not found.</p>
         <button
           onClick={() => router.push('/')}
@@ -319,7 +360,7 @@ export default function PuzzlePage() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center px-4 py-8">
+    <main className="min-h-screen flex flex-col items-center px-6 py-8">
 
       {/* Back button */}
       <div className="w-full max-w-2xl mb-4">
@@ -406,6 +447,7 @@ export default function PuzzlePage() {
         ghostWardCells={cascadeWards}
         constraintWardCells={constraintWards}
         isCompleted={playerState.completed}
+        isFreshWin={isFreshWin}
       />
       </div>
 

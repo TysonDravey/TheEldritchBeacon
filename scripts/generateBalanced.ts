@@ -37,6 +37,7 @@
  *   --max-size    Hard cap on territory size (default: ceil(n * 1.5))
  */
 
+import './loadEnv';
 import { writeFileSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { solveLogically, getNextDeduction, findContradictions } from '../engine/solver';

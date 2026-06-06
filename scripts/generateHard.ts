@@ -18,6 +18,7 @@
  * Output: JSON lines printed to stdout, ready to paste into samplePuzzles.ts
  */
 
+import './loadEnv';
 import { generatePuzzle } from '../engine/generator';
 import { rateDifficulty } from '../engine/difficulty';
 import { readFileSync } from 'fs';

@@ -14,6 +14,7 @@
  *   npx tsx scripts/generate10x10.ts --count 5 --base eb-10x10-c1 --thin 3
  */
 
+import './loadEnv';
 import { writeFileSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { solveLogically, getNextDeduction, findContradictions } from '../engine/solver';

@@ -23,6 +23,10 @@
 
 * { box-sizing: border-box; }
 
+html {
+  scrollbar-gutter: stable both-edges;
+}
+
 body {
   color: var(--ink);
   font-family: Georgia, serif;
@@ -179,26 +183,42 @@ body {
   animation: ward-pulse 2.8s ease-in-out infinite;
 }
 
-/* Win awakening — lift, spin, settle. Stagger delay set inline per watcher. */
-@keyframes watcher-awaken {
+/* Win animation — slow mystical rise → glowing peak → fast slam → bounce settle */
+@keyframes watcher-rise-slam {
   0%   {
     transform: translateY(-4px)  rotateZ(0deg)   scale(1);
     filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6));
   }
-  30%  {
-    transform: translateY(-22px) rotateZ(180deg) scale(1.3);
-    filter: drop-shadow(0 0 22px rgba(255,255,255,0.95)) drop-shadow(0 0 10px rgba(255,255,255,0.7)) drop-shadow(0 8px 18px rgba(0,0,0,0.9));
+  12%  {
+    transform: translateY(-12px) rotateZ(55deg)  scale(1.04);
+    filter: drop-shadow(0 6px 12px rgba(0,0,0,0.85));
+  }
+  38%  {
+    transform: translateY(-36px) rotateZ(200deg) scale(1.10);
+    filter: drop-shadow(0 0 12px rgba(255,210,90,0.55)) drop-shadow(0 8px 16px rgba(0,0,0,0.9));
   }
   60%  {
-    transform: translateY(-22px) rotateZ(360deg) scale(1.3);
-    filter: drop-shadow(0 0 14px rgba(255,255,255,0.6)) drop-shadow(0 6px 12px rgba(0,0,0,0.85));
+    transform: translateY(-54px) rotateZ(340deg) scale(1.14);
+    filter: drop-shadow(0 0 20px rgba(255,220,110,0.85)) drop-shadow(0 10px 22px rgba(0,0,0,0.9));
   }
-  85%  {
-    transform: translateY(-8px)  rotateZ(360deg) scale(1.05);
-    filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6));
+  /* Hover at peak — almost still */
+  68%  {
+    transform: translateY(-56px) rotateZ(370deg) scale(1.12);
+    filter: drop-shadow(0 0 18px rgba(255,215,90,0.75)) drop-shadow(0 10px 20px rgba(0,0,0,0.85));
   }
+  /* Fast slam */
+  80%  {
+    transform: translateY(5px)   rotateZ(395deg) scale(0.93);
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.95));
+  }
+  /* Bounce */
+  88%  {
+    transform: translateY(-9px)  rotateZ(400deg) scale(1.03);
+    filter: drop-shadow(0 4px 9px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6));
+  }
+  /* Settle */
   100% {
-    transform: translateY(-4px)  rotateZ(360deg) scale(1);
+    transform: translateY(-4px)  rotateZ(405deg) scale(1);
     filter: drop-shadow(0 5px 10px rgba(0,0,0,0.85)) drop-shadow(0 2px 4px rgba(0,0,0,0.6));
   }
 }

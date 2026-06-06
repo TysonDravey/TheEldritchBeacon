@@ -17,6 +17,7 @@
  *   --mode        Puzzle mode: initiate (default) or shattered-realms
  */
 
+import './loadEnv';
 import { generatePuzzle } from '../engine/generator';
 import { rateDifficulty } from '../engine/difficulty';
 import { readFileSync, writeFileSync } from 'fs';

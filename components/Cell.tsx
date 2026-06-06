@@ -30,6 +30,7 @@ interface CellProps {
   isGhostWard: boolean;
   isConstraintWard: boolean;
   isCompleted: boolean;
+  isFreshWin: boolean;
   size: number;
   thickTop?: boolean;
   thickRight?: boolean;
@@ -64,6 +65,7 @@ function Cell({
   isGhostWard,
   isConstraintWard,
   isCompleted,
+  isFreshWin,
   size,
   thickTop,
   thickRight,
@@ -73,9 +75,8 @@ function Cell({
   const px = cellPx(size);
   const colors = TERRITORY_COLORS[territory] ?? TERRITORY_COLORS[0];
 
-  const watcherSize  = Math.round(px * 0.8);
-  const wardSize     = Math.round(px * 0.5);
-  const awakenDelay  = (row + col) * 80;
+  const watcherSize = Math.round(px * 0.8);
+  const wardSize    = Math.round(px * 0.5);
 
   // Territory borders: only the thick (between-territory) edges are drawn.
   // Internal cell-to-cell lines are dropped — the tile's transparent corners
@@ -171,7 +172,7 @@ function Cell({
       {isSecondaryHighlighted && <div className="absolute inset-0 pointer-events-none z-10 hint-glow-brass" />}
       {state === 'watcher' && (
         <div className="relative z-20">
-          <Watcher territory={territory} size={watcherSize} awakenDelay={isCompleted ? awakenDelay : undefined} />
+          <Watcher territory={territory} size={watcherSize} isFreshWin={isFreshWin} />
         </div>
       )}
       {state === 'ward'    && <div className="relative z-20"><Ward territory={territory} size={wardSize} /></div>}

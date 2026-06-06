@@ -25,6 +25,7 @@ interface BoardProps {
   ghostWardCells?: [number, number][];
   constraintWardCells?: [number, number][];
   isCompleted?: boolean;
+  isFreshWin?: boolean;
 }
 
 // Red outline — only explicit cells and territories, NOT rows/cols
@@ -78,6 +79,7 @@ export default function Board({
   ghostWardCells,
   constraintWardCells,
   isCompleted = false,
+  isFreshWin = false,
 }: BoardProps) {
   const { size, territoryMap } = puzzle;
 
@@ -317,6 +319,7 @@ export default function Board({
                 territory={territory}
                 state={state}
                 isCompleted={isCompleted}
+                isFreshWin={isFreshWin}
                 isHighlighted={outlined}
                 isSecondaryHighlighted={secondaryHighlighted}
                 isDimmed={hintActive && !lit && !secondaryHighlighted && !isPrimary && !isGhost && !isGhostWard && !isConstraintWard}
