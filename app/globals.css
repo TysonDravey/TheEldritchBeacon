@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'Lovecraftimus';
+  src: url('/Lovecraftimus.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+.font-lovecraftian {
+  font-family: 'Lovecraftimus', serif;
+}
+
 :root {
   --parchment: #F2E9D8;
   --ink: #1A1209;

@@ -17,6 +17,12 @@ import { WATCHER_SVGS, WARD_PNG } from '@/theme/colors';
 
 const UNDO_LIMIT = 50;
 
+function scrollIndexForId(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return (Math.abs(h) % 3) + 1;
+}
+
 export default function PuzzlePage() {
   const params = useParams();
   const router = useRouter();
@@ -326,29 +332,42 @@ export default function PuzzlePage() {
             src="/buttons/left_button_01.png"
             alt="All Puzzles"
             draggable={false}
-            style={{ height: 64, display: 'block' }}
+            style={{ height: 64, display: 'block', filter: 'drop-shadow(3px 7px 3px rgba(0,0,0,0.75))' }}
           />
         </button>
       </div>
 
-      {/* Puzzle header — fixed height, never changes */}
+      {/* Puzzle title on a scroll */}
       <div
-        className="w-full max-w-2xl mb-6 flex items-start justify-between gap-4 px-4 py-3 rounded-sm"
-        style={{ backgroundColor: 'rgba(242, 233, 216, 0.78)' }}
+        className="w-full max-w-2xl mb-6 relative select-none"
+        style={{ filter: 'drop-shadow(3px 7px 3px rgba(0,0,0,0.75))' }}
       >
-        <div>
-          <h1 className="font-serif text-2xl font-bold text-ink">{puzzle.title}</h1>
-          <p className="font-serif text-sm text-ink-light mt-0.5">
-            {puzzle.size}&times;{puzzle.size} &mdash; {puzzle.difficulty}
-            <span className="ml-2 text-xs opacity-60" title="Obscurity score">&#9670; {scorePuzzle(puzzle)}</span>
-          </p>
+        <img
+          src={`/scrolls/scroll_0${scrollIndexForId(puzzle.id)}.png`}
+          alt=""
+          draggable={false}
+          className="absolute inset-0 w-full h-full"
+          style={{ objectFit: 'fill', display: 'block' }}
+        />
+        <div className="relative text-center" style={{ padding: '10% 16%' }}>
+          <div style={{
+            background: 'rgba(242,233,216,0.88)',
+            padding: '10px 18px',
+            borderRadius: 6,
+            boxShadow: '0 0 24px 18px rgba(242,233,216,0.88)',
+          }}>
+            <h1 className="font-lovecraftian text-2xl text-ink leading-snug" style={{ textWrap: 'balance' } as React.CSSProperties}>{puzzle.title}</h1>
+            <p className="font-serif text-sm text-ink-light mt-1">
+              {puzzle.size}&times;{puzzle.size} &mdash; {puzzle.difficulty}
+              <span className="ml-2 text-xs opacity-60" title="Obscurity score">&#9670; {scorePuzzle(puzzle)}</span>
+            </p>
+            {playerState.hintsUsed > 0 && (
+              <p className="font-serif text-xs text-red-ink mt-1">
+                {playerState.hintsUsed} hint{playerState.hintsUsed !== 1 ? 's' : ''} used
+              </p>
+            )}
+          </div>
         </div>
-        <span
-          className="font-serif text-xs text-red-ink border border-red-ink px-2 py-0.5 rounded-sm mt-1"
-          style={{ visibility: playerState.hintsUsed > 0 ? 'visible' : 'hidden' }}
-        >
-          {playerState.hintsUsed} hint{playerState.hintsUsed !== 1 ? 's' : ''} used
-        </span>
       </div>
 
       {/* Board — always in the same position */}
@@ -405,13 +424,39 @@ export default function PuzzlePage() {
       {/* Status messages — below controls so they never shift the board */}
       <div className="mt-4 w-full max-w-2xl space-y-3">
         {showCompletion && (
-          <div className="border-2 border-brass bg-parchment px-6 py-4 flex items-center gap-4 rounded-sm">
-            <NextImage src="/svg/completion_stamp.svg" alt="Completed" width={48} height={48} />
-            <div>
-              <p className="font-serif text-lg font-bold text-ink">Beacon Restored</p>
-              <p className="font-serif text-sm text-ink-light italic">
-                The Watchers stand vigilant. The wards hold.
-              </p>
+          <div className="flex justify-center">
+            <div
+              className="relative select-none"
+              style={{ width: '52%', filter: 'drop-shadow(3px 7px 3px rgba(0,0,0,0.75))' }}
+            >
+              <img
+                src={`/scrolls/scroll_0${(scrollIndexForId(puzzle.id) % 3) + 1}.png`}
+                alt=""
+                draggable={false}
+                className="absolute inset-0 w-full h-full"
+                style={{ objectFit: 'fill', display: 'block' }}
+              />
+              <div className="relative text-center" style={{ padding: '10% 16%' }}>
+                <div style={{
+                  background: 'rgba(242,233,216,0.88)',
+                  padding: '8px 14px',
+                  borderRadius: 6,
+                  boxShadow: '0 0 24px 18px rgba(242,233,216,0.88)',
+                }}>
+                  <div className="flex items-center justify-center gap-2">
+                    <NextImage src="/svg/completion_stamp.svg" alt="Completed" width={28} height={28} />
+                    <h2
+                      className="font-lovecraftian text-base text-ink leading-snug"
+                      style={{ textWrap: 'balance' } as React.CSSProperties}
+                    >
+                      Beacon Restored
+                    </h2>
+                  </div>
+                  <p className="font-serif text-xs text-ink-light italic mt-1" style={{ textWrap: 'balance' } as React.CSSProperties}>
+                    The Watchers stand vigilant. The wards hold.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         )}

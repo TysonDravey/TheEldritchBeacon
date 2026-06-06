@@ -39,7 +39,7 @@ function PlaqButton({
         src="/buttons/button_01.png"
         alt=""
         draggable={false}
-        style={{ width: 100, height: 48, display: 'block' }}
+        style={{ width: 100, height: 48, display: 'block', filter: 'drop-shadow(3px 7px 3px rgba(0,0,0,0.75))' }}
       />
       <span
         className="absolute inset-0 flex items-center justify-center font-serif text-sm font-bold"
@@ -145,7 +145,7 @@ export default function GameControls({
                     src="/buttons/button_01.png"
                     alt=""
                     draggable={false}
-                    style={{ width: 140, height: 70, display: 'block' }}
+                    style={{ width: 140, height: 70, display: 'block', filter: 'drop-shadow(3px 7px 3px rgba(0,0,0,0.75))' }}
                   />
                   <span
                     className="absolute inset-0 flex items-center justify-center font-serif text-sm font-bold"
@@ -165,7 +165,7 @@ export default function GameControls({
                     src="/buttons/button_01.png"
                     alt=""
                     draggable={false}
-                    style={{ width: 140, height: 70, display: 'block' }}
+                    style={{ width: 140, height: 70, display: 'block', filter: 'drop-shadow(3px 7px 3px rgba(0,0,0,0.75))' }}
                   />
                   <span
                     className="absolute inset-0 flex items-center justify-center font-serif text-sm"

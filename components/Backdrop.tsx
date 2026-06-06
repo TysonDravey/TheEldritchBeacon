@@ -3,14 +3,11 @@
 import { usePathname } from 'next/navigation';
 
 const BACKDROPS = [
-  '/tiles/processed/BG_parchment_01.png',
-  '/tiles/processed/BG_parchment_02.png',
-  '/tiles/processed/BG_parchment_03.png',
-  '/tiles/processed/BG_parchment_04.png',
-  '/tiles/processed/BG_parchment_05.png',
-  '/tiles/processed/BG_parchment_06.png',
-  '/tiles/processed/BG_parchment_07.png',
-  '/tiles/processed/BG_parchment_08.png',
+  '/boards/sampleBoard_06.png',
+  '/boards/sampleBoard_07.png',
+  '/boards/sampleBoard_08.png',
+  '/boards/sampleBoard_09.png',
+  '/boards/sampleBoard_10.png',
 ];
 
 function hash(s: string): number {
@@ -32,14 +29,12 @@ export default function Backdrop() {
       aria-hidden
       className="fixed pointer-events-none bg-parchment"
       style={{
-        inset: '-30%',
+        inset: 0,
         backgroundImage: `url(${url})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
         zIndex: -1,
-        transform: 'perspective(2400px) rotateX(18deg)',
-        transformOrigin: '50% 50%',
       }}
     />
   );

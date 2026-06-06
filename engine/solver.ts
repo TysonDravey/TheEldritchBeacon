@@ -893,7 +893,7 @@ function contradictionTest(
       if (!seen.has(key)) { seen.add(key); allCands.push([r, c, t]); }
     }
   }
-  const limit = limitOverride ?? Math.max(n, 12);
+  const limit = limitOverride ?? Math.max(n * 5, 24);
   const testCands = allCands.slice(0, limit);
 
   for (const [r, c, territory] of testCands) {
@@ -942,8 +942,7 @@ function contradictionTest(
       // --- After basic propagation stalls, try a sub-contradiction pass ---
       if (depth > 0) {
         const testCands = getCandidates(puzzle, test);
-        // Use a smaller inner limit to avoid quadratic blowup (outer n*3 × inner n).
-        const sub = contradictionTest(puzzle, test, testCands, depth - 1, puzzle.size);
+        const sub = contradictionTest(puzzle, test, testCands, depth - 1);
         if (sub && test[sub.row][sub.col] === 'empty') {
           applyDeduction(test, sub);
           outerChanged = true; // re-run basic propagation with the new ward applied

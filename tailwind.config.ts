@@ -19,6 +19,7 @@ const config: Config = {
       },
       fontFamily: {
         serif: ["Georgia", "serif"],
+        lovecraftian: ["Lovecraftimus", "serif"],
       },
     },
   },
