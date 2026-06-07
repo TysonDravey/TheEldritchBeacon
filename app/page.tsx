@@ -327,15 +327,18 @@ export default function HomePage() {
 
         <div className="w-full max-w-2xl flex flex-col gap-8">
 
-          {/* Daily Beacon — coming soon */}
+          {/* Daily Beacon */}
           <section>
-            <div className="flex items-center justify-between border border-ink border-opacity-30 bg-parchment px-4 py-3 rounded-sm opacity-50 cursor-not-allowed select-none">
+            <Link
+              href="/daily"
+              className="flex items-center justify-between border border-ink bg-parchment hover:bg-parchment-dark transition-colors px-4 py-3 rounded-sm"
+            >
               <div>
                 <p className="font-serif text-sm font-bold text-ink">Daily Beacon</p>
-                <p className="font-serif text-xs text-ink-light mt-0.5 italic">A new challenge every day — coming soon</p>
+                <p className="font-serif text-xs text-ink-light mt-0.5 italic">A new challenge every day</p>
               </div>
-              <span className="font-serif text-xs text-ink-light border border-ink border-opacity-30 px-2 py-0.5 rounded-sm">Soon</span>
-            </div>
+              <span className="font-serif text-sm text-ink opacity-60">&rarr;</span>
+            </Link>
           </section>
 
           {/* Tutorial nudge */}

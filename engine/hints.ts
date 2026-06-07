@@ -309,6 +309,7 @@ function buildWardHint(
   return {
     level: 3,
     message: `This cell cannot shelter a Watcher. ${d.reason} Mark it with a Ward.`,
+    primaryCell: [row, col],
     highlightCells: [[row, col]],
     highlightTerritories: d.affectedTerritories,
     deduction: d,

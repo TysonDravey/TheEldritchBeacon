@@ -1,0 +1,62 @@
+[
+  {
+    "event": "puzzle_started",
+    "description": "Player opens a campaign puzzle for the first time (fresh state, not already completed). Top of conversion funnel.",
+    "file": "app/puzzle/[id]/page.tsx"
+  },
+  {
+    "event": "puzzle_completed",
+    "description": "Player solves a campaign puzzle (fresh win, not a revisit). Includes puzzle id, difficulty, size, and hints used.",
+    "file": "app/puzzle/[id]/page.tsx"
+  },
+  {
+    "event": "hint_requested",
+    "description": "Player clicks the Hint button during a campaign puzzle. Includes hint depth (escalation level) and puzzle id.",
+    "file": "app/puzzle/[id]/page.tsx"
+  },
+  {
+    "event": "puzzle_restarted",
+    "description": "Player confirms the Restart dialog during a campaign puzzle. Churn/frustration signal.",
+    "file": "app/puzzle/[id]/page.tsx"
+  },
+  {
+    "event": "tutorial_started",
+    "description": "Player visits the tutorial page. Entry point into the new-player onboarding funnel.",
+    "file": "app/tutorial/page.tsx"
+  },
+  {
+    "event": "tutorial_completed",
+    "description": "Player reaches the final step of the tutorial ('done' action). New-player conversion milestone.",
+    "file": "app/tutorial/page.tsx"
+  },
+  {
+    "event": "daily_calendar_viewed",
+    "description": "Player opens the Daily Beacon page and sees the calendar view. Top of the daily funnel.",
+    "file": "app/daily/page.tsx"
+  },
+  {
+    "event": "daily_puzzle_started",
+    "description": "Player selects a date from the Daily Beacon calendar and enters the puzzle view.",
+    "file": "app/daily/page.tsx"
+  },
+  {
+    "event": "daily_puzzle_completed",
+    "description": "Player solves the daily puzzle (fresh win). Includes date, streak count, and hints used.",
+    "file": "app/daily/page.tsx"
+  },
+  {
+    "event": "daily_hint_requested",
+    "description": "Player clicks the Hint button during a daily puzzle. Includes hint depth and the puzzle date.",
+    "file": "app/daily/page.tsx"
+  },
+  {
+    "event": "region_unlocked",
+    "description": "A new campaign region banner is shown to the player on the home page. Progression milestone.",
+    "file": "app/page.tsx"
+  },
+  {
+    "event": "progress_reset",
+    "description": "Player confirms the Reset Progress action from the home page footer. Strong churn/frustration signal.",
+    "file": "app/page.tsx"
+  }
+]

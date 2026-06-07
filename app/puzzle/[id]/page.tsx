@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import posthog from 'posthog-js';
 import NextImage from 'next/image';
 import Link from 'next/link';
 import { getPuzzleById, SAMPLE_PUZZLES } from '@/data/samplePuzzles';
@@ -211,6 +212,14 @@ export default function PuzzlePage() {
       setPlayerState(newState);
       savePlayerState(newState);
       if (solved) {
+        posthog.capture('puzzle_completed', {
+          puzzle_id:   puzzle.id,
+          size:        puzzle.size,
+          difficulty:  puzzle.difficulty,
+          score:       scorePuzzle(puzzle),
+          hints_used:  newState.hintsUsed,
+          mode:        puzzle.mode ?? 'initiate',
+        });
         setShowCompletion(true);
         setIsFreshWin(true);
         const SLAM_DELAY = 2000;
@@ -319,6 +328,12 @@ export default function PuzzlePage() {
   const handleHint = useCallback(() => {
     if (!puzzle || !playerState) return;
     const hint     = getHint(puzzle, playerState.cells, hintDepthRef.current);
+    posthog.capture('hint_used', {
+      puzzle_id:  puzzle.id,
+      difficulty: puzzle.difficulty,
+      hint_level: hint.level,
+      hints_so_far: playerState.hintsUsed + 1,
+    });
     hintDepthRef.current += 1; // next ask escalates
     const newState = { ...playerState, hintsUsed: playerState.hintsUsed + 1 };
     setPlayerState(newState);
@@ -443,36 +458,48 @@ export default function PuzzlePage() {
 
       {/* Region progress bar */}
       {region && regionPuzzles.length > 1 && currentIdx >= 0 && (
-        <div className="w-full max-w-2xl mb-4 flex items-center gap-3">
-          <img
-            src={region.ward}
-            alt=""
-            draggable={false}
-            style={{
-              height: 36, width: 36, objectFit: 'contain',
-              filter: 'drop-shadow(2px 4px 3px rgba(0,0,0,0.65))',
-            }}
-          />
-          <div className="flex-1">
-            <div className="flex justify-between mb-1.5">
-              <span className="font-serif text-xs text-ink-light">{region.name}</span>
-              <span className="font-serif text-xs text-ink-light opacity-60">{currentIdx + 1} / {regionPuzzles.length}</span>
-            </div>
-            <div className="flex gap-0.5">
-              {regionPuzzles.map((p, i) => (
-                <div
-                  key={p.id}
-                  className="flex-1 rounded-sm"
-                  style={{
-                    height: 5,
-                    background: i < currentIdx
-                      ? 'rgba(26,18,9,0.65)'
-                      : i === currentIdx
-                        ? 'rgba(139,26,26,0.8)'
-                        : 'rgba(26,18,9,0.15)',
-                  }}
-                />
-              ))}
+        <div className="w-full max-w-2xl mb-4">
+          <div style={{
+            background: 'rgba(26,18,9,0.07)',
+            border: '1px solid rgba(26,18,9,0.22)',
+            borderRadius: 8,
+            padding: '10px 14px',
+          }}>
+            <div className="flex items-center gap-3">
+              <img
+                src={region.ward}
+                alt=""
+                draggable={false}
+                style={{
+                  height: 40, width: 40, objectFit: 'contain',
+                  filter: 'drop-shadow(2px 4px 3px rgba(0,0,0,0.55))',
+                  flexShrink: 0,
+                }}
+              />
+              <div className="flex-1 min-w-0">
+                <div className="flex justify-between items-baseline mb-2">
+                  <span className="font-serif text-sm text-ink">{region.name}</span>
+                  <span className="font-serif text-xs text-ink-light ml-3" style={{ flexShrink: 0 }}>
+                    {currentIdx + 1} / {regionPuzzles.length}
+                  </span>
+                </div>
+                <div className="flex gap-px">
+                  {regionPuzzles.map((p, i) => (
+                    <div
+                      key={p.id}
+                      className="flex-1 rounded-sm"
+                      style={{
+                        height: 8,
+                        background: i < currentIdx
+                          ? 'rgba(26,18,9,0.55)'
+                          : i === currentIdx
+                            ? '#8B1A1A'
+                            : 'rgba(26,18,9,0.14)',
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
