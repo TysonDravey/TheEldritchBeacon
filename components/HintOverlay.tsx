@@ -18,7 +18,22 @@ export default function HintOverlay({ hint, onDismiss }: HintOverlayProps) {
   if (!hint) return null;
 
   return (
-    <div className="relative select-none mt-4" style={{ width: 440, maxWidth: '100%' }}>
+    <div
+      className="select-none"
+      style={{
+        position: 'fixed',
+        bottom: 0, left: 0, right: 0,
+        zIndex: 60,
+        display: 'flex',
+        justifyContent: 'center',
+        padding: '0 16px',
+        paddingBottom: 'max(8px, env(safe-area-inset-bottom))',
+        background: 'rgba(8,5,2,0.75)',
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
+      }}
+    >
+    <div className="relative w-full" style={{ maxWidth: 480 }}>
       {/* Scroll background — stretched to match content height */}
       <img
         src="/scrolls/scroll_short_01.png"
@@ -88,6 +103,7 @@ export default function HintOverlay({ hint, onDismiss }: HintOverlayProps) {
           </button>
         </div>
       </div>
+    </div>
     </div>
   );
 }

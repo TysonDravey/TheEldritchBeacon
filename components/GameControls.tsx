@@ -75,7 +75,7 @@ export default function GameControls({
 
   return (
     <>
-      <div className="flex items-center gap-3 mt-4">
+      <div className="flex items-center gap-3">
         <PlaqButton
           label="Hint"
           onClick={onHint}

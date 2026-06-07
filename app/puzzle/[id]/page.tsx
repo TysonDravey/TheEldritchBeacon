@@ -405,149 +405,125 @@ export default function PuzzlePage() {
     : null;
 
   return (
-    <main className="min-h-screen flex flex-col items-center px-6 py-8">
+    <main style={{ height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-      {/* Back button */}
-      <div className="w-full max-w-2xl mb-4">
-        <button
-          onClick={() => router.push('/')}
-          className="transition-all duration-100 hover:brightness-110 active:scale-95"
-          title="Back to all puzzles"
-        >
-          <img
-            src="/buttons/left_button_01.png"
-            alt="All Puzzles"
-            draggable={false}
-            style={{ height: 64, display: 'block', filter: 'drop-shadow(3px 7px 3px rgba(0,0,0,0.75))' }}
-          />
-        </button>
-      </div>
-
-      {/* Puzzle title on a scroll */}
-      <div
-        className="w-full max-w-2xl mb-6 relative select-none"
-        style={{ filter: 'drop-shadow(3px 7px 3px rgba(0,0,0,0.75))' }}
-      >
-        <img
-          src={`/scrolls/scroll_0${scrollIndexForId(puzzle.id)}.png`}
-          alt=""
-          draggable={false}
-          className="absolute inset-0 w-full h-full"
-          style={{ objectFit: 'fill', display: 'block' }}
-        />
-        <div className="relative text-center" style={{ padding: '10% 16%' }}>
-          <div style={{
-            background: 'rgba(242,233,216,0.88)',
-            padding: '10px 18px',
-            borderRadius: 6,
-            boxShadow: '0 0 24px 18px rgba(242,233,216,0.88)',
-          }}>
-            <h1 className="font-lovecraftian text-2xl text-ink leading-snug" style={{ textWrap: 'balance' } as React.CSSProperties}>{puzzle.title}</h1>
-            <p className="font-serif text-sm text-ink-light mt-1">
-              {puzzle.size}&times;{puzzle.size} &mdash; {puzzle.difficulty}
-              <span className="ml-2 text-xs opacity-60" title="Obscurity score">&#9670; {scorePuzzle(puzzle)}</span>
-            </p>
-            {playerState.hintsUsed > 0 && (
-              <p className="font-serif text-xs text-red-ink mt-1">
-                {playerState.hintsUsed} hint{playerState.hintsUsed !== 1 ? 's' : ''} used
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Region progress bar */}
-      {region && regionPuzzles.length > 1 && currentIdx >= 0 && (
-        <div className="w-full max-w-2xl mb-4">
-          <div style={{
-            background: 'rgba(26,18,9,0.07)',
-            border: '1px solid rgba(26,18,9,0.22)',
-            borderRadius: 8,
-            padding: '10px 14px',
-          }}>
-            <div className="flex items-center gap-3">
-              <img
-                src={region.ward}
-                alt=""
-                draggable={false}
-                style={{
-                  height: 40, width: 40, objectFit: 'contain',
-                  filter: 'drop-shadow(2px 4px 3px rgba(0,0,0,0.55))',
-                  flexShrink: 0,
-                }}
-              />
-              <div className="flex-1 min-w-0">
-                <div className="flex justify-between items-baseline mb-2">
-                  <span className="font-serif text-sm text-ink">{region.name}</span>
-                  <span className="font-serif text-xs text-ink-light ml-3" style={{ flexShrink: 0 }}>
-                    {currentIdx + 1} / {regionPuzzles.length}
-                  </span>
-                </div>
-                <div className="flex gap-px">
-                  {regionPuzzles.map((p, i) => (
-                    <div
-                      key={p.id}
-                      className="flex-1 rounded-sm"
-                      style={{
-                        height: 8,
-                        background: i < currentIdx
-                          ? 'rgba(26,18,9,0.55)'
-                          : i === currentIdx
-                            ? '#8B1A1A'
-                            : 'rgba(26,18,9,0.14)',
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Board — always in the same position */}
-      <div style={{ opacity: tilesReady ? 1 : 0, transition: 'opacity 0.4s ease', position: 'relative' }}>
-      {!tilesReady && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center z-50 gap-3"
-          style={{ minWidth: 200 }}>
-          <p className="font-serif text-sm text-ink opacity-60 italic">Summoning the Watchers…</p>
-          <div className="w-48 h-2 rounded-full overflow-hidden" style={{ background: 'rgba(26,18,9,0.15)' }}>
-            <div
-              className="h-full rounded-full transition-all duration-200"
-              style={{ width: `${loadProgress}%`, background: 'rgba(139,26,26,0.7)' }}
+      {/* ── Compact header ── */}
+      <div style={{
+        flexShrink: 0,
+        background: 'rgba(242,233,216,0.92)',
+        borderBottom: '1px solid rgba(26,18,9,0.15)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        paddingTop: 'env(safe-area-inset-top)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px' }}>
+          <button
+            onClick={() => router.push('/')}
+            className="transition-all duration-100 hover:brightness-110 active:scale-95 shrink-0"
+          >
+            <img
+              src="/buttons/left_button_01.png"
+              alt="Back"
+              draggable={false}
+              style={{ height: 40, display: 'block', filter: 'drop-shadow(2px 4px 2px rgba(0,0,0,0.6))' }}
             />
+          </button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h1 className="font-lovecraftian text-base text-ink leading-tight truncate">{puzzle.title}</h1>
+            <p className="font-serif text-ink-light leading-none" style={{ fontSize: 11 }}>
+              {puzzle.size}&times;{puzzle.size} &mdash; {puzzle.difficulty}
+              <span className="ml-1 opacity-50">&#9670; {scorePuzzle(puzzle)}</span>
+              {playerState.hintsUsed > 0 && (
+                <span className="ml-2 text-red-ink">
+                  {playerState.hintsUsed} hint{playerState.hintsUsed !== 1 ? 's' : ''}
+                </span>
+              )}
+            </p>
           </div>
-          <p className="font-serif text-xs opacity-40">{loadProgress}%</p>
         </div>
-      )}
-      <Board
-        puzzle={puzzle}
-        playerCells={playerState.cells}
-        onCellWard={handleCellWard}
-        onCellWatcher={handleCellWatcher}
-        onCellDrag={handleCellDrag}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-        primaryCell={hintResult?.primaryCell}
-        highlightCells={hintResult?.highlightCells}
-        secondaryHighlightCells={hintResult?.secondaryHighlightCells}
-        highlightTerritories={hintResult?.highlightTerritories}
-        secondaryHighlightTerritories={hintResult?.secondaryHighlightTerritories}
-        highlightRows={hintResult?.highlightRows}
-        highlightCols={hintResult?.highlightCols}
-        hintActive={!!hintResult}
-        contradiction={contradiction}
-        flashCells={flashCells}
-        ghostCells={cascadeGhosts}
-        ghostWardCells={cascadeWards}
-        constraintWardCells={constraintWards}
-        isCompleted={playerState.completed}
-        isFreshWin={isFreshWin}
-      />
+
+        {/* Slim progress bar */}
+        {region && regionPuzzles.length > 1 && currentIdx >= 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 12px 8px' }}>
+            <img
+              src={region.ward}
+              alt=""
+              draggable={false}
+              style={{ height: 20, width: 20, objectFit: 'contain', opacity: 0.8, flexShrink: 0 }}
+            />
+            <div style={{ flex: 1, display: 'flex', gap: 2 }}>
+              {regionPuzzles.map((p, i) => (
+                <div
+                  key={p.id}
+                  style={{
+                    flex: 1,
+                    height: 4,
+                    borderRadius: 2,
+                    background: i < currentIdx
+                      ? 'rgba(26,18,9,0.55)'
+                      : i === currentIdx ? '#8B1A1A' : 'rgba(26,18,9,0.14)',
+                  }}
+                />
+              ))}
+            </div>
+            <span className="font-serif shrink-0" style={{ fontSize: 10, color: 'rgba(26,18,9,0.45)' }}>
+              {currentIdx + 1}/{regionPuzzles.length}
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Controls */}
-      <div className="mt-6">
+      {/* ── Board — fills remaining space ── */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 8 }}>
+        <div style={{ opacity: tilesReady ? 1 : 0, transition: 'opacity 0.4s ease', position: 'relative' }}>
+          {!tilesReady && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center z-50 gap-3" style={{ minWidth: 200 }}>
+              <p className="font-serif text-sm text-ink opacity-60 italic">Summoning the Watchers…</p>
+              <div className="w-48 h-2 rounded-full overflow-hidden" style={{ background: 'rgba(26,18,9,0.15)' }}>
+                <div className="h-full rounded-full transition-all duration-200" style={{ width: `${loadProgress}%`, background: 'rgba(139,26,26,0.7)' }} />
+              </div>
+              <p className="font-serif text-xs opacity-40">{loadProgress}%</p>
+            </div>
+          )}
+          <Board
+            puzzle={puzzle}
+            playerCells={playerState.cells}
+            onCellWard={handleCellWard}
+            onCellWatcher={handleCellWatcher}
+            onCellDrag={handleCellDrag}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            primaryCell={hintResult?.primaryCell}
+            highlightCells={hintResult?.highlightCells}
+            secondaryHighlightCells={hintResult?.secondaryHighlightCells}
+            highlightTerritories={hintResult?.highlightTerritories}
+            secondaryHighlightTerritories={hintResult?.secondaryHighlightTerritories}
+            highlightRows={hintResult?.highlightRows}
+            highlightCols={hintResult?.highlightCols}
+            hintActive={!!hintResult}
+            contradiction={contradiction}
+            flashCells={flashCells}
+            ghostCells={cascadeGhosts}
+            ghostWardCells={cascadeWards}
+            constraintWardCells={constraintWards}
+            isCompleted={playerState.completed}
+            isFreshWin={isFreshWin}
+          />
+        </div>
+      </div>
+
+      {/* ── Controls footer ── */}
+      <div style={{
+        flexShrink: 0,
+        display: 'flex',
+        justifyContent: 'center',
+        background: 'rgba(242,233,216,0.92)',
+        borderTop: '1px solid rgba(26,18,9,0.12)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        padding: '8px 16px',
+        paddingBottom: 'max(8px, env(safe-area-inset-bottom))',
+      }}>
         <GameControls
           onHint={handleHint}
           onUndo={handleUndo}
@@ -558,82 +534,77 @@ export default function PuzzlePage() {
         />
       </div>
 
-      {/* Status messages — below controls so they never shift the board */}
-      <div className="mt-4 w-full max-w-2xl space-y-3">
-        {showCompletion && (
-          <div className="flex justify-center">
-            <div
-              className="relative select-none"
-              style={{ width: '52%', filter: 'drop-shadow(3px 7px 3px rgba(0,0,0,0.75))' }}
-            >
-              <img
-                src={`/scrolls/scroll_0${(scrollIndexForId(puzzle.id) % 3) + 1}.png`}
-                alt=""
-                draggable={false}
-                className="absolute inset-0 w-full h-full"
-                style={{ objectFit: 'fill', display: 'block' }}
-              />
-              <div className="relative text-center" style={{ padding: '10% 16%' }}>
-                <div style={{
-                  background: 'rgba(242,233,216,0.88)',
-                  padding: '8px 14px',
-                  borderRadius: 6,
-                  boxShadow: '0 0 24px 18px rgba(242,233,216,0.88)',
-                }}>
-                  <div className="flex items-center justify-center gap-2">
-                    <NextImage src="/svg/completion_stamp.svg" alt="Completed" width={28} height={28} />
-                    <h2
-                      className="font-lovecraftian text-base text-ink leading-snug"
-                      style={{ textWrap: 'balance' } as React.CSSProperties}
-                    >
-                      Beacon Restored
-                    </h2>
-                  </div>
-                  <p className="font-serif text-xs text-ink-light italic mt-1" style={{ textWrap: 'balance' } as React.CSSProperties}>
-                    The Watchers stand vigilant. The wards hold.
-                  </p>
-                  {nextPuzzle && (
-                    <div className="mt-3">
-                      <Link href={`/puzzle/${nextPuzzle.id}`}>
-                        <img
-                          src="/buttons/left_button_01.png"
-                          alt="Next Puzzle"
-                          draggable={false}
-                          className="transition-all duration-100 hover:brightness-110 active:scale-95"
-                          style={{
-                            height: 52,
-                            display: 'block',
-                            margin: '0 auto',
-                            transform: 'scaleX(-1)',
-                            filter: 'drop-shadow(3px 7px 3px rgba(0,0,0,0.75))',
-                          }}
-                        />
-                      </Link>
-                    </div>
-                  )}
+      {/* ── Fixed overlays — never affect layout ── */}
+
+      {/* Hint overlay */}
+      <HintOverlay hint={hintResult} onDismiss={() => setHintResult(null)} />
+
+      {/* Contradiction / rejection — floats above footer */}
+      {(rejectionMessage || (contradiction.found && !showCompletion)) && (
+        <div style={{
+          position: 'fixed',
+          bottom: 'calc(env(safe-area-inset-bottom) + 72px)',
+          left: 16, right: 16,
+          zIndex: 40,
+        }}>
+          <div className="border border-red-ink bg-parchment px-4 py-2 rounded-sm" style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
+            <p className="font-serif text-sm text-red-ink italic">
+              {rejectionMessage ?? contradiction.message ?? 'A contradiction lurks in the arrangement.'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Completion overlay */}
+      {showCompletion && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 50,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(8,5,2,0.6)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+          }}
+          onClick={() => setShowCompletion(false)}
+        >
+          <div
+            className="relative select-none"
+            style={{ width: '80%', maxWidth: 360, filter: 'drop-shadow(3px 7px 3px rgba(0,0,0,0.75))' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <img
+              src={`/scrolls/scroll_0${(scrollIndexForId(puzzle.id) % 3) + 1}.png`}
+              alt=""
+              draggable={false}
+              className="absolute inset-0 w-full h-full"
+              style={{ objectFit: 'fill', display: 'block' }}
+            />
+            <div className="relative text-center" style={{ padding: '10% 16%' }}>
+              <div style={{ background: 'rgba(242,233,216,0.92)', padding: '12px 18px', borderRadius: 6, boxShadow: '0 0 24px 18px rgba(242,233,216,0.92)' }}>
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <NextImage src="/svg/completion_stamp.svg" alt="Completed" width={28} height={28} />
+                  <h2 className="font-lovecraftian text-lg text-ink leading-snug">Beacon Restored</h2>
                 </div>
+                <p className="font-serif text-xs text-ink-light italic">The Watchers stand vigilant. The wards hold.</p>
+                {nextPuzzle && (
+                  <div className="mt-3">
+                    <Link href={`/puzzle/${nextPuzzle.id}`}>
+                      <img
+                        src="/buttons/left_button_01.png"
+                        alt="Next Puzzle"
+                        draggable={false}
+                        className="transition-all duration-100 hover:brightness-110 active:scale-95"
+                        style={{ height: 48, display: 'block', margin: '0 auto', transform: 'scaleX(-1)', filter: 'drop-shadow(3px 7px 3px rgba(0,0,0,0.75))' }}
+                      />
+                    </Link>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-        )}
-        {rejectionMessage && (
-          <div className="border border-red-ink bg-parchment px-4 py-2 rounded-sm">
-            <p className="font-serif text-sm text-red-ink italic">
-              {rejectionMessage}
-            </p>
-          </div>
-        )}
-        {contradiction.found && !showCompletion && !rejectionMessage && (
-          <div className="border border-red-ink bg-parchment px-4 py-2 rounded-sm">
-            <p className="font-serif text-sm text-red-ink">
-              {contradiction.message ?? 'A contradiction lurks in the arrangement.'}
-            </p>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Hint overlay — fixed position, never affects layout */}
-      <HintOverlay hint={hintResult} onDismiss={() => setHintResult(null)} />
     </main>
   );
 }
