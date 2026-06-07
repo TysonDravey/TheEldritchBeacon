@@ -86,17 +86,21 @@ async function main() {
     const idx = start + found.length;
     const idStr = String(idx).padStart(3, '0');
     const id = `eb-hard-${size}x${size}-${idStr}`;
+
+    // Compute difficulty first so we can pick a tier-appropriate title.
+    const difficulty = rateDifficulty({ ...puzzle, id, title: '' });
+
     // Pull a title from the shared pool that isn't already in samplePuzzles
     // OR already used by this run's pending results.
     const inFileTitles = existingTitles(readFileSync(join(process.cwd(), 'data', 'samplePuzzles.ts'), 'utf-8'));
     for (const p of found) inFileTitles.add(p.title);
-    const title = nextUnusedTitle(inFileTitles);
+    const title = nextUnusedTitle(inFileTitles, difficulty);
 
     const finalPuzzle: Puzzle = {
       ...puzzle,
       id,
       title,
-      difficulty: rateDifficulty({ ...puzzle, id, title }),
+      difficulty,
     };
 
     // Only count genuinely Archon puzzles (require contradiction-test reasoning)

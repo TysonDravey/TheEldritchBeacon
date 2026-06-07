@@ -22,21 +22,20 @@ import { generatePuzzle } from '../engine/generator';
 import { rateDifficulty } from '../engine/difficulty';
 import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import type { Puzzle, PuzzleMode } from '../engine/boardTypes';
+import type { Difficulty, Puzzle, PuzzleMode } from '../engine/boardTypes';
 import { nextUnusedTitle, existingTitles } from './titlePool';
 
 const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK ?? '';
 
 async function discordPing(msg: string): Promise<void> {
+  if (!DISCORD_WEBHOOK) return;
   try {
     await fetch(DISCORD_WEBHOOK, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content: msg }),
     });
-  } catch {
-    // non-fatal — don't interrupt generation if Discord is unreachable
-  }
+  } catch { /* non-fatal */ }
 }
 
 // ---------------------------------------------------------------------------
@@ -126,7 +125,7 @@ async function main() {
       content = readFileSync(filePath, 'utf-8');
       const idNum  = nextIdNum(content, size);
       const id     = `eb-${size}x${size}-${String(idNum).padStart(3, '0')}`;
-      const title  = nextUnusedTitle(existingTitles(content));
+      const title  = nextUnusedTitle(existingTitles(content), diff as Difficulty);
 
       const cmd = [
         'generateBatch',
