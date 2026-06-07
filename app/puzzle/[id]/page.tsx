@@ -485,7 +485,7 @@ export default function PuzzlePage() {
       </div>
 
       {/* ── Board — fills remaining space ── */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 8 }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8, minHeight: 0 }}>
         <div style={{ opacity: tilesReady ? 1 : 0, transition: 'opacity 0.4s ease', position: 'relative' }}>
           {!tilesReady && (
             <div className="absolute inset-0 flex flex-col items-center justify-center z-50 gap-3" style={{ minWidth: 200 }}>

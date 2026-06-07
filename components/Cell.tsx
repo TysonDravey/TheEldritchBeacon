@@ -44,8 +44,8 @@ function cellPx(boardSize: number): number {
     case 6:  return 64;
     case 7:  return 56;
     case 8:  return 50;
-    case 9:  return 46;
-    case 10: return 42;
+    case 9:  return 40;
+    case 10: return 36;
     default: return Math.max(36, Math.floor(360 / boardSize));
   }
 }

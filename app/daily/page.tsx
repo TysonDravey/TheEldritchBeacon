@@ -33,6 +33,25 @@ function loadCompletedDates(): Set<string> {
   } catch { return new Set(); }
 }
 
+function loadStartedDates(yearMonth: string): Set<string> {
+  const started = new Set<string>();
+  try {
+    const days = daysInMonth(yearMonth);
+    for (const date of days) {
+      const puzzleId = DAILY_CALENDAR[date];
+      if (!puzzleId) continue;
+      const key = `eldritch_beacon_state_daily_${date}_${puzzleId}`;
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const state = JSON.parse(raw);
+      if (state?.completed) continue;
+      const hasMove = state?.cells?.some((row: string[]) => row.some((c: string) => c !== 'empty'));
+      if (hasMove) started.add(date);
+    }
+  } catch { /* ignore */ }
+  return started;
+}
+
 function saveCompletedDate(date: string): void {
   try {
     const existing = loadCompletedDates();
@@ -106,11 +125,13 @@ function scrollIndexForId(s: string): number {
 function MonthCalendar({
   yearMonth,
   completedDates,
+  startedDates,
   todayStr,
   onSelectDate,
 }: {
   yearMonth: string;
   completedDates: Set<string>;
+  startedDates: Set<string>;
   todayStr: string;
   onSelectDate: (date: string) => void;
 }) {
@@ -153,6 +174,7 @@ function MonthCalendar({
           const dow       = dayOfWeekMon0(dateStr);
           const hasPuzzle = !!DAILY_CALENDAR[dateStr];
           const completed = completedDates.has(dateStr);
+          const started   = !completed && startedDates.has(dateStr);
           const isToday   = dateStr === todayStr;
           const isFuture  = dateStr > todayStr;
           const isPast    = dateStr < todayStr;
@@ -205,6 +227,9 @@ function MonthCalendar({
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <NextImage src="/svg/completion_stamp.svg" alt="done" width={18} height={18} style={{ opacity: 0.75 }} />
                 </div>
+              )}
+              {started && (
+                <div style={{ position: 'absolute', bottom: 3, left: '50%', transform: 'translateX(-50%)', width: 5, height: 5, borderRadius: '50%', background: 'rgba(181,134,13,0.85)', boxShadow: '0 0 3px rgba(181,134,13,0.5)' }} />
               )}
             </div>
           );
@@ -259,6 +284,7 @@ export default function DailyPage() {
   const [view,            setView]           = useState<'calendar' | 'puzzle'>('calendar');
   const [selectedDate,    setSelectedDate]   = useState<string>(todayStr);
   const [completedDates,  setCompletedDates] = useState<Set<string>>(new Set());
+  const [startedDates,    setStartedDates]   = useState<Set<string>>(new Set());
 
   const puzzleId = DAILY_CALENDAR[selectedDate] ?? null;
   const puzzle   = puzzleId ? getPuzzleById(puzzleId) : null;
@@ -285,11 +311,12 @@ export default function DailyPage() {
   const preDragCellsRef = useRef<CellState[][] | null>(null);
   const playerStateRef  = useRef<PlayerState | null>(null);
 
-  // Load completed dates and streak from localStorage on mount
+  // Load completed dates, started dates and streak from localStorage on mount
   useEffect(() => {
     setCompletedDates(loadCompletedDates());
+    setStartedDates(loadStartedDates(yearMonth));
     setStreak(loadStreak());
-  }, []);
+  }, [yearMonth]);
 
   // Preload tile images
   useEffect(() => {
@@ -422,6 +449,7 @@ export default function DailyPage() {
       if (solved) {
         saveCompletedDate(selectedDate);
         setCompletedDates(prev => new Set([...prev, selectedDate]));
+        setStartedDates(prev => { const n = new Set(prev); n.delete(selectedDate); return n; });
         const isToday = selectedDate === todayStr;
         let streakCount = streak.count;
         if (isToday) {
@@ -636,6 +664,7 @@ export default function DailyPage() {
           <MonthCalendar
             yearMonth={yearMonth}
             completedDates={completedDates}
+            startedDates={startedDates}
             todayStr={todayStr}
             onSelectDate={(date) => { setSelectedDate(date); setView('puzzle'); }}
           />
