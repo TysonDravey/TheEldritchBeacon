@@ -22,6 +22,7 @@ function difficultyColor(difficulty: Difficulty): string {
     case 'Eldritch':    return 'text-red-ink border-red-ink font-bold';
     case 'Harbinger':   return 'text-red-ink border-red-ink font-bold italic';
     case 'Archon':      return 'text-red-ink border-red-ink font-bold opacity-90';
+    case 'Unbound':     return 'text-red-ink border-red-ink font-bold italic opacity-90';
     default:            return 'text-ink border-ink';
   }
 }

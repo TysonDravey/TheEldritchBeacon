@@ -103,19 +103,19 @@ async function main() {
       difficulty,
     };
 
-    // Only count genuinely Archon puzzles (require contradiction-test reasoning)
-    if (finalPuzzle.difficulty !== 'Archon') {
+    // Only count puzzles that require contradiction-test reasoning (Archon or Unbound)
+    if (finalPuzzle.difficulty !== 'Archon' && finalPuzzle.difficulty !== 'Unbound') {
       process.stderr.write(`  seed ${seed}: skipped (${finalPuzzle.difficulty}, ${elapsed}s)\n`);
       continue;
     }
 
     found.push(finalPuzzle);
-    process.stderr.write(`  ✓ ${id} — Archon (${elapsed}s, seed ${seed})\n`);
-    await discordPing(`✓ ${id} — Archon (${elapsed}s)`);
+    process.stderr.write(`  ✓ ${id} — ${finalPuzzle.difficulty} (${elapsed}s, seed ${seed})\n`);
+    await discordPing(`✓ ${id} — ${finalPuzzle.difficulty} (${elapsed}s)`);
   }
 
   process.stderr.write(`\nDone. ${found.length} puzzles from ${attempts} seed attempts.\n\n`);
-  await discordPing(`@here 🔔 Archon ${size}×${size} complete: ${found.length}/${count} puzzles in ${attempts} seed attempts.`);
+  await discordPing(`@here 🔔 Archon/Unbound ${size}×${size} complete: ${found.length}/${count} puzzles in ${attempts} seed attempts.`);
   process.stderr.write(`Paste the following lines into data/samplePuzzles.ts:\n\n`);
 
   for (const p of found) {

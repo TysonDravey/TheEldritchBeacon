@@ -15,7 +15,7 @@ export interface Board {
 
 export type PuzzleMode = 'initiate' | 'cult-master' | 'twin-watchers' | 'shattered-realms';
 
-export type Difficulty = 'Initiate' | 'Scholar' | 'Occultist' | 'High Priest' | 'Eldritch' | 'Harbinger' | 'Archon';
+export type Difficulty = 'Initiate' | 'Scholar' | 'Occultist' | 'High Priest' | 'Eldritch' | 'Harbinger' | 'Archon' | 'Unbound';
 
 export interface Puzzle {
   id: string;

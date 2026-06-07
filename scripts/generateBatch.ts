@@ -116,7 +116,7 @@ async function main() {
       if (difficulty && diff !== difficulty) {
         process.stderr.write(`  skip ${seed}: wrong difficulty ${diff}\n`);
         continue;
-      } else if (!difficulty && depth > 0 && diff !== 'Archon') {
+      } else if (!difficulty && depth > 0 && diff !== 'Archon' && diff !== 'Unbound') {
         process.stderr.write(`  skip ${seed}: solvable without hypothesis (${diff})\n`);
         continue;
       }

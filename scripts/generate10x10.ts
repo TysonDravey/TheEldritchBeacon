@@ -394,7 +394,7 @@ function parseArgs() {
 }
 
 const DIFFICULTY_RANK: Record<string, number> = {
-  Initiate: 1, Scholar: 2, Occultist: 3, 'High Priest': 4, Eldritch: 5, Harbinger: 6, Archon: 7,
+  Initiate: 1, Scholar: 2, Occultist: 3, 'High Priest': 4, Eldritch: 5, Harbinger: 6, Archon: 7, Unbound: 8,
 };
 
 /** Re-runs the depth-1 solver, recording technique counts and the first deduction kind. */

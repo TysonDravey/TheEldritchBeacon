@@ -3,6 +3,7 @@ import {
   getCandidates,
   findContradictions,
   getNextDeduction,
+  computeCascadeSteps,
 } from './solver';
 import { isSolved } from './rules';
 
@@ -18,7 +19,8 @@ interface TechniqueRecord {
   pairElimination: number;
   territoryDeadEnd: number;
   hiddenSet: number;
-  contradictionTest: number;
+  contradictionTest: number;      // hypothetical, chain ≤ 2 forced steps
+  contradictionTestDeep: number;  // hypothetical, chain 3+ forced steps
 }
 
 function classifyDeduction(d: DeductionResult): keyof TechniqueRecord {
@@ -42,7 +44,8 @@ function computeScore(record: TechniqueRecord): number {
     record.pairElimination * 3 +
     record.territoryDeadEnd * 4 +
     record.hiddenSet * 4 +
-    record.contradictionTest * 5
+    record.contradictionTest * 5 +
+    record.contradictionTestDeep * 12
   );
 }
 
@@ -104,6 +107,7 @@ function buildRecord(puzzle: Puzzle): TechniqueRecord {
     territoryDeadEnd: 0,
     hiddenSet: 0,
     contradictionTest: 0,
+    contradictionTestDeep: 0,
   };
 
   let progress = true;
@@ -114,7 +118,13 @@ function buildRecord(puzzle: Puzzle): TechniqueRecord {
     if (contradiction.found) break;
     const d = getNextDeduction(puzzle, cells);
     if (!d) break;
-    record[classifyDeduction(d)]++;
+    if (d.reasonType === 'hypothetical') {
+      const chain = computeCascadeSteps(puzzle, cells, d.row, d.col);
+      if (chain.length >= 3) record.contradictionTestDeep++;
+      else record.contradictionTest++;
+    } else {
+      record[classifyDeduction(d)]++;
+    }
     progress = true;
     applyDeductionToBoard(cells, d, n);
   }
@@ -124,8 +134,7 @@ function buildRecord(puzzle: Puzzle): TechniqueRecord {
 
 export function rateDifficulty(puzzle: Puzzle): Difficulty {
   const record = buildRecord(puzzle);
-  // Any puzzle requiring hypothesis-based contradiction testing is Archon —
-  // qualitatively harder than forward-reasoning alone.
+  if (record.contradictionTestDeep > 0) return 'Unbound';
   if (record.contradictionTest > 0) return 'Archon';
   if (record.hiddenSet > 0) return 'Harbinger';
   return scoreTodifficulty(computeScore(record));

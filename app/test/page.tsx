@@ -11,7 +11,7 @@ type RatingMap = Record<string, Rating>;
 
 const STORAGE_KEY = 'eb-test-ratings';
 
-const DIFFICULTIES: Difficulty[] = ['Initiate', 'Scholar', 'Occultist', 'High Priest', 'Eldritch', 'Harbinger', 'Archon'];
+const DIFFICULTIES: Difficulty[] = ['Initiate', 'Scholar', 'Occultist', 'High Priest', 'Eldritch', 'Harbinger', 'Archon', 'Unbound'];
 
 function loadRatings(): RatingMap {
   try {
@@ -232,6 +232,7 @@ function diffColor(d: Difficulty): { bg: string; text: string } {
     case 'Eldritch':    return { bg: 'rgba(139,26,26,0.15)',   text: '#8B1A1A' };
     case 'Harbinger':   return { bg: 'rgba(139,26,26,0.25)',   text: '#8B1A1A' };
     case 'Archon':      return { bg: 'rgba(26,18,9,0.15)',     text: '#1A1209'  };
+    case 'Unbound':     return { bg: 'rgba(26,18,9,0.22)',     text: '#1A1209'  };
     default:            return { bg: 'rgba(26,18,9,0.08)',     text: 'var(--ink)' };
   }
 }

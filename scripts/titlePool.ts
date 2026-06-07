@@ -366,7 +366,7 @@ function difficultyTier(d: Difficulty): 1 | 2 | 3 | 4 {
     case 'Initiate':   case 'Scholar':    return 1;
     case 'Occultist':  case 'High Priest': return 2;
     case 'Eldritch':   case 'Harbinger':  return 3;
-    case 'Archon':                         return 4;
+    case 'Archon':     case 'Unbound':    return 4;
   }
 }
 
