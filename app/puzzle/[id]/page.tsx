@@ -17,6 +17,7 @@ import GameControls from '@/components/GameControls';
 import HintOverlay from '@/components/HintOverlay';
 import { WATCHER_SVGS, WARD_PNG } from '@/theme/colors';
 import { REGION_BY_DIFFICULTY } from '@/data/regions';
+import { haptic } from '@/lib/haptic';
 
 const UNDO_LIMIT = 50;
 
@@ -193,6 +194,10 @@ export default function PuzzlePage() {
         newUndoStack = [...current.undoStack, current.cells.map((r) => [...r])].slice(-UNDO_LIMIT);
       }
 
+      // Haptic for the cell transition
+      if (next === 'watcher' || (next === 'empty' && current.cells[row][col] === 'watcher')) haptic('medium');
+      else haptic('light');
+
       hintDepthRef.current = 0;
       setHintResult(null);
       const contra  = findContradictions(puzzle, newCells);
@@ -220,34 +225,39 @@ export default function PuzzlePage() {
           hints_used:  newState.hintsUsed,
           mode:        puzzle.mode ?? 'initiate',
         });
-        setShowCompletion(true);
         setIsFreshWin(true);
         const SLAM_DELAY = 2000;
         const STEP_MS    = 60;
         winTimersRef.current.forEach(clearTimeout);
         winTimersRef.current = [];
         const watcherCells: [number, number][] = [];
-        for (let r = 0; r < puzzle.size; r++) {
-          for (let c = 0; c < puzzle.size; c++) {
+        for (let r = 0; r < puzzle.size; r++)
+          for (let c = 0; c < puzzle.size; c++)
             if (newCells[r][c] === 'watcher') watcherCells.push([r, c]);
-          }
-        }
+
+        let maxDelay = 0;
         for (let r = 0; r < puzzle.size; r++) {
           for (let c = 0; c < puzzle.size; c++) {
             if (newCells[r][c] === 'ward') {
               const dist = Math.min(...watcherCells.map(([wr, wc]) => Math.abs(wr - r) + Math.abs(wc - c)));
+              const delay = SLAM_DELAY + dist * STEP_MS;
+              if (delay > maxDelay) maxDelay = delay;
               const t = setTimeout(() => {
+                haptic('win-ward');
                 const el = document.querySelector(`[data-cell="true"][data-row="${r}"][data-col="${c}"]`);
                 if (el) {
                   el.classList.remove('tile-wiggle');
                   void (el as HTMLElement).offsetWidth;
                   el.classList.add('tile-wiggle');
                 }
-              }, SLAM_DELAY + dist * STEP_MS);
+              }, delay);
               winTimersRef.current.push(t);
             }
           }
         }
+        // Show completion overlay after the last ward has slammed and wiggled
+        const completionT = setTimeout(() => setShowCompletion(true), maxDelay + 500);
+        winTimersRef.current.push(completionT);
       }
     },
     [puzzle],
@@ -309,6 +319,7 @@ export default function PuzzlePage() {
 
       if (!canPlaceWatcher(puzzle, current.cells, row, col)) {
         const reason = watcherRejectionReason(puzzle, current.cells, row, col);
+        haptic('error');
         applyChange(row, col, 'ward');
         setRejectionMessage(reason);
         setFlashCells([[row, col]]);

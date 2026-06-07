@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import posthog from 'posthog-js';
+import { haptic } from '@/lib/haptic';
 import NextImage from 'next/image';
 import { getPuzzleById } from '@/data/samplePuzzles';
 import { DAILY_CALENDAR } from '@/data/dailyCalendar';
@@ -403,6 +404,9 @@ export default function DailyPage() {
         newUndoStack = [...current.undoStack, current.cells.map((r) => [...r])].slice(-UNDO_LIMIT);
       }
 
+      if (next === 'watcher' || (next === 'empty' && current.cells[row][col] === 'watcher')) haptic('medium');
+      else haptic('light');
+
       hintDepthRef.current = 0;
       setHintResult(null);
       const contra = findContradictions(puzzle, newCells);
@@ -434,7 +438,6 @@ export default function DailyPage() {
           hints_used:  newState.hintsUsed,
           streak:      streakCount,
         });
-        setShowCompletion(true);
         setIsFreshWin(true);
 
         winTimersRef.current.forEach(clearTimeout);
@@ -443,18 +446,25 @@ export default function DailyPage() {
         for (let r = 0; r < puzzle.size; r++)
           for (let c = 0; c < puzzle.size; c++)
             if (newCells[r][c] === 'watcher') watcherCells.push([r, c]);
+
+        let maxDelay = 0;
         for (let r = 0; r < puzzle.size; r++) {
           for (let c = 0; c < puzzle.size; c++) {
             if (newCells[r][c] === 'ward') {
               const dist = Math.min(...watcherCells.map(([wr, wc]) => Math.abs(wr - r) + Math.abs(wc - c)));
+              const delay = 2000 + dist * 60;
+              if (delay > maxDelay) maxDelay = delay;
               const t = setTimeout(() => {
+                haptic('win-ward');
                 const el = document.querySelector(`[data-cell="true"][data-row="${r}"][data-col="${c}"]`);
                 if (el) { el.classList.remove('tile-wiggle'); void (el as HTMLElement).offsetWidth; el.classList.add('tile-wiggle'); }
-              }, 2000 + dist * 60);
+              }, delay);
               winTimersRef.current.push(t);
             }
           }
         }
+        const completionT = setTimeout(() => setShowCompletion(true), maxDelay + 500);
+        winTimersRef.current.push(completionT);
       }
     },
     [puzzle, selectedDate, todayStr],
@@ -502,6 +512,7 @@ export default function DailyPage() {
       if (prev === 'watcher') { applyChange(row, col, 'empty'); return; }
       if (!canPlaceWatcher(puzzle, current.cells, row, col)) {
         const reason = watcherRejectionReason(puzzle, current.cells, row, col);
+        haptic('error');
         applyChange(row, col, 'ward');
         setRejectionMessage(reason);
         setFlashCells([[row, col]]);
