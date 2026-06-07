@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import NextImage from 'next/image';
-import { getPuzzleById } from '@/data/samplePuzzles';
+import Link from 'next/link';
+import { getPuzzleById, SAMPLE_PUZZLES } from '@/data/samplePuzzles';
 import { loadPlayerState, savePlayerState, createFreshPlayerState } from '@/lib/storage';
 import { getHint } from '@/engine/hints';
 import { scorePuzzle } from '@/engine/difficulty';
@@ -14,6 +15,7 @@ import Board from '@/components/Board';
 import GameControls from '@/components/GameControls';
 import HintOverlay from '@/components/HintOverlay';
 import { WATCHER_SVGS, WARD_PNG } from '@/theme/colors';
+import { REGION_BY_DIFFICULTY } from '@/data/regions';
 
 const UNDO_LIMIT = 50;
 
@@ -48,6 +50,10 @@ export default function PuzzlePage() {
   const winTimersRef      = useRef<ReturnType<typeof setTimeout>[]>([]);
   const isDraggingRef     = useRef(false);
   const preDragCellsRef   = useRef<CellState[][] | null>(null);
+  // Mutable ref kept in sync with playerState — applyChange reads and writes this
+  // synchronously so that multiple rapid drag calls in the same JS frame each build
+  // on the previous result instead of all starting from the same stale closure.
+  const playerStateRef    = useRef<PlayerState | null>(null);
 
   useEffect(() => {
     const srcs = [
@@ -162,52 +168,51 @@ export default function PuzzlePage() {
   }, [hintResult]);
 
   useEffect(() => () => { winTimersRef.current.forEach(clearTimeout); }, []);
+  useEffect(() => { playerStateRef.current = playerState; }, [playerState]);
 
   // Shared logic for applying any cell state change
   const applyChange = useCallback(
     (row: number, col: number, next: CellState) => {
-      if (!playerState || !puzzle || playerState.completed) return;
+      // Read from the ref so that multiple rapid calls in the same JS frame (e.g. from
+      // coalesced pointer events during a drag) each build on the previous result rather
+      // than all starting from the same stale React state closure.
+      const current = playerStateRef.current;
+      if (!current || !puzzle || current.completed) return;
 
-      const newCells: CellState[][] = playerState.cells.map((r) => [...r]);
+      const newCells: CellState[][] = current.cells.map((r) => [...r]);
       newCells[row][col] = next;
 
-      // Build undo stack entry:
-      // - Single click: push current cells as snapshot
-      // - First cell of a drag: push the pre-drag snapshot stored in preDragCellsRef, then clear it
-      // - Subsequent drag cells: no push (snapshot already pushed on first cell)
-      // NOTE: snapshot must be pushed here, not in handleDragStart, because handleDragStart
-      // runs in the same event tick as the first applyChange — pushing in handleDragStart
-      // causes a stale-closure race where applyChange's setPlayerState overwrites it.
       let newUndoStack: CellState[][][];
       if (isDraggingRef.current && preDragCellsRef.current) {
-        newUndoStack = [...playerState.undoStack, preDragCellsRef.current].slice(-UNDO_LIMIT);
-        preDragCellsRef.current = null; // only push once per drag gesture
+        newUndoStack = [...current.undoStack, preDragCellsRef.current].slice(-UNDO_LIMIT);
+        preDragCellsRef.current = null;
       } else if (isDraggingRef.current) {
-        newUndoStack = playerState.undoStack; // subsequent drag cells — no new snapshot
+        newUndoStack = current.undoStack;
       } else {
-        newUndoStack = [...playerState.undoStack, playerState.cells.map((r) => [...r])].slice(-UNDO_LIMIT);
+        newUndoStack = [...current.undoStack, current.cells.map((r) => [...r])].slice(-UNDO_LIMIT);
       }
 
-      hintDepthRef.current = 0; // any move resets hint escalation
-      setHintResult(null);      // dismiss active hint on any move
+      hintDepthRef.current = 0;
+      setHintResult(null);
       const contra  = findContradictions(puzzle, newCells);
       const solved  = isSolved(puzzle, newCells);
 
       const newState: PlayerState = {
-        ...playerState,
+        ...current,
         cells: newCells,
         undoStack: newUndoStack,
         completed: solved,
       };
 
+      // Sync ref update must happen before setPlayerState so the next rapid call
+      // in the same frame sees this call's changes, not the stale closure state.
+      playerStateRef.current = newState;
       setContradiction(contra);
       setPlayerState(newState);
       savePlayerState(newState);
       if (solved) {
         setShowCompletion(true);
         setIsFreshWin(true);
-        // Ward cascade: wiggle each ward once, radiating from watcher positions.
-        // Watchers all slam at ~200ms base + 1760ms slam point = ~1960ms.
         const SLAM_DELAY = 2000;
         const STEP_MS    = 60;
         winTimersRef.current.forEach(clearTimeout);
@@ -236,7 +241,7 @@ export default function PuzzlePage() {
         }
       }
     },
-    [playerState, puzzle],
+    [puzzle],
   );
 
   const handleDragStart = useCallback(() => {
@@ -251,34 +256,50 @@ export default function PuzzlePage() {
     preDragCellsRef.current = null;
   }, []);
 
+  // Drag ward — dedicated non-toggle callback: only places when action='place', only removes
+  // when action='remove'. Reads playerStateRef (always fresh, sync-updated by applyChange)
+  // so it is immune to stale-closure races that could cause a toggle during fast drags.
+  const handleCellDrag = useCallback(
+    (row: number, col: number, action: 'place' | 'remove') => {
+      const current = playerStateRef.current;
+      if (!current || current.completed) return;
+      const prev = current.cells[row][col];
+      if (action === 'place'  && prev === 'empty') applyChange(row, col, 'ward');
+      if (action === 'remove' && prev === 'ward')  applyChange(row, col, 'empty');
+    },
+    [applyChange],
+  );
+
   // Single click → ward toggle (empty↔ward; ignore watcher cells)
+  // Reads playerStateRef.current (not playerState closure) so the function stays stable
+  // across renders — onCellWardRef in Board never swaps to a new closure mid-drag, which
+  // was the race that caused wards to flip when dragging fast on desktop.
   const handleCellWard = useCallback(
     (row: number, col: number) => {
-      if (!playerState) return;
-      const prev = playerState.cells[row][col];
+      const current = playerStateRef.current;
+      if (!current) return;
+      const prev = current.cells[row][col];
       if (prev === 'watcher') return;
       applyChange(row, col, prev === 'empty' ? 'ward' : 'empty');
     },
-    [playerState, applyChange],
+    [applyChange],
   );
 
   // Double click → watcher toggle (empty↔watcher; invalid attempts become red wards)
   const handleCellWatcher = useCallback(
     (row: number, col: number) => {
-      if (!playerState || !puzzle) return;
-      const prev = playerState.cells[row][col];
+      const current = playerStateRef.current;
+      if (!current || !puzzle) return;
+      const prev = current.cells[row][col];
       if (prev === 'ward') return;
 
       if (prev === 'watcher') {
-        // Remove existing watcher
         applyChange(row, col, 'empty');
         return;
       }
 
-      // Attempting to place on an empty cell — validate first
-      if (!canPlaceWatcher(puzzle, playerState.cells, row, col)) {
-        const reason = watcherRejectionReason(puzzle, playerState.cells, row, col);
-        // Place a ward instead and flash it red
+      if (!canPlaceWatcher(puzzle, current.cells, row, col)) {
+        const reason = watcherRejectionReason(puzzle, current.cells, row, col);
         applyChange(row, col, 'ward');
         setRejectionMessage(reason);
         setFlashCells([[row, col]]);
@@ -292,7 +313,7 @@ export default function PuzzlePage() {
 
       applyChange(row, col, 'watcher');
     },
-    [playerState, puzzle, applyChange],
+    [puzzle, applyChange],
   );
 
   const handleHint = useCallback(() => {
@@ -359,6 +380,15 @@ export default function PuzzlePage() {
     );
   }
 
+  const region = REGION_BY_DIFFICULTY[puzzle.difficulty] ?? null;
+  const regionPuzzles = SAMPLE_PUZZLES
+    .filter(p => p.difficulty === puzzle.difficulty && p.mode === 'initiate')
+    .sort((a, b) => scorePuzzle(a) - scorePuzzle(b));
+  const currentIdx = regionPuzzles.findIndex(p => p.id === puzzle.id);
+  const nextPuzzle = currentIdx >= 0 && currentIdx < regionPuzzles.length - 1
+    ? regionPuzzles[currentIdx + 1]
+    : null;
+
   return (
     <main className="min-h-screen flex flex-col items-center px-6 py-8">
 
@@ -411,6 +441,43 @@ export default function PuzzlePage() {
         </div>
       </div>
 
+      {/* Region progress bar */}
+      {region && regionPuzzles.length > 1 && currentIdx >= 0 && (
+        <div className="w-full max-w-2xl mb-4 flex items-center gap-3">
+          <img
+            src={region.ward}
+            alt=""
+            draggable={false}
+            style={{
+              height: 36, width: 36, objectFit: 'contain',
+              filter: 'drop-shadow(2px 4px 3px rgba(0,0,0,0.65))',
+            }}
+          />
+          <div className="flex-1">
+            <div className="flex justify-between mb-1.5">
+              <span className="font-serif text-xs text-ink-light">{region.name}</span>
+              <span className="font-serif text-xs text-ink-light opacity-60">{currentIdx + 1} / {regionPuzzles.length}</span>
+            </div>
+            <div className="flex gap-0.5">
+              {regionPuzzles.map((p, i) => (
+                <div
+                  key={p.id}
+                  className="flex-1 rounded-sm"
+                  style={{
+                    height: 5,
+                    background: i < currentIdx
+                      ? 'rgba(26,18,9,0.65)'
+                      : i === currentIdx
+                        ? 'rgba(139,26,26,0.8)'
+                        : 'rgba(26,18,9,0.15)',
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Board — always in the same position */}
       <div style={{ opacity: tilesReady ? 1 : 0, transition: 'opacity 0.4s ease', position: 'relative' }}>
       {!tilesReady && (
@@ -431,6 +498,7 @@ export default function PuzzlePage() {
         playerCells={playerState.cells}
         onCellWard={handleCellWard}
         onCellWatcher={handleCellWatcher}
+        onCellDrag={handleCellDrag}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         primaryCell={hintResult?.primaryCell}
@@ -497,6 +565,25 @@ export default function PuzzlePage() {
                   <p className="font-serif text-xs text-ink-light italic mt-1" style={{ textWrap: 'balance' } as React.CSSProperties}>
                     The Watchers stand vigilant. The wards hold.
                   </p>
+                  {nextPuzzle && (
+                    <div className="mt-3">
+                      <Link href={`/puzzle/${nextPuzzle.id}`}>
+                        <img
+                          src="/buttons/left_button_01.png"
+                          alt="Next Puzzle"
+                          draggable={false}
+                          className="transition-all duration-100 hover:brightness-110 active:scale-95"
+                          style={{
+                            height: 52,
+                            display: 'block',
+                            margin: '0 auto',
+                            transform: 'scaleX(-1)',
+                            filter: 'drop-shadow(3px 7px 3px rgba(0,0,0,0.75))',
+                          }}
+                        />
+                      </Link>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

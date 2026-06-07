@@ -9,6 +9,7 @@ interface BoardProps {
   playerCells: CellState[][];
   onCellWard: (row: number, col: number) => void;
   onCellWatcher: (row: number, col: number) => void;
+  onCellDrag?: (row: number, col: number, action: 'place' | 'remove') => void;
   onDragStart?: () => void;
   onDragEnd?: () => void;
   primaryCell?: [number, number];
@@ -63,6 +64,7 @@ export default function Board({
   playerCells,
   onCellWard,
   onCellWatcher,
+  onCellDrag,
   onDragStart,
   onDragEnd,
   primaryCell,
@@ -86,11 +88,13 @@ export default function Board({
   // Keep latest versions in refs so stable handlers don't go stale
   const onCellWardRef    = useRef(onCellWard);
   const onCellWatcherRef = useRef(onCellWatcher);
+  const onCellDragRef    = useRef(onCellDrag);
   const onDragStartRef   = useRef(onDragStart);
   const onDragEndRef     = useRef(onDragEnd);
   const playerCellsRef   = useRef(playerCells);
   useEffect(() => { onCellWardRef.current    = onCellWard;    }, [onCellWard]);
   useEffect(() => { onCellWatcherRef.current = onCellWatcher; }, [onCellWatcher]);
+  useEffect(() => { onCellDragRef.current    = onCellDrag;    }, [onCellDrag]);
   useEffect(() => { onDragStartRef.current   = onDragStart;   }, [onDragStart]);
   useEffect(() => { onDragEndRef.current     = onDragEnd;     }, [onDragEnd]);
   useEffect(() => { playerCellsRef.current   = playerCells;   }, [playerCells]);
@@ -100,21 +104,38 @@ export default function Board({
   const startPosRef     = useRef({ x: 0, y: 0 });
   const prevDragPosRef  = useRef({ x: 0, y: 0 });
   const dragActionRef   = useRef<'place' | 'remove'>('place');
-  const lastDragCellRef = useRef(''); // "row,col" — skip re-entry on same cell
+  const visitedDragCellsRef = useRef<Set<string>>(new Set()); // all cells touched this drag — never reprocess
   const clickTimerRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingClickRef    = useRef<{ row: number; col: number } | null>(null);
   const lastTapRef         = useRef<{ x: number; y: number; time: number } | null>(null);
   const doubletapFiredRef  = useRef(false);
   const boardHandledUpRef  = useRef(false);
+  const boardRef = useRef<HTMLDivElement>(null);
+
+  // Cache of cell screen rects — built once per gesture at pointerDown.
+  // elementFromPoint is unreliable with preserve-3d and transparent tile corners;
+  // using getBoundingClientRect per cell is exact regardless of 3D transforms.
+  type CellRect = { row: number; col: number; left: number; top: number; right: number; bottom: number };
+  const cellRectsRef = useRef<CellRect[]>([]);
+
+  function buildCellCache() {
+    if (!boardRef.current) return;
+    const els = boardRef.current.querySelectorAll<HTMLElement>('[data-cell="true"]');
+    const cache: CellRect[] = [];
+    for (const el of els) {
+      const r = el.getBoundingClientRect();
+      const row = parseInt(el.dataset.row ?? '-1', 10);
+      const col = parseInt(el.dataset.col ?? '-1', 10);
+      if (row >= 0 && col >= 0) cache.push({ row, col, left: r.left, top: r.top, right: r.right, bottom: r.bottom });
+    }
+    cellRectsRef.current = cache;
+  }
 
   function getCellAtPoint(x: number, y: number): { row: number; col: number } | null {
-    const el = document.elementFromPoint(x, y) as HTMLElement | null;
-    const cell = el?.closest('[data-cell="true"]') as HTMLElement | null;
-    if (!cell) return null;
-    const row = parseInt(cell.dataset.row ?? '-1', 10);
-    const col = parseInt(cell.dataset.col ?? '-1', 10);
-    if (row < 0 || col < 0) return null;
-    return { row, col };
+    for (const c of cellRectsRef.current) {
+      if (x >= c.left && x < c.right && y >= c.top && y < c.bottom) return { row: c.row, col: c.col };
+    }
+    return null;
   }
 
   function wiggleCell(row: number, col: number) {
@@ -128,21 +149,25 @@ export default function Board({
 
   function applyDragWard(row: number, col: number) {
     const key = `${row},${col}`;
-    if (lastDragCellRef.current === key) return;
-    lastDragCellRef.current = key;
-    const state = playerCellsRef.current[row]?.[col];
-    if (dragActionRef.current === 'place'  && state === 'empty') { onCellWardRef.current(row, col); wiggleCell(row, col); }
-    if (dragActionRef.current === 'remove' && state === 'ward')  { onCellWardRef.current(row, col); wiggleCell(row, col); }
+    if (visitedDragCellsRef.current.has(key)) return;
+    visitedDragCellsRef.current.add(key);
+    // Use the dedicated drag callback — it reads playerStateRef (always fresh) and only
+    // places or only removes; the toggle-based onCellWard is never called during drags.
+    if (onCellDragRef.current) {
+      onCellDragRef.current(row, col, dragActionRef.current);
+      wiggleCell(row, col);
+    }
   }
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0) return;
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
+    buildCellCache();
 
     pointerDownRef.current  = true;
     isDraggingRef.current   = false;
-    lastDragCellRef.current = '';
+    visitedDragCellsRef.current = new Set();
     startPosRef.current     = { x: e.clientX, y: e.clientY };
 
     const cell = getCellAtPoint(e.clientX, e.clientY);
@@ -263,7 +288,7 @@ export default function Board({
       if (!pointerDownRef.current) return;
       pointerDownRef.current  = false;
       isDraggingRef.current   = false;
-      lastDragCellRef.current = '';
+      visitedDragCellsRef.current = new Set();
       // Only cancel the pending click if the board's own handler didn't fire —
       // if it did, the timer is intentional and must not be cleared here.
       if (!boardHandledUpRef.current) {
@@ -279,6 +304,7 @@ export default function Board({
   return (
     <div style={{ perspective: '700px', perspectiveOrigin: '50% 50%' }}>
     <div
+      ref={boardRef}
       className="game-board inline-block border-2 cursor-pointer"
       style={{
         lineHeight: 0,
