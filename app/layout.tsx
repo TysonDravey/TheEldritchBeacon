@@ -1,10 +1,17 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import Backdrop from '@/components/Backdrop';
+import RegisterSW from '@/components/RegisterSW';
 
 export const metadata: Metadata = {
   title: 'The Eldritch Beacon',
   description: 'A Puzzle of Watchers and Wards',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    title: 'Eldritch Beacon',
+    statusBarStyle: 'black-translucent',
+  },
 };
 
 const TILE_COUNT = 10;
@@ -17,6 +24,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <meta name="mobile-web-app-capable" content="yes" />
         {Array.from({ length: TILE_COUNT }, (_, i) => (
           <link
             key={i}
@@ -33,6 +43,7 @@ export default function RootLayout({
         ))}
       </head>
       <body className="text-ink font-serif min-h-screen">
+        <RegisterSW />
         <Backdrop />
         {children}
       </body>
