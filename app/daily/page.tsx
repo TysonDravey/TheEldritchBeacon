@@ -16,7 +16,9 @@ import type { PlayerState, CellState, HintResult, ContradictionResult } from '@/
 import Board from '@/components/Board';
 import GameControls from '@/components/GameControls';
 import HintOverlay from '@/components/HintOverlay';
+import TechniqueDiscovery from '@/components/TechniqueDiscovery';
 import { WATCHER_SVGS, WARD_PNG } from '@/theme/colors';
+import { isTechniqueNew, markTechniqueDiscovered } from '@/lib/techniques';
 
 const UNDO_LIMIT = 50;
 const DAILY_COMPLETED_KEY = 'eldritch_beacon_daily_completed';
@@ -294,6 +296,7 @@ export default function DailyPage() {
   const puzzle   = puzzleId ? getPuzzleById(puzzleId) : null;
   const [playerState,     setPlayerState]    = useState<PlayerState | null>(null);
   const [hintResult,      setHintResult]     = useState<HintResult | null>(null);
+  const [pendingDiscovery, setPendingDiscovery] = useState<string | null>(null);
   const [showCompletion,  setShowCompletion] = useState(false);
   const [tilesReady,      setTilesReady]     = useState(false);
   const [loadProgress,    setLoadProgress]   = useState(0);
@@ -573,6 +576,10 @@ export default function DailyPage() {
     setPlayerState(newState);
     savePlayerState({ ...newState, puzzleId: storageKey });
     setHintResult(hint);
+    if (hint.techniqueName && isTechniqueNew(hint.techniqueName)) {
+      markTechniqueDiscovered(hint.techniqueName);
+      setPendingDiscovery(hint.techniqueName);
+    }
   }, [puzzle, playerState, selectedDate]);
 
   const handleUndo = useCallback(() => {
@@ -797,6 +804,13 @@ export default function DailyPage() {
       {/* ── Fixed overlays ── */}
 
       <HintOverlay hint={hintResult} onDismiss={() => setHintResult(null)} />
+
+      {pendingDiscovery && (
+        <TechniqueDiscovery
+          techniqueName={pendingDiscovery}
+          onDismiss={() => setPendingDiscovery(null)}
+        />
+      )}
 
       {(rejectionMessage || (contradiction.found && !showCompletion)) && (
         <div style={{

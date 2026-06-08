@@ -11,6 +11,27 @@ const TERRITORY_NAMES: string[] = [
   'Faded Indigo', 'Emerald', 'Violet', 'Copper', 'Rose',
 ];
 
+// Technique name for each deduction type — shown in hints and Codex
+export const TECHNIQUE_NAMES: Partial<Record<string, string>> = {
+  'adjacency':          'Touching Shadows',
+  'row-occupied':       'Full Row',
+  'col-occupied':       'Full Column',
+  'territory-occupied': 'Territory Claimed',
+  'row-confinement':    'Territory Lock',
+  'col-confinement':    'Column Lock',
+  'pair-row':           'Shared Horizon',
+  'pair-col':           'Shared Horizon',
+  'hidden-set-row':     'Hidden Set',
+  'hidden-set-col':     'Hidden Set',
+  'dual-confinement':   'Dual Confinement',
+  'territory-dead-end': 'Territory Dead-End',
+  'hypothetical':       'Forbidden Tide',
+  'hypothetical-deep':  'Forced Territory Chain',
+  'naked-single-territory': 'Last Refuge',
+  'naked-single-row':   'Last Refuge',
+  'naked-single-col':   'Last Refuge',
+};
+
 function tname(index: number): string {
   return TERRITORY_NAMES[index] ?? `Territory ${index + 1}`;
 }
@@ -388,6 +409,12 @@ function buildStudyHint(puzzle: Puzzle, playerCells: CellState[][]): HintResult 
 //         0 = first ask (vague), 1 = second ask (consequence), 2+ = direct.
 // ---------------------------------------------------------------------------
 
+function techniqueForDeduction(d: { type: string; reasonType?: string }, isDeepChain?: boolean): string | undefined {
+  if (d.type === 'watcher') return TECHNIQUE_NAMES['naked-single-territory'];
+  const key = isDeepChain ? 'hypothetical-deep' : (d.reasonType ?? '');
+  return TECHNIQUE_NAMES[key];
+}
+
 export function getHint(
   puzzle: Puzzle,
   playerCells: CellState[][],
@@ -407,8 +434,6 @@ export function getHint(
   if (!deduction) return buildStudyHint(puzzle, playerCells);
 
   if (deduction.type === 'watcher') {
-    // Watcher hints are always level 4 — only shown when forced
-    // At depth 0, just highlight the territory; at depth 1+, give the answer
     if (depth === 0) {
       const territory = puzzle.territoryMap[deduction.row][deduction.col];
       return {
@@ -417,7 +442,8 @@ export function getHint(
         highlightTerritories: [territory],
       };
     }
-    return buildWatcherHint(deduction, puzzle);
+    const hint = buildWatcherHint(deduction, puzzle);
+    return { ...hint, techniqueName: techniqueForDeduction(deduction) };
   }
 
   // Ward deductions — adjacency/row/col/territory-occupied are cheap facts,
@@ -425,9 +451,16 @@ export function getHint(
   const isCheapFact = ['adjacency','row-occupied','col-occupied','territory-occupied']
     .includes(deduction.reasonType ?? '');
 
-  if (isCheapFact && depth >= 1) {
-    return buildWardHint(deduction, puzzle, 2, playerCells);
-  }
+  const rawHint = isCheapFact && depth >= 1
+    ? buildWardHint(deduction, puzzle, 2, playerCells)
+    : buildWardHint(deduction, puzzle, depth, playerCells);
 
-  return buildWardHint(deduction, puzzle, depth, playerCells);
+  // Attach technique name once the hint is concrete (level > 1, or cheap facts always)
+  const isDeepChain = deduction.reasonType === 'hypothetical' &&
+    rawHint.cascadeSteps != null && rawHint.cascadeSteps.length >= 3;
+  const techniqueName = (rawHint.level >= 2 || isCheapFact)
+    ? techniqueForDeduction(deduction, isDeepChain)
+    : undefined;
+
+  return techniqueName ? { ...rawHint, techniqueName } : rawHint;
 }

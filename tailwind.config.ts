@@ -20,6 +20,7 @@ const config: Config = {
       fontFamily: {
         serif: ["Georgia", "serif"],
         lovecraftian: ["Lovecraftimus", "serif"],
+        journal: ["var(--font-caveat)", "cursive"],
       },
     },
   },

@@ -11,13 +11,41 @@ import { getHint } from '@/engine/hints';
 import { scorePuzzle } from '@/engine/difficulty';
 import { isSolved, canPlaceWatcher, watcherRejectionReason } from '@/engine/rules';
 import { findContradictions } from '@/engine/solver';
-import type { PlayerState, CellState, HintResult, ContradictionResult } from '@/engine/boardTypes';
+import type { PlayerState, CellState, HintResult, ContradictionResult, Difficulty } from '@/engine/boardTypes';
 import Board from '@/components/Board';
 import GameControls from '@/components/GameControls';
 import HintOverlay from '@/components/HintOverlay';
+import TechniqueDiscovery from '@/components/TechniqueDiscovery';
 import { WATCHER_SVGS, WARD_PNG } from '@/theme/colors';
 import { REGION_BY_DIFFICULTY } from '@/data/regions';
 import { haptic } from '@/lib/haptic';
+import { isTechniqueNew, markTechniqueDiscovered } from '@/lib/techniques';
+
+// Chapter completion data — keyed by difficulty tier
+const CHAPTER_COMPLETIONS: Partial<Record<Difficulty, {
+  image: string;
+  chapterLabel: string;
+  title: string;
+  lore: string;
+}>> = {
+  Initiate: {
+    image: '/titleCards/campaign_01/chapter_01.png',
+    chapterLabel: 'Chapter I Complete',
+    title: 'The Lower Gallery',
+    lore: 'The lower gallery is open.\n\nSomething in the walls shifted when the last chart was restored. The Beacon holds — for now.\n\nWhatever disturbed the Watchers came from higher up.',
+  },
+};
+
+function loadAllCompleted(): Set<string> {
+  const ids = new Set<string>();
+  try {
+    for (const puzzle of SAMPLE_PUZZLES) {
+      const raw = localStorage.getItem(`eldritch_beacon_state_${puzzle.id}`);
+      if (raw && JSON.parse(raw)?.completed) ids.add(puzzle.id);
+    }
+  } catch { /* ignore */ }
+  return ids;
+}
 
 const UNDO_LIMIT = 50;
 
@@ -35,6 +63,7 @@ export default function PuzzlePage() {
 
   const [playerState,      setPlayerState]      = useState<PlayerState | null>(null);
   const [hintResult,       setHintResult]       = useState<HintResult | null>(null);
+  const [pendingDiscovery, setPendingDiscovery] = useState<string | null>(null);
   const [showCompletion,   setShowCompletion]   = useState(false);
   const [tilesReady,       setTilesReady]       = useState(false);
   const [loadProgress,     setLoadProgress]     = useState(0);
@@ -44,7 +73,8 @@ export default function PuzzlePage() {
   const [cascadeGhosts,    setCascadeGhosts]    = useState<[number, number][]>([]);
   const [cascadeWards,     setCascadeWards]     = useState<[number, number][]>([]);
   const [constraintWards,  setConstraintWards]  = useState<[number, number][]>([]);
-  const [isFreshWin,       setIsFreshWin]       = useState(false);
+  const [isFreshWin,          setIsFreshWin]          = useState(false);
+  const [showChapterComplete, setShowChapterComplete] = useState(false);
   // Tracks how many hints player has asked without making a move — drives escalation
   const hintDepthRef      = useRef(0);
   const flashTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -255,8 +285,20 @@ export default function PuzzlePage() {
             }
           }
         }
-        // Show completion overlay after the last ward has slammed and wiggled
-        const completionT = setTimeout(() => setShowCompletion(true), maxDelay + 500);
+        // Check if this completes the whole chapter
+        const tierPuzzles = SAMPLE_PUZZLES.filter(p => p.difficulty === puzzle.difficulty && p.mode === 'initiate');
+        const allCompleted = loadAllCompleted();
+        allCompleted.add(puzzle.id);
+        const chapterJustFinished = CHAPTER_COMPLETIONS[puzzle.difficulty] != null
+          && tierPuzzles.every(p => allCompleted.has(p.id));
+
+        const completionT = setTimeout(() => {
+          if (chapterJustFinished) {
+            setShowChapterComplete(true);
+          } else {
+            setShowCompletion(true);
+          }
+        }, maxDelay + 500);
         winTimersRef.current.push(completionT);
       }
     },
@@ -345,11 +387,15 @@ export default function PuzzlePage() {
       hint_level: hint.level,
       hints_so_far: playerState.hintsUsed + 1,
     });
-    hintDepthRef.current += 1; // next ask escalates
+    hintDepthRef.current += 1;
     const newState = { ...playerState, hintsUsed: playerState.hintsUsed + 1 };
     setPlayerState(newState);
     savePlayerState(newState);
     setHintResult(hint);
+    if (hint.techniqueName && isTechniqueNew(hint.techniqueName)) {
+      markTechniqueDiscovered(hint.techniqueName);
+      setPendingDiscovery(hint.techniqueName);
+    }
   }, [puzzle, playerState]);
 
   const handleUndo = useCallback(() => {
@@ -550,6 +596,13 @@ export default function PuzzlePage() {
       {/* Hint overlay */}
       <HintOverlay hint={hintResult} onDismiss={() => setHintResult(null)} />
 
+      {pendingDiscovery && (
+        <TechniqueDiscovery
+          techniqueName={pendingDiscovery}
+          onDismiss={() => setPendingDiscovery(null)}
+        />
+      )}
+
       {/* Contradiction / rejection — floats above footer */}
       {(rejectionMessage || (contradiction.found && !showCompletion)) && (
         <div style={{
@@ -615,6 +668,68 @@ export default function PuzzlePage() {
           </div>
         </div>
       )}
+
+      {/* Chapter completion overlay */}
+      {showChapterComplete && (() => {
+        const completion = CHAPTER_COMPLETIONS[puzzle.difficulty];
+        if (!completion) return null;
+        return (
+          <div
+            style={{
+              position: 'fixed', inset: 0, zIndex: 60,
+              display: 'flex', flexDirection: 'column',
+              background: '#0a0705',
+            }}
+          >
+            <img
+              src={completion.image}
+              alt=""
+              draggable={false}
+              style={{
+                position: 'absolute', inset: 0,
+                width: '100%', height: '100%',
+                objectFit: 'cover', objectPosition: 'center top',
+              }}
+            />
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: 'linear-gradient(to bottom, rgba(8,5,2,0.2) 0%, rgba(8,5,2,0.1) 35%, rgba(8,5,2,0.6) 65%, rgba(8,5,2,0.95) 100%)',
+            }} />
+
+            <div style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0,
+              padding: '0 28px',
+              paddingBottom: 'max(44px, env(safe-area-inset-bottom))',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
+            }}>
+              <p className="font-serif" style={{ fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(242,233,216,0.5)' }}>
+                {completion.chapterLabel}
+              </p>
+              <h2 className="font-lovecraftian text-center" style={{ fontSize: 28, color: 'rgba(242,233,216,0.95)', textShadow: '0 2px 20px rgba(0,0,0,0.9)', lineHeight: 1.2, marginTop: -4 }}>
+                {completion.title}
+              </h2>
+              <p className="font-journal text-center" style={{ fontSize: 18, color: 'rgba(242,233,216,0.78)', textShadow: '0 1px 8px rgba(0,0,0,0.9)', lineHeight: 1.65, maxWidth: 300, whiteSpace: 'pre-line' }}>
+                {completion.lore}
+              </p>
+              <button
+                onClick={() => router.push('/')}
+                className="transition-all duration-100 hover:brightness-110 active:scale-95 relative"
+                style={{ filter: 'drop-shadow(3px 7px 3px rgba(0,0,0,0.75))' }}
+              >
+                <img
+                  src="/buttons/left_button_01.png"
+                  alt="Continue"
+                  draggable={false}
+                  style={{ height: 64, display: 'block', transform: 'scaleX(-1)' }}
+                />
+                <span className="absolute inset-0 flex items-center justify-center font-serif text-sm font-bold" style={{ color: 'rgba(242,233,210,0.95)', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
+                  Continue
+                </span>
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
     </main>
   );

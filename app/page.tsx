@@ -328,6 +328,38 @@ export default function HomePage() {
 
         <div className="w-full max-w-2xl flex flex-col gap-8">
 
+          {/* Campaign entry */}
+          <section>
+            <Link
+              href="/campaign"
+              className="relative block overflow-hidden rounded-sm"
+              style={{ filter: 'drop-shadow(3px 7px 3px rgba(0,0,0,0.6))' }}
+            >
+              <img
+                src="/titleCards/campaign_01/intro_01.png"
+                alt=""
+                draggable={false}
+                className="w-full object-cover"
+                style={{ height: 160, objectPosition: 'center 30%' }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(to bottom, rgba(8,5,2,0.1) 0%, rgba(8,5,2,0.65) 100%)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'flex-end',
+                  padding: '12px 16px',
+                }}
+              >
+                <p className="font-serif text-xs" style={{ color: 'rgba(242,233,216,0.55)', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 2 }}>Chapter I</p>
+                <p className="font-lovecraftian text-xl" style={{ color: 'rgba(242,233,216,0.95)', textShadow: '0 1px 8px rgba(0,0,0,0.9)' }}>The Foundations</p>
+                <p className="font-serif text-xs italic" style={{ color: 'rgba(242,233,216,0.6)', marginTop: 2 }}>Begin the campaign</p>
+              </div>
+            </Link>
+          </section>
+
           {/* Daily Beacon */}
           <section>
             <Link

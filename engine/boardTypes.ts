@@ -78,6 +78,7 @@ export interface DeductionResult {
 export interface HintResult {
   level: 1 | 2 | 3 | 4;
   message: string;
+  techniqueName?: string;              // named technique this hint demonstrates
   primaryCell?: [number, number];       // single cell that gets the spinner marker
   highlightCells?: [number, number][];  // red outline
   secondaryHighlightCells?: [number, number][];  // brass outline (cause cells)

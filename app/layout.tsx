@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
+import { Caveat } from 'next/font/google';
 import './globals.css';
 import Backdrop from '@/components/Backdrop';
 import RegisterSW from '@/components/RegisterSW';
+
+const caveat = Caveat({ subsets: ['latin'], variable: '--font-caveat' });
 
 export const metadata: Metadata = {
   title: 'The Eldritch Beacon',
@@ -42,7 +45,7 @@ export default function RootLayout({
           <link key={`bg-${i}`} rel="preload" as="image" href={`/boards/sampleBoard_${String(i).padStart(2, '0')}.png`} />
         ))}
       </head>
-      <body className="text-ink font-serif min-h-screen">
+      <body className={`${caveat.variable} text-ink font-serif min-h-screen`}>
         <RegisterSW />
         <Backdrop />
         {children}

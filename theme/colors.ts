@@ -9,11 +9,11 @@ export type TerritoryName = typeof TERRITORY_NAMES[number];
 export const TERRITORY_COLORS: Record<number, { bg: string; border: string; text: string }> = {
   0: { bg: '#C9736B', border: '#8B3A3A', text: '#fff' },        // Crimson
   1: { bg: '#C9A85C', border: '#7A6030', text: '#1A1209' },     // Ochre
-  2: { bg: '#6B9E8E', border: '#3A6B5E', text: '#fff' },        // Sea Green
+  2: { bg: '#5A8EA0', border: '#2E5C70', text: '#fff' },        // Sea Green
   3: { bg: '#D4C9A8', border: '#8B7D5A', text: '#1A1209' },     // Bone
   4: { bg: '#9BA4AF', border: '#4A525C', text: '#fff' },        // Storm Grey
   5: { bg: '#7B8EC4', border: '#3A4E8B', text: '#fff' },        // Faded Indigo
-  6: { bg: '#5E9E6B', border: '#2E5E38', text: '#fff' },        // Emerald
+  6: { bg: '#4E7A45', border: '#2A4A22', text: '#fff' },        // Emerald
   7: { bg: '#9B7BB8', border: '#5A3A7A', text: '#fff' },        // Violet
   8: { bg: '#B87333', border: '#7A4A1A', text: '#fff' },        // Copper
   9: { bg: '#C98B9E', border: '#7A3A52', text: '#fff' },        // Rose
