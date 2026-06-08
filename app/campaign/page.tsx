@@ -6,14 +6,19 @@ import { SAMPLE_PUZZLES } from '@/data/samplePuzzles';
 import { REGIONS } from '@/data/regions';
 import { scorePuzzle } from '@/engine/difficulty';
 
-const COMPLETED_KEY    = 'eldritch_beacon_completed';
-const NOTE_SEEN_KEY    = 'eldritch_beacon_keeper_note_seen';
+const STORAGE_KEY_PREFIX = 'eldritch_beacon_state_';
+const NOTE_SEEN_KEY      = 'eldritch_beacon_keeper_note_seen';
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
 
 function loadCompletedIds(): Set<string> {
+  const ids = new Set<string>();
   try {
-    const raw = localStorage.getItem(COMPLETED_KEY);
-    return raw ? new Set(JSON.parse(raw)) : new Set();
-  } catch { return new Set(); }
+    for (const puzzle of SAMPLE_PUZZLES) {
+      const raw = localStorage.getItem(`${STORAGE_KEY_PREFIX}${puzzle.id}`);
+      if (raw && JSON.parse(raw)?.completed) ids.add(puzzle.id);
+    }
+  } catch { /* ignore */ }
+  return ids;
 }
 
 function findNextPuzzle(completedIds: Set<string>): string {
@@ -27,6 +32,35 @@ function findNextPuzzle(completedIds: Set<string>): string {
   return SAMPLE_PUZZLES[SAMPLE_PUZZLES.length - 1].id;
 }
 
+function getCurrentChapter(completedIds: Set<string>): {
+  roman: string; regionName: string; image: string; completedCount: number;
+} {
+  const regionsWithPuzzles = REGIONS.filter(r =>
+    SAMPLE_PUZZLES.some(p => p.difficulty === r.difficulty && p.mode === 'initiate')
+  );
+  let idx = regionsWithPuzzles.length - 1;
+  let completedCount = regionsWithPuzzles.length;
+  for (let i = 0; i < regionsWithPuzzles.length; i++) {
+    const puzzles = SAMPLE_PUZZLES.filter(
+      p => p.difficulty === regionsWithPuzzles[i].difficulty && p.mode === 'initiate'
+    );
+    if (!puzzles.every(p => completedIds.has(p.id))) {
+      idx = i;
+      completedCount = i;
+      break;
+    }
+  }
+  const image = completedCount === 0
+    ? '/titleCards/campaign_01/intro_01.png'
+    : `/titleCards/campaign_01/chapter_${String(completedCount).padStart(2, '0')}.png`;
+  return {
+    roman: ROMAN[idx] ?? String(idx + 1),
+    regionName: regionsWithPuzzles[idx]?.name ?? 'The Foundations',
+    image,
+    completedCount,
+  };
+}
+
 type View = 'intro' | 'note';
 
 export default function CampaignPage() {
@@ -35,12 +69,14 @@ export default function CampaignPage() {
   const [started, setStarted] = useState(false);
   const [nextId,  setNextId]  = useState<string | null>(null);
   const [ready,   setReady]   = useState(false);
+  const [chapter, setChapter] = useState({ roman: 'I', regionName: 'The Foundations', image: '/titleCards/campaign_01/intro_01.png', completedCount: 0 });
 
   useEffect(() => {
-    const completed  = loadCompletedIds();
-    const noteSeen   = !!localStorage.getItem(NOTE_SEEN_KEY);
+    const completed = loadCompletedIds();
+    const noteSeen  = !!localStorage.getItem(NOTE_SEEN_KEY);
     setStarted(completed.size > 0 || noteSeen);
     setNextId(findNextPuzzle(completed));
+    setChapter(getCurrentChapter(completed));
     setReady(true);
   }, []);
 
@@ -157,7 +193,7 @@ export default function CampaignPage() {
       }}
     >
       <img
-        src="/titleCards/campaign_01/intro_01.png"
+        src={chapter.image}
         alt=""
         draggable={false}
         style={{
@@ -217,14 +253,14 @@ export default function CampaignPage() {
           className="font-serif"
           style={{ fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(242,233,216,0.5)' }}
         >
-          Chapter I
+          Chapter {chapter.roman}
         </p>
 
         <h1
           className="font-lovecraftian text-center"
           style={{ fontSize: 32, color: 'rgba(242,233,216,0.95)', textShadow: '0 2px 20px rgba(0,0,0,0.9)', lineHeight: 1.2, marginTop: -8 }}
         >
-          The Foundations
+          {chapter.regionName}
         </h1>
 
         <p
