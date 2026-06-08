@@ -23,7 +23,8 @@ const DAILY_COMPLETED_KEY = 'eldritch_beacon_daily_completed';
 const DAILY_STREAK_KEY    = 'eldritch_beacon_daily_streak';
 
 function getTodayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function loadCompletedDates(): Set<string> {
@@ -95,7 +96,10 @@ function daysInMonth(yearMonth: string): string[] {
   const days: string[] = [];
   const d = new Date(year, month - 1, 1);
   while (d.getMonth() === month - 1) {
-    days.push(d.toISOString().slice(0, 10));
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    days.push(`${y}-${m}-${day}`);
     d.setDate(d.getDate() + 1);
   }
   return days;
@@ -684,97 +688,102 @@ export default function DailyPage() {
     );
   }
 
-  const scrollIdx = scrollIndexForId(puzzle.id);
+  const dateLabel = new Date(selectedDate + 'T12:00:00Z').toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC',
+  });
 
   return (
-    <main className="min-h-screen flex flex-col items-center px-6 py-8">
+    <main style={{ height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-      {/* Back to calendar */}
-      <div className="w-full max-w-2xl mb-4">
-        <button
-          onClick={() => setView('calendar')}
-          className="transition-all duration-100 hover:brightness-110 active:scale-95"
-        >
-          <img
-            src="/buttons/left_button_01.png"
-            alt="Calendar"
-            draggable={false}
-            style={{ height: 64, display: 'block', filter: 'drop-shadow(3px 7px 3px rgba(0,0,0,0.75))' }}
-          />
-        </button>
-      </div>
-
-      {/* Title scroll */}
-      <div
-        className="w-full max-w-2xl mb-6 relative select-none"
-        style={{ filter: 'drop-shadow(3px 7px 3px rgba(0,0,0,0.75))' }}
-      >
-        <img src={`/scrolls/scroll_0${scrollIdx}.png`} alt="" draggable={false}
-          className="absolute inset-0 w-full h-full" style={{ objectFit: 'fill', display: 'block' }} />
-        <div className="relative text-center" style={{ padding: '10% 16%' }}>
-          <div style={{ background: 'rgba(242,233,216,0.88)', padding: '10px 18px', borderRadius: 6, boxShadow: '0 0 24px 18px rgba(242,233,216,0.88)' }}>
-            <p className="font-serif text-xs text-ink-light uppercase tracking-widest mb-1">The Daily Beacon</p>
-            <h1 className="font-lovecraftian text-2xl text-ink leading-snug" style={{ textWrap: 'balance' } as React.CSSProperties}>
-              {puzzle.title}
-            </h1>
-            <p className="font-serif text-sm text-ink-light mt-1">
-              {new Date(selectedDate + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' })}
-              {selectedDate !== todayStr && ' — Past Beacon'}
-              {' '}&mdash;{' '}{puzzle.size}&times;{puzzle.size}
+      {/* ── Compact header ── */}
+      <div style={{
+        flexShrink: 0,
+        background: 'rgba(242,233,216,0.92)',
+        borderBottom: '1px solid rgba(26,18,9,0.15)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        paddingTop: 'env(safe-area-inset-top)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px' }}>
+          <button
+            onClick={() => setView('calendar')}
+            className="transition-all duration-100 hover:brightness-110 active:scale-95 shrink-0"
+          >
+            <img
+              src="/buttons/left_button_01.png"
+              alt="Calendar"
+              draggable={false}
+              style={{ height: 40, display: 'block', filter: 'drop-shadow(2px 4px 2px rgba(0,0,0,0.6))' }}
+            />
+          </button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h1 className="font-lovecraftian text-base text-ink leading-tight truncate">{puzzle.title}</h1>
+            <p className="font-serif text-ink-light leading-none" style={{ fontSize: 11 }}>
+              {dateLabel}{selectedDate !== todayStr && ' — Past'} &mdash; {puzzle.size}&times;{puzzle.size}
+              {streak.count >= 2 && (
+                <span className="ml-2" style={{ opacity: 0.6 }}>{streak.count}-day streak</span>
+              )}
+              {playerState.hintsUsed > 0 && (
+                <span className="ml-2 text-red-ink">
+                  {playerState.hintsUsed} hint{playerState.hintsUsed !== 1 ? 's' : ''}
+                </span>
+              )}
             </p>
-            {streak.count >= 2 && (
-              <p className="font-serif text-xs text-ink mt-1" style={{ opacity: 0.7 }}>
-                {streak.count}-day streak
-              </p>
-            )}
-            {playerState.hintsUsed > 0 && (
-              <p className="font-serif text-xs text-red-ink mt-1">
-                {playerState.hintsUsed} hint{playerState.hintsUsed !== 1 ? 's' : ''} used
-              </p>
-            )}
           </div>
         </div>
       </div>
 
-      {/* Board */}
-      <div style={{ opacity: tilesReady ? 1 : 0, transition: 'opacity 0.4s ease', position: 'relative' }}>
-        {!tilesReady && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center z-50 gap-3" style={{ minWidth: 200 }}>
-            <p className="font-serif text-sm text-ink opacity-60 italic">Summoning the Watchers…</p>
-            <div className="w-48 h-2 rounded-full overflow-hidden" style={{ background: 'rgba(26,18,9,0.15)' }}>
-              <div className="h-full rounded-full transition-all duration-200" style={{ width: `${loadProgress}%`, background: 'rgba(139,26,26,0.7)' }} />
+      {/* ── Board — fills remaining space ── */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8, minHeight: 0 }}>
+        <div style={{ opacity: tilesReady ? 1 : 0, transition: 'opacity 0.4s ease', position: 'relative' }}>
+          {!tilesReady && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center z-50 gap-3" style={{ minWidth: 200 }}>
+              <p className="font-serif text-sm text-ink opacity-60 italic">Summoning the Watchers…</p>
+              <div className="w-48 h-2 rounded-full overflow-hidden" style={{ background: 'rgba(26,18,9,0.15)' }}>
+                <div className="h-full rounded-full transition-all duration-200" style={{ width: `${loadProgress}%`, background: 'rgba(139,26,26,0.7)' }} />
+              </div>
+              <p className="font-serif text-xs opacity-40">{loadProgress}%</p>
             </div>
-            <p className="font-serif text-xs opacity-40">{loadProgress}%</p>
-          </div>
-        )}
-        <Board
-          puzzle={puzzle}
-          playerCells={playerState.cells}
-          onCellWard={handleCellWard}
-          onCellWatcher={handleCellWatcher}
-          onCellDrag={handleCellDrag}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          primaryCell={hintResult?.primaryCell}
-          highlightCells={hintResult?.highlightCells}
-          secondaryHighlightCells={hintResult?.secondaryHighlightCells}
-          highlightTerritories={hintResult?.highlightTerritories}
-          secondaryHighlightTerritories={hintResult?.secondaryHighlightTerritories}
-          highlightRows={hintResult?.highlightRows}
-          highlightCols={hintResult?.highlightCols}
-          hintActive={!!hintResult}
-          contradiction={contradiction}
-          flashCells={flashCells}
-          ghostCells={cascadeGhosts}
-          ghostWardCells={cascadeWards}
-          constraintWardCells={constraintWards}
-          isCompleted={playerState.completed}
-          isFreshWin={isFreshWin}
-        />
+          )}
+          <Board
+            puzzle={puzzle}
+            playerCells={playerState.cells}
+            onCellWard={handleCellWard}
+            onCellWatcher={handleCellWatcher}
+            onCellDrag={handleCellDrag}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            primaryCell={hintResult?.primaryCell}
+            highlightCells={hintResult?.highlightCells}
+            secondaryHighlightCells={hintResult?.secondaryHighlightCells}
+            highlightTerritories={hintResult?.highlightTerritories}
+            secondaryHighlightTerritories={hintResult?.secondaryHighlightTerritories}
+            highlightRows={hintResult?.highlightRows}
+            highlightCols={hintResult?.highlightCols}
+            hintActive={!!hintResult}
+            contradiction={contradiction}
+            flashCells={flashCells}
+            ghostCells={cascadeGhosts}
+            ghostWardCells={cascadeWards}
+            constraintWardCells={constraintWards}
+            isCompleted={playerState.completed}
+            isFreshWin={isFreshWin}
+          />
+        </div>
       </div>
 
-      {/* Controls */}
-      <div className="mt-6">
+      {/* ── Controls footer ── */}
+      <div style={{
+        flexShrink: 0,
+        display: 'flex',
+        justifyContent: 'center',
+        background: 'rgba(242,233,216,0.92)',
+        borderTop: '1px solid rgba(26,18,9,0.12)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        padding: '8px 16px',
+        paddingBottom: 'max(8px, env(safe-area-inset-bottom))',
+      }}>
         <GameControls
           onHint={handleHint}
           onUndo={handleUndo}
@@ -785,52 +794,70 @@ export default function DailyPage() {
         />
       </div>
 
-      {/* Status messages */}
-      <div className="mt-4 w-full max-w-2xl space-y-3">
-        {showCompletion && (
-          <div className="flex justify-center">
-            <div className="relative select-none" style={{ width: '52%', filter: 'drop-shadow(3px 7px 3px rgba(0,0,0,0.75))' }}>
-              <img src={`/scrolls/scroll_0${(scrollIdx % 3) + 1}.png`} alt="" draggable={false}
-                className="absolute inset-0 w-full h-full" style={{ objectFit: 'fill', display: 'block' }} />
-              <div className="relative text-center" style={{ padding: '10% 16%' }}>
-                <div style={{ background: 'rgba(242,233,216,0.88)', padding: '8px 14px', borderRadius: 6, boxShadow: '0 0 24px 18px rgba(242,233,216,0.88)' }}>
-                  <div className="flex items-center justify-center gap-2">
-                    <NextImage src="/svg/completion_stamp.svg" alt="Completed" width={28} height={28} />
-                    <h2 className="font-lovecraftian text-base text-ink leading-snug" style={{ textWrap: 'balance' } as React.CSSProperties}>
-                      Beacon Restored
-                    </h2>
-                  </div>
-                  <p className="font-serif text-xs text-ink-light italic mt-1" style={{ textWrap: 'balance' } as React.CSSProperties}>
-                    {alreadyCompleted ? 'You already lit this beacon today.' : 'The Watchers stand vigilant. The wards hold.'}
-                  </p>
-                  {!alreadyCompleted && streak.count >= 2 && (
-                    <p className="font-serif text-xs text-ink mt-2" style={{ opacity: 0.75 }}>
-                      {streak.count}-day streak
-                    </p>
-                  )}
-                  <p className="font-serif text-xs text-ink-light mt-2" style={{ opacity: 0.6 }}>
-                    Return tomorrow for the next beacon.
-                  </p>
+      {/* ── Fixed overlays ── */}
+
+      <HintOverlay hint={hintResult} onDismiss={() => setHintResult(null)} />
+
+      {(rejectionMessage || (contradiction.found && !showCompletion)) && (
+        <div style={{
+          position: 'fixed',
+          bottom: 'calc(env(safe-area-inset-bottom) + 72px)',
+          left: 16, right: 16,
+          zIndex: 40,
+        }}>
+          <div className="border border-red-ink bg-parchment px-4 py-2 rounded-sm" style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
+            <p className="font-serif text-sm text-red-ink italic">
+              {rejectionMessage ?? contradiction.message ?? 'A contradiction lurks in the arrangement.'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {showCompletion && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 50,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(8,5,2,0.6)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+          }}
+          onClick={() => setShowCompletion(false)}
+        >
+          <div
+            className="relative select-none"
+            style={{ width: '80%', maxWidth: 360, filter: 'drop-shadow(3px 7px 3px rgba(0,0,0,0.75))' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <img
+              src={`/scrolls/scroll_0${(scrollIndexForId(puzzle.id) % 3) + 1}.png`}
+              alt="" draggable={false}
+              className="absolute inset-0 w-full h-full"
+              style={{ objectFit: 'fill', display: 'block' }}
+            />
+            <div className="relative text-center" style={{ padding: '10% 16%' }}>
+              <div style={{ background: 'rgba(242,233,216,0.92)', padding: '12px 18px', borderRadius: 6, boxShadow: '0 0 24px 18px rgba(242,233,216,0.92)' }}>
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <NextImage src="/svg/completion_stamp.svg" alt="Completed" width={28} height={28} />
+                  <h2 className="font-lovecraftian text-lg text-ink leading-snug">Beacon Restored</h2>
                 </div>
+                <p className="font-serif text-xs text-ink-light italic">
+                  {alreadyCompleted ? 'You already lit this beacon.' : 'The Watchers stand vigilant. The wards hold.'}
+                </p>
+                {!alreadyCompleted && streak.count >= 2 && (
+                  <p className="font-serif text-xs text-ink mt-2" style={{ opacity: 0.75 }}>
+                    {streak.count}-day streak
+                  </p>
+                )}
+                <p className="font-serif text-xs text-ink-light mt-2" style={{ opacity: 0.6 }}>
+                  {selectedDate === todayStr ? 'Return tomorrow for the next beacon.' : 'Play today\'s beacon when you\'re ready.'}
+                </p>
               </div>
             </div>
           </div>
-        )}
-        {rejectionMessage && (
-          <div className="border border-red-ink bg-parchment px-4 py-2 rounded-sm">
-            <p className="font-serif text-sm text-red-ink italic">{rejectionMessage}</p>
-          </div>
-        )}
-        {contradiction.found && !showCompletion && !rejectionMessage && (
-          <div className="border border-red-ink bg-parchment px-4 py-2 rounded-sm">
-            <p className="font-serif text-sm text-red-ink">
-              {contradiction.message ?? 'A contradiction lurks in the arrangement.'}
-            </p>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      <HintOverlay hint={hintResult} onDismiss={() => setHintResult(null)} />
     </main>
   );
 }
