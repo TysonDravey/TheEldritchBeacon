@@ -34,6 +34,42 @@ const CHAPTER_COMPLETIONS: Partial<Record<Difficulty, {
     title: 'The Lower Gallery',
     lore: 'The lower gallery is open.\n\nSomething in the walls shifted when the last chart was restored. The Beacon holds — for now.\n\nWhatever disturbed the Watchers came from higher up.',
   },
+  Scholar: {
+    image: '/titleCards/campaign_01/chapter_02.png',
+    chapterLabel: 'Chapter II Complete',
+    title: 'The Shore Charts',
+    lore: 'The tide has not come in the way it should.\n\nThe shore charts are restored, and the Watchers hold the coast. Something moved through here before we arrived.\n\nThe fog is thickening to the west.',
+  },
+  Occultist: {
+    image: '/titleCards/campaign_01/chapter_03.png',
+    chapterLabel: 'Chapter III Complete',
+    title: 'Into the Fog',
+    lore: 'Visibility is four steps in any direction. No more.\n\nThe charts are restored but I cannot say what I saw in the margins — marks that were not there when I began.\n\nI am still counting. The numbers are still right. I do not know why that frightens me.',
+  },
+  'High Priest': {
+    image: '/titleCards/campaign_01/chapter_04.png',
+    chapterLabel: 'Chapter IV Complete',
+    title: 'The Hidden Reefs',
+    lore: 'There are things below the surface that do not appear on any chart I was given.\n\nThe Watchers hold. The Beacon holds. I keep telling myself this.\n\nSomething below the hull has been listening.',
+  },
+  Eldritch: {
+    image: '/titleCards/campaign_01/chapter_05.png',
+    chapterLabel: 'Chapter V Complete',
+    title: 'Deep Water',
+    lore: 'No light reaches here from outside.\n\nI have been restoring charts for longer than I can account for. The Watchers do not sleep. I am beginning to understand why.\n\nThe Beacon still holds. That is all I am permitted to say.',
+  },
+  Archon: {
+    image: '/titleCards/campaign_01/chapter_07.png',
+    chapterLabel: 'Chapter VII Complete',
+    title: 'The Lantern Room',
+    lore: 'I am at the top.\n\nThe light burns. It has always burned. I understand now that someone must stand here for it to do so — and that I am not the first.\n\nThe chart is complete. The Beacon holds.',
+  },
+  Unbound: {
+    image: '/titleCards/campaign_01/unbound_01.png',
+    chapterLabel: 'Beyond the Chart',
+    title: 'The Unbound',
+    lore: 'These charts should not exist.\n\nThe rules hold — one Watcher, one row, one column — but something has learned to use the rules against themselves.\n\nI restored the chart. I do not know what I have released.',
+  },
 };
 
 function loadAllCompleted(): Set<string> {
