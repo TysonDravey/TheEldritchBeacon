@@ -75,29 +75,7 @@ function RegionSection({
   const currentPuzzle = sorted.find(p => !completedIds.has(p.id)) ?? null;
   const currentIdx = sorted.findIndex(p => !completedIds.has(p.id));
 
-  // ── Locked ──────────────────────────────────────────────────────────────
-  if (locked) {
-    return (
-      <div className="opacity-40 select-none">
-        <div className="flex items-center gap-4">
-          <img
-            src={region.ward}
-            alt=""
-            className="w-12 h-12 object-contain grayscale"
-          />
-          <div>
-            <h2 className="font-lovecraftian text-xl text-ink" style={{ textShadow: OUTLINE }}>
-              {region.name}
-            </h2>
-            <p className="font-serif text-xs text-ink-light italic mt-0.5" style={{ textShadow: OUTLINE }}>
-              Sealed — complete the previous region to ascend
-            </p>
-          </div>
-        </div>
-        <div className="border-t border-ink opacity-30 mt-4" />
-      </div>
-    );
-  }
+  if (locked) return null;
 
   // ── Complete ─────────────────────────────────────────────────────────────
   if (allDone) {
@@ -288,6 +266,27 @@ export default function HomePage() {
     prevComplete = prevComplete && puzzles.every(p => completedIds.has(p.id));
   }
 
+  // Compute current chapter for the campaign banner
+  const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+  const regionsWithPuzzles = REGIONS.filter(r => (byDifficulty.get(r.difficulty) ?? []).length > 0);
+  let currentChapterIdx = regionsWithPuzzles.length - 1;
+  let allChaptersComplete = true;
+  for (let i = 0; i < regionsWithPuzzles.length; i++) {
+    const puzzles = byDifficulty.get(regionsWithPuzzles[i].difficulty) ?? [];
+    if (!puzzles.every(p => completedIds.has(p.id))) {
+      currentChapterIdx = i;
+      allChaptersComplete = false;
+      break;
+    }
+  }
+  const completedChapterCount = allChaptersComplete ? regionsWithPuzzles.length : currentChapterIdx;
+  const currentRegion = regionsWithPuzzles[currentChapterIdx];
+  const chapterImage = completedChapterCount === 0
+    ? '/titleCards/campaign_01/intro_01.png'
+    : `/titleCards/campaign_01/chapter_${String(completedChapterCount).padStart(2, '0')}.png`;
+  const chapterRoman = ROMAN[currentChapterIdx] ?? String(currentChapterIdx + 1);
+  const campaignStarted = completedIds.size > 0;
+
   const shatteredPuzzles = SAMPLE_PUZZLES.filter(p => p.mode === 'shattered-realms');
 
   return (
@@ -336,7 +335,7 @@ export default function HomePage() {
               style={{ filter: 'drop-shadow(3px 7px 3px rgba(0,0,0,0.6))' }}
             >
               <img
-                src="/titleCards/campaign_01/intro_01.png"
+                src={chapterImage}
                 alt=""
                 draggable={false}
                 className="w-full object-cover"
@@ -353,9 +352,9 @@ export default function HomePage() {
                   padding: '12px 16px',
                 }}
               >
-                <p className="font-serif text-xs" style={{ color: 'rgba(242,233,216,0.55)', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 2 }}>Chapter I</p>
-                <p className="font-lovecraftian text-xl" style={{ color: 'rgba(242,233,216,0.95)', textShadow: '0 1px 8px rgba(0,0,0,0.9)' }}>The Foundations</p>
-                <p className="font-serif text-xs italic" style={{ color: 'rgba(242,233,216,0.6)', marginTop: 2 }}>Begin the campaign</p>
+                <p className="font-serif text-xs" style={{ color: 'rgba(242,233,216,0.55)', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 2 }}>Chapter {chapterRoman}</p>
+                <p className="font-lovecraftian text-xl" style={{ color: 'rgba(242,233,216,0.95)', textShadow: '0 1px 8px rgba(0,0,0,0.9)' }}>{currentRegion?.name ?? 'The Foundations'}</p>
+                <p className="font-serif text-xs italic" style={{ color: 'rgba(242,233,216,0.6)', marginTop: 2 }}>{campaignStarted ? 'Continue the campaign' : 'Begin the campaign'}</p>
               </div>
             </Link>
           </section>
@@ -404,6 +403,14 @@ export default function HomePage() {
                 />
               );
             })}
+            {lockedRegions.size > 0 && (
+              <p
+                className="font-serif text-xs text-center italic"
+                style={{ color: 'rgba(26,18,9,0.35)', textShadow: OUTLINE }}
+              >
+                {lockedRegions.size} {lockedRegions.size === 1 ? 'region' : 'regions'} sealed beyond
+              </p>
+            )}
           </section>
 
           {/* Shattered Realms */}
