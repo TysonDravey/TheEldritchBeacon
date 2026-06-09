@@ -346,11 +346,13 @@ export default function PuzzlePage() {
             }
           }
         }
-        // Check if this completes the whole chapter
+        // Check if this completes the whole chapter (initiate-mode puzzles only)
         const tierPuzzles = SAMPLE_PUZZLES.filter(p => p.difficulty === puzzle.difficulty && p.mode === 'initiate');
         const allCompleted = loadAllCompleted();
         allCompleted.add(puzzle.id);
-        const chapterJustFinished = CHAPTER_COMPLETIONS[puzzle.difficulty] != null
+        const chapterJustFinished = puzzle.mode === 'initiate'
+          && CHAPTER_COMPLETIONS[puzzle.difficulty] != null
+          && tierPuzzles.length > 0
           && tierPuzzles.every(p => allCompleted.has(p.id));
 
         // watcher-rise-slam: 200ms delay + 2200ms duration — always wait for it to finish

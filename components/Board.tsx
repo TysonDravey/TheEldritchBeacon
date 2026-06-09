@@ -104,7 +104,7 @@ export default function Board({
   const startPosRef     = useRef({ x: 0, y: 0 });
   const prevDragPosRef  = useRef({ x: 0, y: 0 });
   const dragActionRef   = useRef<'place' | 'remove'>('place');
-  const visitedDragCellsRef = useRef<Set<string>>(new Set()); // all cells touched this drag — never reprocess
+  const visitedDragCellsRef = useRef<Set<string>>(new Set());
   const clickTimerRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingClickRef    = useRef<{ row: number; col: number } | null>(null);
   const lastTapRef         = useRef<{ x: number; y: number; time: number } | null>(null);
@@ -165,6 +165,12 @@ export default function Board({
     e.currentTarget.setPointerCapture(e.pointerId);
     buildCellCache();
 
+    // Always cancel any pending single-click from the previous gesture — if the user
+    // taps and then immediately starts dragging, the old timer must not fire mid-drag
+    // and toggle a ward unexpectedly.
+    if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
+    pendingClickRef.current = null;
+
     pointerDownRef.current  = true;
     isDraggingRef.current   = false;
     visitedDragCellsRef.current = new Set();
@@ -174,7 +180,6 @@ export default function Board({
     if (!cell) return;
 
     // Detect double-tap by proximity (not exact cell) — finger position varies on mobile.
-    // Both window and ward timer start from the same pointerUp, so no race condition.
     const now  = Date.now();
     const last = lastTapRef.current;
     if (last) {
@@ -183,8 +188,6 @@ export default function Board({
       if (dist < 40 && now - last.time < 300) {
         doubletapFiredRef.current = true;
         lastTapRef.current = null;
-        if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
-        pendingClickRef.current = null;
         const state = playerCellsRef.current[cell.row]?.[cell.col];
         if (state !== 'ward') onCellWatcherRef.current(cell.row, cell.col);
         return;
@@ -281,16 +284,12 @@ export default function Board({
   useEffect(() => () => { if (clickTimerRef.current) clearTimeout(clickTimerRef.current); }, []);
 
   // Safety net: reset drag state whenever the pointer is released anywhere on the page.
-  // This catches releases outside the board that pointer capture may miss (e.g. browser
-  // chrome, iframe boundaries, or rapid focus changes).
   useEffect(() => {
     const onGlobalUp = () => {
       if (!pointerDownRef.current) return;
       pointerDownRef.current  = false;
       isDraggingRef.current   = false;
       visitedDragCellsRef.current = new Set();
-      // Only cancel the pending click if the board's own handler didn't fire —
-      // if it did, the timer is intentional and must not be cleared here.
       if (!boardHandledUpRef.current) {
         if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
         pendingClickRef.current = null;
