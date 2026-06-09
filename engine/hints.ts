@@ -86,17 +86,22 @@ function buildWardHint(
   if (reasonType === 'row-occupied' && blockedBy) {
     const [br, bc] = blockedBy;
     const blockerTerritory = puzzle.territoryMap[br][bc];
+    const isTwin = puzzle.mode === 'twin-watchers';
     if (depth === 0) {
       return {
         level: 1,
-        message: `Row ${br + 1} has already received its Watcher.`,
+        message: isTwin
+          ? `Row ${br + 1} is already guarded by both its Watchers.`
+          : `Row ${br + 1} has already received its Watcher.`,
         highlightRows: [br],
         highlightTerritories: [blockerTerritory],
       };
     }
     return {
       level: 3,
-      message: `The ${tname(blockerTerritory)} Watcher at column ${bc + 1} claims row ${br + 1}. No other Watcher may share that row. Mark this cell with a Ward.`,
+      message: isTwin
+        ? `Row ${br + 1} already holds 2 Watchers — its full complement. No more may enter. Mark this cell with a Ward.`
+        : `The ${tname(blockerTerritory)} Watcher at column ${bc + 1} claims row ${br + 1}. No other Watcher may share that row. Mark this cell with a Ward.`,
       highlightCells: [[row, col], [br, bc]],
       highlightRows: [br],
       deduction: d,
@@ -106,17 +111,22 @@ function buildWardHint(
   if (reasonType === 'col-occupied' && blockedBy) {
     const [br, bc] = blockedBy;
     const blockerTerritory = puzzle.territoryMap[br][bc];
+    const isTwin = puzzle.mode === 'twin-watchers';
     if (depth === 0) {
       return {
         level: 1,
-        message: `Column ${bc + 1} has already received its Watcher.`,
+        message: isTwin
+          ? `Column ${bc + 1} is already guarded by both its Watchers.`
+          : `Column ${bc + 1} has already received its Watcher.`,
         highlightCols: [bc],
         highlightTerritories: [blockerTerritory],
       };
     }
     return {
       level: 3,
-      message: `The ${tname(blockerTerritory)} Watcher at row ${br + 1} claims column ${bc + 1}. No other Watcher may share that column. Mark this cell with a Ward.`,
+      message: isTwin
+        ? `Column ${bc + 1} already holds 2 Watchers — its full complement. No more may enter. Mark this cell with a Ward.`
+        : `The ${tname(blockerTerritory)} Watcher at row ${br + 1} claims column ${bc + 1}. No other Watcher may share that column. Mark this cell with a Ward.`,
       highlightCells: [[row, col], [br, bc]],
       highlightCols: [bc],
       deduction: d,
@@ -125,16 +135,21 @@ function buildWardHint(
 
   if (reasonType === 'territory-occupied' && blockedBy) {
     const [br, bc] = blockedBy;
+    const isTwin = puzzle.mode === 'twin-watchers';
     if (depth === 0) {
       return {
         level: 1,
-        message: `The ${tname(cellTerritory)} territory has already been claimed.`,
+        message: isTwin
+          ? `The ${tname(cellTerritory)} territory already holds both its Watchers.`
+          : `The ${tname(cellTerritory)} territory has already been claimed.`,
         highlightTerritories: [cellTerritory],
       };
     }
     return {
       level: 3,
-      message: `The ${tname(cellTerritory)} territory already has a Watcher at row ${br + 1}, column ${bc + 1}. This cell must be a Ward.`,
+      message: isTwin
+        ? `The ${tname(cellTerritory)} territory is fully guarded — both Watchers are placed. This cell must be a Ward.`
+        : `The ${tname(cellTerritory)} territory already has a Watcher at row ${br + 1}, column ${bc + 1}. This cell must be a Ward.`,
       highlightCells: [[row, col], [br, bc]],
       highlightTerritories: [cellTerritory],
       deduction: d,
@@ -144,10 +159,13 @@ function buildWardHint(
   // ---- Row confinement ----
   if (reasonType === 'row-confinement' && confinedTerritory !== undefined) {
     const confined = confinedTerritory;
+    const isTwin = puzzle.mode === 'twin-watchers';
     if (depth === 0) {
       return {
         level: 1,
-        message: `Study the ${tname(confined)} territory. Its Watcher is confined to a single row.`,
+        message: isTwin
+          ? `Study the ${tname(confined)} territory. All its remaining candidates fall in row ${row + 1}.`
+          : `Study the ${tname(confined)} territory. Its Watcher is confined to a single row.`,
         secondaryHighlightTerritories: [confined],
         highlightRows: [row],
       };
@@ -155,7 +173,9 @@ function buildWardHint(
     if (depth === 1) {
       return {
         level: 2,
-        message: `The ${tname(confined)} territory can only place its Watcher somewhere in row ${row + 1}. If a Watcher rose at this cell, it would claim that row — leaving the ${tname(confined)} territory with nowhere to go.`,
+        message: isTwin
+          ? `The ${tname(confined)} territory must use row ${row + 1} — every valid cell it has is there. Placing a Watcher here would take a slot that ${tname(confined)} needs, leaving it with no valid refuge.`
+          : `The ${tname(confined)} territory can only place its Watcher somewhere in row ${row + 1}. If a Watcher rose at this cell, it would claim that row — leaving the ${tname(confined)} territory with nowhere to go.`,
         highlightCells: [[row, col]],
         highlightTerritories: [cellTerritory],
         secondaryHighlightTerritories: [confined],
@@ -164,7 +184,9 @@ function buildWardHint(
     }
     return {
       level: 3,
-      message: `The ${tname(confined)} territory is confined to row ${row + 1}. Since it must use that row, no other Watcher can occupy it. This cell — belonging to the ${tname(cellTerritory)} territory — must be a Ward.`,
+      message: isTwin
+        ? `The ${tname(confined)} territory's remaining candidates are all in row ${row + 1}, and it needs every open slot there. No other Watcher can enter row ${row + 1}. This cell — belonging to the ${tname(cellTerritory)} territory — must be a Ward.`
+        : `The ${tname(confined)} territory is confined to row ${row + 1}. Since it must use that row, no other Watcher can occupy it. This cell — belonging to the ${tname(cellTerritory)} territory — must be a Ward.`,
       highlightCells: [[row, col]],
       highlightTerritories: [cellTerritory],
       secondaryHighlightTerritories: [confined],
@@ -176,10 +198,13 @@ function buildWardHint(
   // ---- Column confinement ----
   if (reasonType === 'col-confinement' && confinedTerritory !== undefined) {
     const confined = confinedTerritory;
+    const isTwin = puzzle.mode === 'twin-watchers';
     if (depth === 0) {
       return {
         level: 1,
-        message: `Study the ${tname(confined)} territory. Its Watcher is confined to a single column.`,
+        message: isTwin
+          ? `Study the ${tname(confined)} territory. All its remaining candidates fall in column ${col + 1}.`
+          : `Study the ${tname(confined)} territory. Its Watcher is confined to a single column.`,
         secondaryHighlightTerritories: [confined],
         highlightCols: [col],
       };
@@ -187,7 +212,9 @@ function buildWardHint(
     if (depth === 1) {
       return {
         level: 2,
-        message: `The ${tname(confined)} territory can only place its Watcher somewhere in column ${col + 1}. If a Watcher rose at this cell, it would claim that column — leaving the ${tname(confined)} territory with nowhere to go.`,
+        message: isTwin
+          ? `The ${tname(confined)} territory must use column ${col + 1} — every valid cell it has is there. Placing a Watcher here would take a slot that ${tname(confined)} needs, leaving it with no valid refuge.`
+          : `The ${tname(confined)} territory can only place its Watcher somewhere in column ${col + 1}. If a Watcher rose at this cell, it would claim that column — leaving the ${tname(confined)} territory with nowhere to go.`,
         highlightCells: [[row, col]],
         highlightTerritories: [cellTerritory],
         secondaryHighlightTerritories: [confined],
@@ -196,7 +223,9 @@ function buildWardHint(
     }
     return {
       level: 3,
-      message: `The ${tname(confined)} territory is confined to column ${col + 1}. Since it must use that column, no other Watcher can occupy it. This cell must be a Ward.`,
+      message: isTwin
+        ? `The ${tname(confined)} territory's remaining candidates are all in column ${col + 1}, and it needs every open slot there. No other Watcher can enter column ${col + 1}. This cell must be a Ward.`
+        : `The ${tname(confined)} territory is confined to column ${col + 1}. Since it must use that column, no other Watcher can occupy it. This cell must be a Ward.`,
       highlightCells: [[row, col]],
       highlightTerritories: [cellTerritory],
       secondaryHighlightTerritories: [confined],
@@ -255,14 +284,72 @@ function buildWardHint(
   // ---- Hypothetical (contradiction test) ----
   if (reasonType === 'hypothetical' && confinedTerritory !== undefined) {
     const victim = confinedTerritory;
+    const isTwin = puzzle.mode === 'twin-watchers';
 
     // Compute victim's remaining valid candidates
     const allCandidates = getCandidates(puzzle, playerCells);
     const victimCells: [number, number][] = allCandidates.get(victim) ?? [];
+
+    if (depth === 0) {
+      return {
+        level: 1,
+        message: isTwin
+          ? `Consider what would happen if a Watcher rose at this cell. Trace how it forces other placements, and watch what happens to the ${tname(victim)} territory.`
+          : `Consider what would happen if a Watcher rose at this cell. Study where the ${tname(victim)} territory can still place its Watcher.`,
+        primaryCell: [row, col],
+        highlightTerritories: [victim],
+      };
+    }
+
+    // Twin mode: a single watcher never claims a full row or column (takes two).
+    // The contradiction comes from adjacency alone or a chain of forced placements.
+    if (isTwin) {
+      const forcedSteps     = computeCascadeSteps(puzzle, playerCells, row, col);
+      const constraintWaves = buildCascadeConstraintWaves(puzzle, playerCells, row, col, forcedSteps);
+      const constraintCovered = new Set(
+        constraintWaves.flatMap(ww => ww.flat()).map(([r, c]) => `${r},${c}`)
+      );
+      const remainingVictimCells = victimCells.filter(([r, c]) => !constraintCovered.has(`${r},${c}`));
+      const chainLen = forcedSteps.length;
+
+      if (depth === 1) {
+        const msg = chainLen === 0
+          ? `If a Watcher rose here, its adjacency zone alone would eliminate every remaining valid cell in the ${tname(victim)} territory — leaving it with no refuge.`
+          : `If a Watcher rose here, it would force ${chainLen} more Watcher${chainLen > 1 ? 's' : ''} into fixed positions. Together that chain leaves the ${tname(victim)} territory with no valid refuge.`;
+        return {
+          level: 2,
+          message: msg,
+          primaryCell: [row, col],
+          highlightCells: victimCells,
+          highlightTerritories: [victim],
+        };
+      }
+
+      const msg = chainLen === 0
+        ? `A Watcher here is impossible. Its adjacency zone directly eliminates every remaining valid cell in the ${tname(victim)} territory. Mark this cell with a Ward.`
+        : `A Watcher here is impossible. It forces ${chainLen} Watcher${chainLen > 1 ? 's' : ''} into fixed positions — Watchers that have nowhere else to go. By the end of that chain, the ${tname(victim)} territory has no valid cell remaining. Mark this cell with a Ward.`;
+      return {
+        level: 3,
+        message: msg,
+        primaryCell: [row, col],
+        highlightCells: victimCells,
+        highlightTerritories: [victim],
+        deduction: d,
+        cascadeSteps: forcedSteps,
+        cascadeConstraintWaves: constraintWaves,
+        cascadeVictimCells: remainingVictimCells,
+      };
+    }
+
+    // Standard mode: single watcher claims its full row and column.
     const victimRows = new Set(victimCells.map(([r]) => r));
     const victimCols = new Set(victimCells.map(([, c]) => c));
 
-    // Explain exactly which constraint wipes out the victim
+    // Partition victim cells by which constraint eliminates them
+    const inSameRow = victimCells.filter(([r])    => r === row);
+    const inSameCol = victimCells.filter(([r, c]) => r !== row && c === col);
+    const adjacent  = victimCells.filter(([r, c]) => r !== row && c !== col && Math.abs(r - row) <= 1 && Math.abs(c - col) <= 1);
+
     let whySealed: string;
     if (victimCells.length === 0) {
       whySealed = `the ${tname(victim)} territory already has no valid refuge`;
@@ -271,27 +358,28 @@ function buildWardHint(
     } else if (victimCols.size === 1 && victimCols.has(col)) {
       whySealed = `every remaining cell in the ${tname(victim)} territory sits in column ${col + 1} — the same column this Watcher would claim`;
     } else {
-      whySealed = `this Watcher's row ${row + 1}, column ${col + 1}, and adjacency zone together cover every remaining refuge in the ${tname(victim)} territory`;
+      const parts: string[] = [];
+      if (inSameRow.length > 0)
+        parts.push(`${inSameRow.length} cell${inSameRow.length > 1 ? 's' : ''} sit in row ${row + 1}`);
+      if (inSameCol.length > 0)
+        parts.push(`${inSameCol.length} cell${inSameCol.length > 1 ? 's' : ''} sit in column ${col + 1}`);
+      if (adjacent.length > 0)
+        parts.push(`${adjacent.length} cell${adjacent.length > 1 ? 's are' : ' is'} adjacent to this position`);
+      const remaining = victimCells.length - inSameRow.length - inSameCol.length - adjacent.length;
+      if (remaining > 0)
+        parts.push(`${remaining} more would be forced out by the chain reaction`);
+      whySealed = parts.length > 0
+        ? `of the ${tname(victim)} territory's remaining refuges: ${parts.join(', ')}`
+        : `this Watcher's row, column, and adjacency zone together seal off the ${tname(victim)} territory`;
     }
 
-    if (depth === 0) {
-      // Level I: point to the hypothetical cell and the victim territory only
-      return {
-        level: 1,
-        message: `Consider what would happen if a Watcher rose at this cell. Study where the ${tname(victim)} territory can still place its Watcher.`,
-        primaryCell: [row, col],
-        highlightTerritories: [victim],
-      };
-    }
-
-    // Level II / III: show the cross-pattern (row + col) the hypothetical watcher claims,
-    // with the victim's remaining cells outlined in red within that zone.
-    // This makes the cascade visible: "the cross is what the watcher claims; the red cells
-    // are what it destroys."
     if (depth === 1) {
+      const opener = whySealed.startsWith('of the')
+        ? `If a Watcher rose here, it would claim row ${row + 1} and column ${col + 1}. But ${whySealed}. The ${tname(victim)} territory would have nowhere to go.`
+        : `If a Watcher rose here, it would claim row ${row + 1} and column ${col + 1}. ${whySealed.charAt(0).toUpperCase() + whySealed.slice(1)}. The ${tname(victim)} territory would have nowhere to go.`;
       return {
         level: 2,
-        message: `If a Watcher rose here, it would claim row ${row + 1} and column ${col + 1}. ${whySealed.charAt(0).toUpperCase() + whySealed.slice(1)}. The ${tname(victim)} territory would have nowhere to go.`,
+        message: opener,
         primaryCell: [row, col],
         highlightCells: victimCells,
         highlightRows: [row],
@@ -307,7 +395,9 @@ function buildWardHint(
 
     return {
       level: 3,
-      message: `A Watcher here is impossible. It would claim row ${row + 1} and column ${col + 1} — but ${whySealed}. The ${tname(victim)} territory would be sealed off. Mark this cell with a Ward.`,
+      message: whySealed.startsWith('of the')
+        ? `A Watcher here is impossible. It would claim row ${row + 1} and column ${col + 1} — but ${whySealed}. The ${tname(victim)} territory would be sealed off. Mark this cell with a Ward.`
+        : `A Watcher here is impossible. ${whySealed.charAt(0).toUpperCase() + whySealed.slice(1)} — the ${tname(victim)} territory would be sealed off. Mark this cell with a Ward.`,
       primaryCell: [row, col],
       highlightCells: victimCells,
       highlightRows: [row],
@@ -341,12 +431,17 @@ function buildWardHint(
 function buildWatcherHint(d: DeductionResult, puzzle: Puzzle): HintResult {
   const territory = puzzle.territoryMap[d.row][d.col];
   const name = tname(territory);
+  const isTwin = puzzle.mode === 'twin-watchers';
 
   let message: string;
   if (d.reasonType === 'naked-single-row') {
-    message = `Row ${d.row + 1} has only one cell that can still receive a Watcher — this one, belonging to the ${name} territory. A Watcher must rise here.`;
+    message = isTwin
+      ? `Row ${d.row + 1} has only one valid cell left for its next Watcher — this one, belonging to the ${name} territory. A Watcher must rise here.`
+      : `Row ${d.row + 1} has only one cell that can still receive a Watcher — this one, belonging to the ${name} territory. A Watcher must rise here.`;
   } else if (d.reasonType === 'naked-single-col') {
-    message = `Column ${d.col + 1} has only one cell that can still receive a Watcher — this one, belonging to the ${name} territory. A Watcher must rise here.`;
+    message = isTwin
+      ? `Column ${d.col + 1} has only one valid cell left for its next Watcher — this one, belonging to the ${name} territory. A Watcher must rise here.`
+      : `Column ${d.col + 1} has only one cell that can still receive a Watcher — this one, belonging to the ${name} territory. A Watcher must rise here.`;
   } else {
     message = `All other cells in the ${name} territory have been eliminated. Only one refuge remains. A Watcher must rise here.`;
   }
@@ -430,7 +525,8 @@ export function getHint(
     );
   }
 
-  const deduction = getNextDeduction(puzzle, playerCells);
+  const solverDepth = puzzle.mode === 'twin-watchers' ? 2 : 1;
+  const deduction = getNextDeduction(puzzle, playerCells, solverDepth);
   if (!deduction) return buildStudyHint(puzzle, playerCells);
 
   if (deduction.type === 'watcher') {

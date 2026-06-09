@@ -71,11 +71,16 @@ function main() {
   const { months } = parseArgs();
   const calendarPath = join(process.cwd(), 'data', 'dailyCalendar.ts');
 
-  // Build the sorted SR pool (all SR puzzles sorted ascending by score)
+  // Build the sorted SR pool.
+  // Sort by a composite score that treats board size as the primary axis:
+  //   effectiveScore = (size - 5) * 200 + rawScore
+  // This ensures every 5×5 puzzle sorts before every 6×6, every 6×6 before
+  // every 7×7, etc., so Monday (easiest tier) can only receive small boards.
   const srPuzzles = SAMPLE_PUZZLES
     .filter(p => p.mode === 'shattered-realms')
-    .map(p => ({ id: p.id, score: scorePuzzle(p) }))
-    .sort((a, b) => a.score - b.score);
+    .map(p => ({ id: p.id, size: p.size, score: scorePuzzle(p) }))
+    .map(p => ({ ...p, effectiveScore: (p.size - 5) * 200 + p.score }))
+    .sort((a, b) => a.effectiveScore - b.effectiveScore);
 
   if (srPuzzles.length < 7) {
     console.error(`Only ${srPuzzles.length} SR puzzles found — need at least 7.`);
@@ -93,8 +98,10 @@ function main() {
   console.log('SR puzzle pool:', srPuzzles.length);
   tiers.forEach((t, i) => {
     const dayName = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i];
-    const scores  = t.map(id => srPuzzles.find(p => p.id === id)!.score);
-    console.log(`  Tier ${i} (${dayName}): ${t.length} puzzles, scores ${Math.min(...scores)}–${Math.max(...scores)}`);
+    const puzzles = t.map(id => srPuzzles.find(p => p.id === id)!);
+    const sizes   = [...new Set(puzzles.map(p => p.size))].sort((a,b)=>a-b);
+    const scores  = puzzles.map(p => p.score);
+    console.log(`  Tier ${i} (${dayName}): ${t.length} puzzles, sizes ${sizes.join('/')}, scores ${Math.min(...scores)}–${Math.max(...scores)}`);
   });
 
   let content = readFileSync(calendarPath, 'utf-8');

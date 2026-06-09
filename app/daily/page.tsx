@@ -126,6 +126,72 @@ function scrollIndexForId(s: string): number {
   return (Math.abs(h) % 3) + 1;
 }
 
+// ─── Watcher-emerges animation for the freshly completed calendar cell ───────
+
+// size, color, duration, delay — varied so it reads as a burst of loose earth
+const DUST_PARTICLES: { size: number; color: string; duration: number; delay: number }[] = [
+  { size: 10, color: '#6B4020', duration: 0.90, delay: 0.00 },
+  { size: 10, color: '#6B4020', duration: 0.90, delay: 0.00 },
+  { size:  7, color: '#9B6535', duration: 1.10, delay: 0.05 },
+  { size:  7, color: '#9B6535', duration: 1.10, delay: 0.05 },
+  { size:  5, color: '#C8985A', duration: 0.80, delay: 0.02 },
+  { size:  5, color: '#C8985A', duration: 0.80, delay: 0.02 },
+  { size:  8, color: '#7A5030', duration: 1.00, delay: 0.08 },
+  { size:  8, color: '#7A5030', duration: 1.00, delay: 0.08 },
+  { size:  4, color: '#D4AA70', duration: 1.30, delay: 0.12 },
+  { size:  4, color: '#D4AA70', duration: 1.30, delay: 0.12 },
+  { size:  6, color: '#8B5C30', duration: 0.95, delay: 0.04 },
+  { size:  6, color: '#8B5C30', duration: 0.95, delay: 0.04 },
+  // second wave — slightly different timings for depth
+  { size:  9, color: '#5C3418', duration: 0.85, delay: 0.03 },
+  { size:  9, color: '#5C3418', duration: 0.85, delay: 0.03 },
+  { size:  3, color: '#E0C080', duration: 1.40, delay: 0.15 },
+  { size:  3, color: '#E0C080', duration: 1.40, delay: 0.15 },
+  { size:  7, color: '#8B5C30', duration: 1.05, delay: 0.07 },
+  { size:  7, color: '#8B5C30', duration: 1.05, delay: 0.07 },
+  { size:  5, color: '#A87040', duration: 0.75, delay: 0.01 },
+  { size:  5, color: '#A87040', duration: 0.75, delay: 0.01 },
+  { size:  9, color: '#7A5030', duration: 1.15, delay: 0.09 },
+  { size:  9, color: '#7A5030', duration: 1.15, delay: 0.09 },
+  { size:  4, color: '#C8985A', duration: 1.00, delay: 0.06 },
+  { size:  4, color: '#C8985A', duration: 1.00, delay: 0.06 },
+];
+
+function CalendarEmergeCell() {
+  return (
+    // Outer wrapper — overflow visible so dust can escape the cell boundary
+    <div style={{ position: 'absolute', inset: 0, overflow: 'visible' }}>
+      {/* Inner clip — overflow hidden keeps the watcher inside the cell */}
+      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <img
+          src={WATCHER_SVGS[0]}
+          alt=""
+          draggable={false}
+          className="calendar-watcher-emerge"
+          style={{ width: '68%', height: '68%', objectFit: 'contain',
+                   filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.7))' }}
+        />
+      </div>
+      {/* Dust particles live outside the clip so they can spray freely */}
+      {DUST_PARTICLES.map((p, i) => (
+        <div
+          key={i}
+          className={`cal-dust cal-dust-${i}`}
+          style={{
+            width: p.size,
+            height: p.size,
+            background: p.color,
+            animationDuration: `${p.duration}s`,
+            animationDelay: `${p.delay}s`,
+            bottom: -Math.round(p.size / 2),
+            marginLeft: -Math.round(p.size / 2),
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 // ─── Calendar component ───────────────────────────────────────────────────────
 
 function MonthCalendar({
@@ -133,12 +199,14 @@ function MonthCalendar({
   completedDates,
   startedDates,
   todayStr,
+  freshlyCompletedDate,
   onSelectDate,
 }: {
   yearMonth: string;
   completedDates: Set<string>;
   startedDates: Set<string>;
   todayStr: string;
+  freshlyCompletedDate?: string | null;
   onSelectDate: (date: string) => void;
 }) {
   const days     = daysInMonth(yearMonth);
@@ -229,11 +297,13 @@ function MonthCalendar({
               >
                 {day}
               </span>
-              {completed && (
+              {dateStr === freshlyCompletedDate ? (
+                <CalendarEmergeCell />
+              ) : completed ? (
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <NextImage src="/svg/completion_stamp.svg" alt="done" width={18} height={18} style={{ opacity: 0.75 }} />
                 </div>
-              )}
+              ) : null}
               {started && (
                 <div style={{ position: 'absolute', bottom: 3, left: '50%', transform: 'translateX(-50%)', width: 5, height: 5, borderRadius: '50%', background: 'rgba(181,134,13,0.85)', boxShadow: '0 0 3px rgba(181,134,13,0.5)' }} />
               )}
@@ -306,9 +376,10 @@ export default function DailyPage() {
   const [cascadeGhosts,   setCascadeGhosts]  = useState<[number, number][]>([]);
   const [cascadeWards,    setCascadeWards]   = useState<[number, number][]>([]);
   const [constraintWards, setConstraintWards] = useState<[number, number][]>([]);
-  const [isFreshWin,      setIsFreshWin]     = useState(false);
-  const [streak,          setStreak]         = useState<StreakData>({ date: '', count: 0 });
-  const [alreadyCompleted,setAlreadyCompleted] = useState(false);
+  const [isFreshWin,           setIsFreshWin]          = useState(false);
+  const [streak,               setStreak]              = useState<StreakData>({ date: '', count: 0 });
+  const [alreadyCompleted,     setAlreadyCompleted]    = useState(false);
+  const [freshlyCompletedDate, setFreshlyCompletedDate] = useState<string | null>(null);
 
   const hintDepthRef    = useRef(0);
   const flashTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -474,6 +545,7 @@ export default function DailyPage() {
           streak:      streakCount,
         });
         setIsFreshWin(true);
+        setFreshlyCompletedDate(selectedDate);
 
         winTimersRef.current.forEach(clearTimeout);
         winTimersRef.current = [];
@@ -671,13 +743,28 @@ export default function DailyPage() {
           boxShadow: '0 8px 32px rgba(0,0,0,0.55)',
           width: '100%',
           maxWidth: 400,
+          position: 'relative',
         }}>
+          {/* Dev preview — replay the watcher emergence on today's cell */}
+          <button
+            onClick={() => { setFreshlyCompletedDate(null); setTimeout(() => setFreshlyCompletedDate(todayStr), 16); }}
+            title="Preview watcher emergence"
+            style={{
+              position: 'absolute', top: 12, right: 12,
+              background: 'rgba(26,18,9,0.08)', border: '1px solid rgba(26,18,9,0.2)',
+              borderRadius: 4, padding: '2px 7px', cursor: 'pointer',
+              fontFamily: 'Georgia, serif', fontSize: 11, color: 'rgba(26,18,9,0.5)',
+            }}
+          >
+            ↺ preview
+          </button>
           <MonthCalendar
             yearMonth={yearMonth}
             completedDates={completedDates}
             startedDates={startedDates}
             todayStr={todayStr}
-            onSelectDate={(date) => { setSelectedDate(date); setView('puzzle'); }}
+            freshlyCompletedDate={freshlyCompletedDate}
+            onSelectDate={(date) => { setFreshlyCompletedDate(null); setSelectedDate(date); setView('puzzle'); }}
           />
         </div>
 

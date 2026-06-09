@@ -13,6 +13,9 @@ const UNLOCKED_KEY = 'eb_unlocked_regions';
 
 const OUTLINE = '-1px -1px 0 rgba(242,233,216,0.95), 1px -1px 0 rgba(242,233,216,0.95), -1px 1px 0 rgba(242,233,216,0.95), 1px 1px 0 rgba(242,233,216,0.95)';
 
+// Pre-compute scores once at module load — avoids re-running the solver on every render/sort
+const PUZZLE_SCORE = new Map<string, number>(SAMPLE_PUZZLES.map(p => [p.id, scorePuzzle(p)]));
+
 function difficultyColor(difficulty: Difficulty): string {
   switch (difficulty) {
     case 'Initiate':    return 'text-ink border-ink';
@@ -69,7 +72,7 @@ function RegionSection({
   locked: boolean;
   newlyUnlocked: boolean;
 }) {
-  const sorted = [...puzzles].sort((a, b) => scorePuzzle(a) - scorePuzzle(b));
+  const sorted = [...puzzles].sort((a, b) => (PUZZLE_SCORE.get(a.id) ?? 0) - (PUZZLE_SCORE.get(b.id) ?? 0));
   const completedCount = sorted.filter(p => completedIds.has(p.id)).length;
   const allDone = completedCount === sorted.length;
   const currentPuzzle = sorted.find(p => !completedIds.has(p.id)) ?? null;
@@ -215,9 +218,8 @@ export default function HomePage() {
     const known = new Set<string>(JSON.parse(localStorage.getItem(UNLOCKED_KEY) ?? '[]'));
     const byDiff = new Map<Difficulty, Puzzle[]>();
     for (const p of SAMPLE_PUZZLES.filter(p => p.mode === 'initiate' || p.mode === 'cult-master')) {
-      const d = rateDifficulty(p);
-      if (!byDiff.has(d)) byDiff.set(d, []);
-      byDiff.get(d)!.push(p);
+      if (!byDiff.has(p.difficulty)) byDiff.set(p.difficulty, []);
+      byDiff.get(p.difficulty)!.push(p);
     }
 
     // Walk the region chain to find what's newly unlocked
@@ -251,9 +253,8 @@ export default function HomePage() {
   );
   const byDifficulty = new Map<Difficulty, Puzzle[]>();
   for (const p of campaignPuzzles) {
-    const d = rateDifficulty(p);
-    if (!byDifficulty.has(d)) byDifficulty.set(d, []);
-    byDifficulty.get(d)!.push(p);
+    if (!byDifficulty.has(p.difficulty)) byDifficulty.set(p.difficulty, []);
+    byDifficulty.get(p.difficulty)!.push(p);
   }
 
   // Compute which regions are locked (previous must be fully complete)
@@ -414,21 +415,42 @@ export default function HomePage() {
           </section>
 
           {/* Shattered Realms */}
-          {shatteredPuzzles.length > 0 && (
-            <section>
-              <div className="border-b border-ink pb-1 mb-6">
-                <h2 className="font-lovecraftian text-xl text-ink" style={{ textShadow: OUTLINE }}>Shattered Realms</h2>
-                <p className="font-serif text-xs text-ink-light italic mt-0.5" style={{ textShadow: OUTLINE }}>
-                  Territories may be scattered — one Watcher per color, wherever it falls
-                </p>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {shatteredPuzzles.map(p => (
-                  <PuzzleCard key={p.id} puzzle={p} completed={completedIds.has(p.id)} />
-                ))}
-              </div>
-            </section>
-          )}
+          {shatteredPuzzles.length > 0 && (() => {
+            const sorted = [...shatteredPuzzles].sort((a, b) => (PUZZLE_SCORE.get(a.id) ?? 0) - (PUZZLE_SCORE.get(b.id) ?? 0));
+            const completedCount = sorted.filter(p => completedIds.has(p.id)).length;
+            const current = sorted.find(p => !completedIds.has(p.id)) ?? null;
+            const currentIdx = sorted.findIndex(p => !completedIds.has(p.id));
+            const allDone = completedCount === sorted.length;
+            return (
+              <section>
+                <div className="flex items-start gap-4 mb-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <h2 className="font-lovecraftian text-xl text-ink" style={{ textShadow: OUTLINE }}>
+                        Shattered Realms
+                        {allDone && <span className="ml-2 text-brass text-base font-serif">✓</span>}
+                      </h2>
+                      <span className="font-serif text-xs text-ink-light shrink-0" style={{ textShadow: OUTLINE }}>
+                        {completedCount}/{sorted.length}
+                      </span>
+                    </div>
+                    <p className="font-serif text-xs text-ink-light italic mt-0.5" style={{ textShadow: OUTLINE }}>
+                      Territories may be scattered — one Watcher per color, wherever it falls
+                    </p>
+                  </div>
+                </div>
+                <div className="border-t border-ink opacity-30 mb-4" />
+                {current && (
+                  <div>
+                    <PuzzleCard puzzle={current} completed={false} />
+                    <p className="mt-2 font-serif text-xs text-center text-ink-light" style={{ textShadow: OUTLINE }}>
+                      Puzzle {currentIdx + 1} of {sorted.length}
+                    </p>
+                  </div>
+                )}
+              </section>
+            );
+          })()}
 
         </div>
 

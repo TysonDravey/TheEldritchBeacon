@@ -200,3 +200,88 @@ button, a {
   animation: tile-wiggle 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   transform-origin: center center;
 }
+
+/* ── Calendar watcher emergence ─────────────────────────────────────────── */
+
+@keyframes calendar-watcher-emerge {
+  /* Starts fully below the clipped container — not visible */
+  0%   { transform: translateY(110%)              scale(0.8); }
+  /* Shake left-right while grinding up through the ground */
+  14%  { transform: translateY(68%) translateX(-5px) scale(0.82); }
+  25%  { transform: translateY(52%) translateX( 5px) scale(0.86); }
+  36%  { transform: translateY(36%) translateX(-4px) scale(0.90); }
+  47%  { transform: translateY(18%) translateX( 3px) scale(0.94); }
+  /* Pop up just slightly past centre then bounce settle */
+  58%  { transform: translateY(-6%)               scale(1.08); }
+  70%  { transform: translateY( 4%)               scale(0.95); }
+  81%  { transform: translateY(-2%)               scale(1.02); }
+  91%  { transform: translateY( 1%)               scale(0.99); }
+  100% { transform: translateY( 0%)               scale(1.00); }
+}
+
+.calendar-watcher-emerge {
+  animation: calendar-watcher-emerge 1.4s ease-out both;
+}
+
+/* Dust — 24 explicit keyframes, all bursting from ground level upward/sideways */
+@keyframes cal-dust-0  { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(-52px, -4px) scale(.15);opacity:0} }
+@keyframes cal-dust-1  { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate( 52px, -4px) scale(.15);opacity:0} }
+@keyframes cal-dust-2  { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(-28px,-36px) scale(.15);opacity:0} }
+@keyframes cal-dust-3  { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate( 28px,-36px) scale(.15);opacity:0} }
+@keyframes cal-dust-4  { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(-18px,-14px) scale(.15);opacity:0} }
+@keyframes cal-dust-5  { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate( 18px,-14px) scale(.15);opacity:0} }
+@keyframes cal-dust-6  { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(-44px,-20px) scale(.15);opacity:0} }
+@keyframes cal-dust-7  { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate( 44px,-20px) scale(.15);opacity:0} }
+@keyframes cal-dust-8  { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate( -8px,-48px) scale(.15);opacity:0} }
+@keyframes cal-dust-9  { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(  8px,-48px) scale(.15);opacity:0} }
+@keyframes cal-dust-10 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(-36px,-10px) scale(.15);opacity:0} }
+@keyframes cal-dust-11 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate( 36px,-10px) scale(.15);opacity:0} }
+@keyframes cal-dust-12 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(-60px,-12px) scale(.15);opacity:0} }
+@keyframes cal-dust-13 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate( 60px,-12px) scale(.15);opacity:0} }
+@keyframes cal-dust-14 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(-14px,-54px) scale(.15);opacity:0} }
+@keyframes cal-dust-15 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate( 14px,-54px) scale(.15);opacity:0} }
+@keyframes cal-dust-16 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(-38px,-28px) scale(.15);opacity:0} }
+@keyframes cal-dust-17 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate( 38px,-28px) scale(.15);opacity:0} }
+@keyframes cal-dust-18 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(-22px, -6px) scale(.15);opacity:0} }
+@keyframes cal-dust-19 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate( 22px, -6px) scale(.15);opacity:0} }
+@keyframes cal-dust-20 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(-50px,-32px) scale(.15);opacity:0} }
+@keyframes cal-dust-21 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate( 50px,-32px) scale(.15);opacity:0} }
+@keyframes cal-dust-22 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(-10px,-30px) scale(.15);opacity:0} }
+@keyframes cal-dust-23 { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate( 10px,-30px) scale(.15);opacity:0} }
+
+.cal-dust {
+  position: absolute;
+  border-radius: 50%;
+  /* origin: bottom-centre — where the watcher breaks through */
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
+  z-index: 99;
+}
+.cal-dust-0  { animation-name: cal-dust-0;  }
+.cal-dust-1  { animation-name: cal-dust-1;  }
+.cal-dust-2  { animation-name: cal-dust-2;  }
+.cal-dust-3  { animation-name: cal-dust-3;  }
+.cal-dust-4  { animation-name: cal-dust-4;  }
+.cal-dust-5  { animation-name: cal-dust-5;  }
+.cal-dust-6  { animation-name: cal-dust-6;  }
+.cal-dust-7  { animation-name: cal-dust-7;  }
+.cal-dust-8  { animation-name: cal-dust-8;  }
+.cal-dust-9  { animation-name: cal-dust-9;  }
+.cal-dust-10 { animation-name: cal-dust-10; }
+.cal-dust-11 { animation-name: cal-dust-11; }
+.cal-dust-12 { animation-name: cal-dust-12; }
+.cal-dust-13 { animation-name: cal-dust-13; }
+.cal-dust-14 { animation-name: cal-dust-14; }
+.cal-dust-15 { animation-name: cal-dust-15; }
+.cal-dust-16 { animation-name: cal-dust-16; }
+.cal-dust-17 { animation-name: cal-dust-17; }
+.cal-dust-18 { animation-name: cal-dust-18; }
+.cal-dust-19 { animation-name: cal-dust-19; }
+.cal-dust-20 { animation-name: cal-dust-20; }
+.cal-dust-21 { animation-name: cal-dust-21; }
+.cal-dust-22 { animation-name: cal-dust-22; }
+.cal-dust-23 { animation-name: cal-dust-23; }

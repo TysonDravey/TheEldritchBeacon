@@ -145,6 +145,21 @@ export default function PuzzlePage() {
 
   useEffect(() => {
     if (!puzzle) return;
+    // Reset all per-puzzle UI state so nothing bleeds over from the previous puzzle.
+    setIsFreshWin(false);
+    setShowCompletion(false);
+    setShowChapterComplete(false);
+    setContradiction({ found: false });
+    setHintResult(null);
+    setFlashCells([]);
+    setRejectionMessage(null);
+    setCascadeGhosts([]);
+    setCascadeWards([]);
+    setConstraintWards([]);
+    hintDepthRef.current = 0;
+    winTimersRef.current.forEach(clearTimeout);
+    winTimersRef.current = [];
+
     const saved = loadPlayerState(puzzle.id);
     if (saved) {
       setPlayerState(saved);
@@ -172,6 +187,16 @@ export default function PuzzlePage() {
     const victimCells   = hintResult?.cascadeVictimCells ?? [];
 
     if (!primary) {
+      setCascadeGhosts([]);
+      setCascadeWards([]);
+      setConstraintWards([]);
+      return;
+    }
+
+    // Only run ghost cascade for actual hypothetical hints that have steps/waves/victims.
+    // Simple watcher hints use primaryCell for the spinner — don't overwrite with a ghost.
+    const isCascade = steps.length > 0 || watcherWaves.length > 0 || victimCells.length > 0;
+    if (!isCascade) {
       setCascadeGhosts([]);
       setCascadeWards([]);
       setConstraintWards([]);
@@ -328,13 +353,15 @@ export default function PuzzlePage() {
         const chapterJustFinished = CHAPTER_COMPLETIONS[puzzle.difficulty] != null
           && tierPuzzles.every(p => allCompleted.has(p.id));
 
+        // watcher-rise-slam: 200ms delay + 2200ms duration — always wait for it to finish
+        const WATCHER_ANIM_END = 2600;
         const completionT = setTimeout(() => {
           if (chapterJustFinished) {
             setShowChapterComplete(true);
           } else {
             setShowCompletion(true);
           }
-        }, maxDelay + 500);
+        }, Math.max(maxDelay, WATCHER_ANIM_END) + 500);
         winTimersRef.current.push(completionT);
       }
     },

@@ -183,8 +183,8 @@ function Cell({
           height={watcherSize}
           alt=""
           draggable={false}
-          className="absolute animate-pulse pointer-events-none z-30"
-          style={{ opacity: 0.35 }}
+          className="absolute pointer-events-none z-30"
+          style={{ opacity: 0.8 }}
         />
       )}
       {isGhost && state === 'empty' && (

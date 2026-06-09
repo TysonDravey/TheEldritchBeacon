@@ -9,10 +9,10 @@ function deepCopy(cells: CellState[][]): CellState[][] {
   return cells.map(row => [...row]);
 }
 
-function applyDeduction(cells: CellState[][], d: DeductionResult): void {
+function applyDeduction(cells: CellState[][], d: DeductionResult, limit = 1): void {
   cells[d.row][d.col] = d.type === 'watcher' ? 'watcher' : 'ward';
   if (d.type === 'watcher') {
-    // Mark all 8 surrounding cells as wards
+    // Mark all 8 surrounding cells as wards (adjacency — always applies)
     const n = cells.length;
     for (let dr = -1; dr <= 1; dr++) {
       for (let dc = -1; dc <= 1; dc++) {
@@ -20,21 +20,21 @@ function applyDeduction(cells: CellState[][], d: DeductionResult): void {
         const nr = d.row + dr;
         const nc = d.col + dc;
         if (nr >= 0 && nr < n && nc >= 0 && nc < cells[nr].length) {
-          if (cells[nr][nc] === 'empty') {
-            cells[nr][nc] = 'ward';
-          }
+          if (cells[nr][nc] === 'empty') cells[nr][nc] = 'ward';
         }
       }
     }
-    // Ward out rest of row and column
-    for (let c = 0; c < cells[d.row].length; c++) {
-      if (c !== d.col && cells[d.row][c] === 'empty') {
-        cells[d.row][c] = 'ward';
+    // Ward out rest of row and column only once the limit is reached
+    const rowCount = cells[d.row].filter(c => c === 'watcher').length;
+    const colCount = cells.filter(r => r[d.col] === 'watcher').length;
+    if (rowCount >= limit) {
+      for (let c = 0; c < cells[d.row].length; c++) {
+        if (c !== d.col && cells[d.row][c] === 'empty') cells[d.row][c] = 'ward';
       }
     }
-    for (let r = 0; r < cells.length; r++) {
-      if (r !== d.row && cells[r][d.col] === 'empty') {
-        cells[r][d.col] = 'ward';
+    if (colCount >= limit) {
+      for (let r = 0; r < cells.length; r++) {
+        if (r !== d.row && cells[r][d.col] === 'empty') cells[r][d.col] = 'ward';
       }
     }
   }
@@ -54,17 +54,19 @@ export function getCandidates(
   playerCells: CellState[][]
 ): Map<number, [number, number][]> {
   const n = puzzle.size;
+  const limit = puzzle.mode === 'twin-watchers' ? 2 : 1;
   const watchers = getWatcherPositions(playerCells);
 
-  // Pre-compute blocked rows, cols, territories from existing watchers
-  const blockedRows = new Set<number>();
-  const blockedCols = new Set<number>();
-  const blockedTerritories = new Set<number>();
+  // Count watchers per row / col / territory — block when count reaches limit
+  const rowCounts       = new Map<number, number>();
+  const colCounts       = new Map<number, number>();
+  const territoryCounts = new Map<number, number>();
 
   for (const [wr, wc] of watchers) {
-    blockedRows.add(wr);
-    blockedCols.add(wc);
-    blockedTerritories.add(puzzle.territoryMap[wr][wc]);
+    rowCounts.set(wr, (rowCounts.get(wr) ?? 0) + 1);
+    colCounts.set(wc, (colCounts.get(wc) ?? 0) + 1);
+    const t = puzzle.territoryMap[wr][wc];
+    territoryCounts.set(t, (territoryCounts.get(t) ?? 0) + 1);
   }
 
   const result = new Map<number, [number, number][]>();
@@ -76,9 +78,9 @@ export function getCandidates(
       const territory = puzzle.territoryMap[r][c];
 
       // Skip cells conflicting with existing watchers
-      if (blockedRows.has(r)) continue;
-      if (blockedCols.has(c)) continue;
-      if (blockedTerritories.has(territory)) continue;
+      if ((rowCounts.get(r)             ?? 0) >= limit) continue;
+      if ((colCounts.get(c)             ?? 0) >= limit) continue;
+      if ((territoryCounts.get(territory) ?? 0) >= limit) continue;
 
       // Check adjacency with any existing watcher
       let adjacent = false;
@@ -97,9 +99,9 @@ export function getCandidates(
     }
   }
 
-  // Territories that have a watcher placed get an empty array (they're satisfied)
+  // Territories that are fully satisfied (watcher count = limit) get an empty array
   for (let t = 0; t < puzzle.size; t++) {
-    if (blockedTerritories.has(t)) {
+    if ((territoryCounts.get(t) ?? 0) >= limit) {
       result.set(t, []);
     } else if (!result.has(t)) {
       result.set(t, []);
@@ -146,35 +148,46 @@ export function findContradictions(
   playerCells: CellState[][]
 ): ContradictionResult {
   const n = puzzle.size;
+  const limit = puzzle.mode === 'twin-watchers' ? 2 : 1;
   const watchers = getWatcherPositions(playerCells);
 
-  // Check watcher placement conflicts
-  const watcherRows = new Set<number>();
-  const watcherCols = new Set<number>();
-  const watcherTerritories = new Set<number>();
+  // Check watcher placement conflicts — flag when count exceeds limit
+  const rowCounts       = new Map<number, number>();
+  const colCounts       = new Map<number, number>();
+  const territoryCounts = new Map<number, number>();
 
   for (let i = 0; i < watchers.length; i++) {
     const [r, c] = watchers[i];
     const territory = puzzle.territoryMap[r][c];
 
-    if (watcherRows.has(r)) {
+    const rc = (rowCounts.get(r)             ?? 0) + 1;
+    const cc = (colCounts.get(c)             ?? 0) + 1;
+    const tc = (territoryCounts.get(territory) ?? 0) + 1;
+
+    if (rc > limit) {
       return {
         found: true,
-        message: `Row ${r + 1} contains more than one Watcher.`,
+        message: limit === 2
+          ? `Row ${r + 1} contains more than two Watchers.`
+          : `Row ${r + 1} contains more than one Watcher.`,
         affectedCells: watchers.filter(([wr]) => wr === r),
       };
     }
-    if (watcherCols.has(c)) {
+    if (cc > limit) {
       return {
         found: true,
-        message: `Column ${c + 1} contains more than one Watcher.`,
+        message: limit === 2
+          ? `Column ${c + 1} contains more than two Watchers.`
+          : `Column ${c + 1} contains more than one Watcher.`,
         affectedCells: watchers.filter(([, wc]) => wc === c),
       };
     }
-    if (watcherTerritories.has(territory)) {
+    if (tc > limit) {
       return {
         found: true,
-        message: `A territory contains more than one Watcher.`,
+        message: limit === 2
+          ? `A territory contains more than two Watchers.`
+          : `A territory contains more than one Watcher.`,
         affectedTerritories: [territory],
         affectedCells: watchers.filter(([wr, wc]) => puzzle.territoryMap[wr][wc] === territory),
       };
@@ -190,19 +203,18 @@ export function findContradictions(
       }
     }
 
-    watcherRows.add(r);
-    watcherCols.add(c);
-    watcherTerritories.add(territory);
+    rowCounts.set(r, rc);
+    colCounts.set(c, cc);
+    territoryCounts.set(territory, tc);
   }
 
   const candidates = getCandidates(puzzle, playerCells);
 
   // Check territories with no watcher and no candidates
   for (let t = 0; t < puzzle.size; t++) {
-    if (watcherTerritories.has(t)) continue; // already has watcher
+    if ((territoryCounts.get(t) ?? 0) >= limit) continue; // already satisfied
     const cands = candidates.get(t) ?? [];
     if (cands.length === 0) {
-      // Collect all cells of this territory to highlight
       const territoryCells: [number, number][] = [];
       for (let r = 0; r < n; r++) {
         for (let c = 0; c < n; c++) {
@@ -222,7 +234,7 @@ export function findContradictions(
 
   // Check rows with no candidates (unfilled)
   for (let r = 0; r < n; r++) {
-    if (watcherRows.has(r)) continue;
+    if ((rowCounts.get(r) ?? 0) >= limit) continue;
     let hasCandidate = false;
     for (const cands of candidates.values()) {
       if (cands.some(([cr]) => cr === r)) {
@@ -241,7 +253,7 @@ export function findContradictions(
 
   // Check columns with no candidates (unfilled)
   for (let c = 0; c < n; c++) {
-    if (watcherCols.has(c)) continue;
+    if ((colCounts.get(c) ?? 0) >= limit) continue;
     let hasCandidate = false;
     for (const cands of candidates.values()) {
       if (cands.some(([, cc]) => cc === c)) {
@@ -276,7 +288,9 @@ function nakedSingle(
   playerCells: CellState[][],
   candidates: Map<number, [number, number][]>
 ): DeductionResult | null {
-  // Territory naked single
+  const limit = puzzle.mode === 'twin-watchers' ? 2 : 1;
+
+  // Territory naked single: exactly 1 candidate remaining (territory still needs a watcher)
   for (const [territory, cands] of candidates) {
     if (cands.length === 1) {
       const [r, c] = cands[0];
@@ -290,10 +304,14 @@ function nakedSingle(
   }
 
   const watchers = getWatcherPositions(playerCells);
-  const watcherRows = new Set(watchers.map(([r]) => r));
-  const watcherCols = new Set(watchers.map(([, c]) => c));
+  const rowCounts = new Map<number, number>();
+  const colCounts = new Map<number, number>();
+  for (const [r, c] of watchers) {
+    rowCounts.set(r, (rowCounts.get(r) ?? 0) + 1);
+    colCounts.set(c, (colCounts.get(c) ?? 0) + 1);
+  }
 
-  // Row naked single
+  // Row naked single: row still needs a watcher and has exactly 1 candidate
   const rowCandidates = new Map<number, [number, number, number][]>();
   for (const [territory, cands] of candidates) {
     for (const [r, c] of cands) {
@@ -302,7 +320,7 @@ function nakedSingle(
     }
   }
   for (const [r, cells] of rowCandidates) {
-    if (watcherRows.has(r)) continue;
+    if ((rowCounts.get(r) ?? 0) >= limit) continue; // row already satisfied
     if (cells.length === 1) {
       const [, c, territory] = cells[0];
       return {
@@ -314,7 +332,7 @@ function nakedSingle(
     }
   }
 
-  // Column naked single
+  // Column naked single: col still needs a watcher and has exactly 1 candidate
   const colCandidates = new Map<number, [number, number, number][]>();
   for (const [territory, cands] of candidates) {
     for (const [r, c] of cands) {
@@ -323,7 +341,7 @@ function nakedSingle(
     }
   }
   for (const [c, cells] of colCandidates) {
-    if (watcherCols.has(c)) continue;
+    if ((colCounts.get(c) ?? 0) >= limit) continue; // col already satisfied
     if (cells.length === 1) {
       const [r, , territory] = cells[0];
       return {
@@ -339,6 +357,39 @@ function nakedSingle(
 }
 
 /**
+ * Twin naked pair.
+ * In twin-watchers mode: if a territory has exactly 2 candidates remaining
+ * and no watchers placed yet, both cells must be watchers. Hint at the first.
+ */
+function twinNakedPair(
+  puzzle: Puzzle,
+  playerCells: CellState[][],
+  candidates: Map<number, [number, number][]>
+): DeductionResult | null {
+  if (puzzle.mode !== 'twin-watchers') return null;
+
+  const watchers = getWatcherPositions(playerCells);
+  const territoryCounts = new Map<number, number>();
+  for (const [r, c] of watchers) {
+    const t = puzzle.territoryMap[r][c];
+    territoryCounts.set(t, (territoryCounts.get(t) ?? 0) + 1);
+  }
+
+  for (const [territory, cands] of candidates) {
+    if (cands.length !== 2) continue;
+    if ((territoryCounts.get(territory) ?? 0) !== 0) continue; // already has a watcher
+    const [r, c] = cands[0];
+    return {
+      type: 'watcher', row: r, col: c,
+      reason: `Territory ${territory + 1} has only two valid cells — both must hold a Watcher.`,
+      reasonType: 'naked-single-territory',
+      affectedTerritories: [territory],
+    };
+  }
+  return null;
+}
+
+/**
  * Technique 2: Row confinement.
  * If all candidates for a territory lie in a single row, no other territory
  * can place a Watcher in that row → eliminate those cells.
@@ -349,22 +400,37 @@ function rowConfinement(
   playerCells: CellState[][],
   candidates: Map<number, [number, number][]>
 ): DeductionResult | null {
+  const limit = puzzle.mode === 'twin-watchers' ? 2 : 1;
+  const watchers = getWatcherPositions(playerCells);
+  const territoryCounts = new Map<number, number>();
+  const rowCounts = new Map<number, number>();
+  for (const [wr, wc] of watchers) {
+    const t = puzzle.territoryMap[wr][wc];
+    territoryCounts.set(t, (territoryCounts.get(t) ?? 0) + 1);
+    rowCounts.set(wr, (rowCounts.get(wr) ?? 0) + 1);
+  }
+
   for (const [territory, cands] of candidates) {
     if (cands.length === 0) continue;
 
     const rows = new Set(cands.map(([r]) => r));
     if (rows.size !== 1) continue;
 
-    // This territory is confined to one row
     const confinedRow = cands[0][0];
 
-    // Find cells in that row that belong to OTHER territories and are still empty
+    // Territory needs this many more watchers
+    const tNeeds = limit - (territoryCounts.get(territory) ?? 0);
+    // Row has this many open slots
+    const rowSlots = limit - (rowCounts.get(confinedRow) ?? 0);
+    // Only block others if T needs to fill all remaining row slots
+    if (tNeeds < rowSlots) continue;
+
+    // Find cells in that row that belong to OTHER territories and are still candidates
     for (let c = 0; c < puzzle.size; c++) {
       if (playerCells[confinedRow][c] !== 'empty') continue;
       const cellTerritory = puzzle.territoryMap[confinedRow][c];
       if (cellTerritory === territory) continue;
 
-      // Check this cell is actually a candidate for its territory
       const territoryCands = candidates.get(cellTerritory) ?? [];
       const isCandidate = territoryCands.some(([r2, c2]) => r2 === confinedRow && c2 === c);
       if (!isCandidate) continue;
@@ -392,14 +458,27 @@ function columnConfinement(
   playerCells: CellState[][],
   candidates: Map<number, [number, number][]>
 ): DeductionResult | null {
+  const limit = puzzle.mode === 'twin-watchers' ? 2 : 1;
+  const watchers = getWatcherPositions(playerCells);
+  const territoryCounts = new Map<number, number>();
+  const colCounts = new Map<number, number>();
+  for (const [wr, wc] of watchers) {
+    const t = puzzle.territoryMap[wr][wc];
+    territoryCounts.set(t, (territoryCounts.get(t) ?? 0) + 1);
+    colCounts.set(wc, (colCounts.get(wc) ?? 0) + 1);
+  }
+
   for (const [territory, cands] of candidates) {
     if (cands.length === 0) continue;
 
     const cols = new Set(cands.map(([, c]) => c));
     if (cols.size !== 1) continue;
 
-    // This territory is confined to one column
     const confinedCol = cands[0][1];
+
+    const tNeeds = limit - (territoryCounts.get(territory) ?? 0);
+    const colSlots = limit - (colCounts.get(confinedCol) ?? 0);
+    if (tNeeds < colSlots) continue;
 
     for (let r = 0; r < puzzle.size; r++) {
       if (playerCells[r][confinedCol] !== 'empty') continue;
@@ -438,17 +517,26 @@ function dualConfinement(
   playerCells: CellState[][],
   candidates: Map<number, [number, number][]>
 ): DeductionResult | null {
+  const limit = puzzle.mode === 'twin-watchers' ? 2 : 1;
   const watchers = getWatcherPositions(playerCells);
-  const watcherRows = new Set(watchers.map(([r]) => r));
-  const watcherCols = new Set(watchers.map(([, c]) => c));
+  const rowCounts = new Map<number, number>();
+  const colCounts = new Map<number, number>();
+  for (const [r, c] of watchers) {
+    rowCounts.set(r, (rowCounts.get(r) ?? 0) + 1);
+    colCounts.set(c, (colCounts.get(c) ?? 0) + 1);
+  }
+  const fullRows = new Set<number>();
+  const fullCols = new Set<number>();
+  for (const [r, cnt] of rowCounts) if (cnt >= limit) fullRows.add(r);
+  for (const [c, cnt] of colCounts) if (cnt >= limit) fullCols.add(c);
 
   for (const [t, cands] of candidates) {
     if (cands.length <= 1) continue; // naked single or already satisfied — handled elsewhere
 
     // Build the set of rows and cols blocked FOR territory t by other territories:
     // a row is blocked if some other (unsatisfied) territory has ALL its candidates in that row.
-    const blockedRows = new Set<number>(watcherRows);
-    const blockedCols = new Set<number>(watcherCols);
+    const blockedRows = new Set<number>(fullRows);
+    const blockedCols = new Set<number>(fullCols);
 
     for (const [ot, ocands] of candidates) {
       if (ot === t || ocands.length === 0) continue;
@@ -592,7 +680,19 @@ function adjacencyElimination(
   _candidates: Map<number, [number, number][]>
 ): DeductionResult | null {
   const n = puzzle.size;
+  const limit = puzzle.mode === 'twin-watchers' ? 2 : 1;
   const watchers = getWatcherPositions(playerCells);
+
+  // Pre-compute counts for limit-aware row/col/territory blocking
+  const rowCounts = new Map<number, number>();
+  const colCounts = new Map<number, number>();
+  const territoryCounts = new Map<number, number>();
+  for (const [wr, wc] of watchers) {
+    rowCounts.set(wr, (rowCounts.get(wr) ?? 0) + 1);
+    colCounts.set(wc, (colCounts.get(wc) ?? 0) + 1);
+    const t = puzzle.territoryMap[wr][wc];
+    territoryCounts.set(t, (territoryCounts.get(t) ?? 0) + 1);
+  }
 
   for (const [wr, wc] of watchers) {
     for (let dr = -1; dr <= 1; dr++) {
@@ -612,40 +712,49 @@ function adjacencyElimination(
         }
       }
     }
-    for (let c = 0; c < n; c++) {
-      if (c !== wc && playerCells[wr][c] === 'empty') {
-        return {
-          type: 'ward', row: wr, col: c,
-          reason: `Row ${wr + 1} already has a Watcher.`,
-          reasonType: 'row-occupied',
-          blockedBy: [wr, wc],
-          affectedCells: [[wr, wc]],
-        };
+    // Only ward the rest of the row if the row has reached its watcher limit
+    if ((rowCounts.get(wr) ?? 0) >= limit) {
+      for (let c = 0; c < n; c++) {
+        if (c !== wc && playerCells[wr][c] === 'empty') {
+          return {
+            type: 'ward', row: wr, col: c,
+            reason: `Row ${wr + 1} already has ${limit} Watcher${limit > 1 ? 's' : ''}.`,
+            reasonType: 'row-occupied',
+            blockedBy: [wr, wc],
+            affectedCells: [[wr, wc]],
+          };
+        }
       }
     }
-    for (let r = 0; r < n; r++) {
-      if (r !== wr && playerCells[r][wc] === 'empty') {
-        return {
-          type: 'ward', row: r, col: wc,
-          reason: `Column ${wc + 1} already has a Watcher.`,
-          reasonType: 'col-occupied',
-          blockedBy: [wr, wc],
-          affectedCells: [[wr, wc]],
-        };
+    // Only ward the rest of the col if the col has reached its watcher limit
+    if ((colCounts.get(wc) ?? 0) >= limit) {
+      for (let r = 0; r < n; r++) {
+        if (r !== wr && playerCells[r][wc] === 'empty') {
+          return {
+            type: 'ward', row: r, col: wc,
+            reason: `Column ${wc + 1} already has ${limit} Watcher${limit > 1 ? 's' : ''}.`,
+            reasonType: 'col-occupied',
+            blockedBy: [wr, wc],
+            affectedCells: [[wr, wc]],
+          };
+        }
       }
     }
     const watcherTerritory = puzzle.territoryMap[wr][wc];
-    for (let r = 0; r < n; r++) {
-      for (let c = 0; c < n; c++) {
-        if (puzzle.territoryMap[r][c] === watcherTerritory && playerCells[r][c] === 'empty') {
-          return {
-            type: 'ward', row: r, col: c,
-            reason: `This territory already has a Watcher.`,
-            reasonType: 'territory-occupied',
-            blockedBy: [wr, wc],
-            affectedCells: [[wr, wc]],
-            affectedTerritories: [watcherTerritory],
-          };
+    // Only ward rest of territory if territory has reached its watcher limit
+    if ((territoryCounts.get(watcherTerritory) ?? 0) >= limit) {
+      for (let r = 0; r < n; r++) {
+        for (let c = 0; c < n; c++) {
+          if (puzzle.territoryMap[r][c] === watcherTerritory && playerCells[r][c] === 'empty') {
+            return {
+              type: 'ward', row: r, col: c,
+              reason: `This territory already has ${limit} Watcher${limit > 1 ? 's' : ''}.`,
+              reasonType: 'territory-occupied',
+              blockedBy: [wr, wc],
+              affectedCells: [[wr, wc]],
+              affectedTerritories: [watcherTerritory],
+            };
+          }
         }
       }
     }
@@ -673,7 +782,10 @@ export function getNextDeduction(
   const adj = adjacencyElimination(puzzle, playerCells, candidates);
   if (adj) return adj;
 
-  // Recompute candidates after considering adjacency (candidates already exclude adjacents)
+  // Technique 1a (twin mode): territory with exactly 2 candidates → both must be watchers
+  const tnp = twinNakedPair(puzzle, playerCells, candidates);
+  if (tnp) return tnp;
+
   // Technique 1: Naked single
   const ns = nakedSingle(puzzle, playerCells, candidates);
   if (ns) return ns;
@@ -793,13 +905,19 @@ function hiddenSetElimination(
   playerCells: CellState[][],
   candidates: Map<number, [number, number][]>
 ): DeductionResult | null {
+  // Hidden set logic assumes 1 watcher per row/col/territory; doesn't generalize to twin mode
+  if (puzzle.mode === 'twin-watchers') return null;
   const n = puzzle.size;
   const watchers = getWatcherPositions(playerCells);
-  const watcherRows = new Set(watchers.map(([r]) => r));
-  const watcherCols = new Set(watchers.map(([, c]) => c));
+  const rowCounts = new Map<number, number>();
+  const colCounts = new Map<number, number>();
+  for (const [r, c] of watchers) {
+    rowCounts.set(r, (rowCounts.get(r) ?? 0) + 1);
+    colCounts.set(c, (colCounts.get(c) ?? 0) + 1);
+  }
 
-  const unfilledRows = Array.from({ length: n }, (_, i) => i).filter(r => !watcherRows.has(r));
-  const unfilledCols = Array.from({ length: n }, (_, i) => i).filter(c => !watcherCols.has(c));
+  const unfilledRows = Array.from({ length: n }, (_, i) => i).filter(r => (rowCounts.get(r) ?? 0) < 1);
+  const unfilledCols = Array.from({ length: n }, (_, i) => i).filter(c => (colCounts.get(c) ?? 0) < 1);
 
   // Hidden sets by row
   for (let k = 2; k <= unfilledRows.length - 1; k++) {
@@ -896,9 +1014,11 @@ function contradictionTest(
   const limit = limitOverride ?? Math.max(n * 5, 24);
   const testCands = allCands.slice(0, limit);
 
+  const applyLim = puzzle.mode === 'twin-watchers' ? 2 : 1;
+
   for (const [r, c, territory] of testCands) {
     const test = deepCopy(playerCells);
-    applyDeduction(test, { type: 'watcher', row: r, col: c, reason: 'test' });
+    applyDeduction(test, { type: 'watcher', row: r, col: c, reason: 'test' }, applyLim);
 
     let outerChanged = true;
     while (outerChanged) {
@@ -910,12 +1030,14 @@ function contradictionTest(
         innerChanged = false;
         const testCands = getCandidates(puzzle, test);
         // getCandidates returns [] for both satisfied AND stuck territories;
-        // use testOccupied to avoid false positives on satisfied territories.
-        const testOccupied = new Set(
-          getWatcherPositions(test).map(([wr, wc]) => puzzle.territoryMap[wr][wc])
-        );
+        // build a count map so twin territories need 2 watchers to be "satisfied".
+        const watcherCnts = new Map<number, number>();
+        for (const [wr, wc] of getWatcherPositions(test)) {
+          const t = puzzle.territoryMap[wr][wc];
+          watcherCnts.set(t, (watcherCnts.get(t) ?? 0) + 1);
+        }
         for (const [t2, tc] of testCands) {
-          if (tc.length === 0 && !testOccupied.has(t2)) {
+          if (tc.length === 0 && (watcherCnts.get(t2) ?? 0) < applyLim) {
             return {
               type: 'ward', row: r, col: c,
               reason: `Placing a Watcher here would leave the ${t2 + 1} territory with no valid cells.`,
@@ -933,7 +1055,7 @@ function contradictionTest(
           rowConfinement(puzzle, test, testCands) ??
           columnConfinement(puzzle, test, testCands);
         if (propagate && test[propagate.row][propagate.col] === 'empty') {
-          applyDeduction(test, propagate);
+          applyDeduction(test, propagate, applyLim);
           innerChanged = true;
         }
       }
@@ -944,7 +1066,7 @@ function contradictionTest(
         // Use a smaller inner limit to avoid quadratic blowup (outer n*3 × inner n).
         const sub = contradictionTest(puzzle, test, testCands, depth - 1, puzzle.size);
         if (sub && test[sub.row][sub.col] === 'empty') {
-          applyDeduction(test, sub);
+          applyDeduction(test, sub, applyLim);
           outerChanged = true; // re-run basic propagation with the new ward applied
         }
       }
@@ -982,7 +1104,7 @@ export function solveLogically(
 
     const deduction = getNextDeduction(puzzle, cells, maxDepth);
     if (deduction) {
-      applyDeduction(cells, deduction);
+      applyDeduction(cells, deduction, puzzle.mode === 'twin-watchers' ? 2 : 1);
       progress = true;
     }
   }
@@ -1017,7 +1139,7 @@ export function solveWithTrace(
     const d = getNextDeduction(puzzle, cells, maxDepth);
     if (d) {
       steps.push(d);
-      applyDeduction(cells, d);
+      applyDeduction(cells, d, puzzle.mode === 'twin-watchers' ? 2 : 1);
       progress = true;
     }
   }
@@ -1145,8 +1267,9 @@ export function computeCascadeSteps(
   hypothRow: number,
   hypothCol: number,
 ): [number, number][] {
+  const lim = puzzle.mode === 'twin-watchers' ? 2 : 1;
   const cells = deepCopy(playerCells);
-  applyDeduction(cells, { type: 'watcher', row: hypothRow, col: hypothCol, reason: 'cascade' });
+  applyDeduction(cells, { type: 'watcher', row: hypothRow, col: hypothCol, reason: 'cascade' }, lim);
 
   const steps: [number, number][] = [];
 
@@ -1156,7 +1279,6 @@ export function computeCascadeSteps(
 
     const cands = getCandidates(puzzle, cells);
 
-    // All forward techniques, no contradiction test (avoid circular logic)
     const d =
       adjacencyElimination(puzzle, cells, cands) ??
       dualConfinement(puzzle, cells, cands) ??
@@ -1169,10 +1291,8 @@ export function computeCascadeSteps(
 
     if (!d || cells[d.row][d.col] !== 'empty') break;
 
-    if (d.type === 'watcher') {
-      steps.push([d.row, d.col]);
-    }
-    applyDeduction(cells, d);
+    if (d.type === 'watcher') steps.push([d.row, d.col]);
+    applyDeduction(cells, d, lim);
   }
 
   return steps;
@@ -1202,6 +1322,8 @@ export function buildCascadeConstraintWaves(
   const cells = deepCopy(playerCells);
   const result: [number, number][][][] = [];
 
+  const lim = puzzle.mode === 'twin-watchers' ? 2 : 1;
+
   for (const [wr, wc] of [[hypothRow, hypothCol] as [number, number], ...forcedSteps]) {
     const localSeen = new Set<string>([`${wr},${wc}`]);
     const waves: [number, number][][] = [];
@@ -1211,6 +1333,15 @@ export function buildCascadeConstraintWaves(
       cells[r][c] === 'empty' &&
       !localSeen.has(`${r},${c}`);
     const mark = (r: number, c: number) => localSeen.add(`${r},${c}`);
+
+    // Count watchers already in this row, col, and territory before this placement.
+    const watcherTerritory = puzzle.territoryMap[wr][wc];
+    let rowCount = 0, colCount = 0, terrCount = 0;
+    for (let c = 0; c < n; c++) if (cells[wr][c] === 'watcher') rowCount++;
+    for (let r = 0; r < n; r++) if (cells[r][wc] === 'watcher') colCount++;
+    for (let r = 0; r < n; r++)
+      for (let c = 0; c < n; c++)
+        if (puzzle.territoryMap[r][c] === watcherTerritory && cells[r][c] === 'watcher') terrCount++;
 
     // Wave 0: adjacent (8-directional)
     const adjWave: [number, number][] = [];
@@ -1224,38 +1355,43 @@ export function buildCascadeConstraintWaves(
     }
     if (adjWave.length > 0) waves.push(adjWave);
 
-    // Wave 1: rest of the row
-    const rowWave: [number, number][] = [];
-    for (let c = 0; c < n; c++) {
-      if (!avail(wr, c)) continue;
-      rowWave.push([wr, c]); mark(wr, c);
-    }
-    if (rowWave.length > 0) waves.push(rowWave);
-
-    // Wave 2: rest of the column
-    const colWave: [number, number][] = [];
-    for (let r = 0; r < n; r++) {
-      if (!avail(r, wc)) continue;
-      colWave.push([r, wc]); mark(r, wc);
-    }
-    if (colWave.length > 0) waves.push(colWave);
-
-    // Wave 3: rest of the watcher's own territory
-    const watcherTerritory = puzzle.territoryMap[wr][wc];
-    const terrWave: [number, number][] = [];
-    for (let r = 0; r < n; r++) {
+    // Wave 1: rest of the row — only when this placement fills the row
+    if (rowCount + 1 >= lim) {
+      const rowWave: [number, number][] = [];
       for (let c = 0; c < n; c++) {
-        if (puzzle.territoryMap[r][c] !== watcherTerritory) continue;
-        if (!avail(r, c)) continue;
-        terrWave.push([r, c]); mark(r, c);
+        if (!avail(wr, c)) continue;
+        rowWave.push([wr, c]); mark(wr, c);
       }
+      if (rowWave.length > 0) waves.push(rowWave);
     }
-    if (terrWave.length > 0) waves.push(terrWave);
+
+    // Wave 2: rest of the column — only when this placement fills the col
+    if (colCount + 1 >= lim) {
+      const colWave: [number, number][] = [];
+      for (let r = 0; r < n; r++) {
+        if (!avail(r, wc)) continue;
+        colWave.push([r, wc]); mark(r, wc);
+      }
+      if (colWave.length > 0) waves.push(colWave);
+    }
+
+    // Wave 3: rest of the territory — only when this placement fills the territory
+    if (terrCount + 1 >= lim) {
+      const terrWave: [number, number][] = [];
+      for (let r = 0; r < n; r++) {
+        for (let c = 0; c < n; c++) {
+          if (puzzle.territoryMap[r][c] !== watcherTerritory) continue;
+          if (!avail(r, c)) continue;
+          terrWave.push([r, c]); mark(r, c);
+        }
+      }
+      if (terrWave.length > 0) waves.push(terrWave);
+    }
 
     result.push(waves);
 
     // Advance simulation: apply watcher + its direct constraints
-    applyDeduction(cells, { type: 'watcher', row: wr, col: wc, reason: 'cascade' });
+    applyDeduction(cells, { type: 'watcher', row: wr, col: wc, reason: 'cascade' }, lim);
     for (const wave of waves) {
       for (const [r, c] of wave) {
         if (cells[r][c] === 'empty') cells[r][c] = 'ward';

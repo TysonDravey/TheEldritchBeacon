@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface GameControlsProps {
   onHint: () => void;
@@ -96,8 +97,8 @@ export default function GameControls({
         />
       </div>
 
-      {/* Restart confirmation dialog */}
-      {confirming && (
+      {/* Restart confirmation dialog — rendered via portal to escape backdropFilter stacking context */}
+      {confirming && typeof document !== 'undefined' && createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center"
           style={{ background: 'rgba(8,5,2,0.88)' }}
@@ -177,7 +178,8 @@ export default function GameControls({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
