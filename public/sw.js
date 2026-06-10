@@ -61,6 +61,8 @@ self.addEventListener('fetch', (event) => {
 
   // Network-first for HTML/JS (app shell stays fresh)
   event.respondWith(
-    fetch(request).catch(() => caches.match(request))
+    fetch(request).catch(() =>
+      caches.match(request).then(r => r ?? new Response('', { status: 503, statusText: 'Offline' }))
+    )
   );
 });

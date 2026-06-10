@@ -4,6 +4,8 @@ import { useRef, useEffect, useCallback } from 'react';
 import type { Puzzle, CellState, ContradictionResult } from '@/engine/boardTypes';
 import Cell from './Cell';
 
+export let boardRenderStart = 0;
+
 interface BoardProps {
   puzzle: Puzzle;
   playerCells: CellState[][];
@@ -83,6 +85,7 @@ export default function Board({
   isCompleted = false,
   isFreshWin = false,
 }: BoardProps) {
+  boardRenderStart = performance.now();
   const { size, territoryMap } = puzzle;
 
   // Keep latest versions in refs so stable handlers don't go stale
@@ -106,13 +109,12 @@ export default function Board({
   const dragActionRef   = useRef<'place' | 'remove'>('place');
   const visitedDragCellsRef = useRef<Set<string>>(new Set());
   const clickTimerRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingClickRef    = useRef<{ row: number; col: number } | null>(null);
   const lastTapRef         = useRef<{ x: number; y: number; time: number } | null>(null);
   const doubletapFiredRef  = useRef(false);
   const boardHandledUpRef  = useRef(false);
   const boardRef = useRef<HTMLDivElement>(null);
 
-  // Cache of cell screen rects — built once per gesture at pointerDown.
+  // Cache of cell screen rects — built once after mount and on resize.
   // elementFromPoint is unreliable with preserve-3d and transparent tile corners;
   // using getBoundingClientRect per cell is exact regardless of 3D transforms.
   type CellRect = { row: number; col: number; left: number; top: number; right: number; bottom: number };
@@ -131,6 +133,14 @@ export default function Board({
     cellRectsRef.current = cache;
   }
 
+  // Build cache on mount and whenever the board resizes (orientation change, zoom, etc.)
+  useEffect(() => {
+    buildCellCache();
+    const ro = new ResizeObserver(() => buildCellCache());
+    if (boardRef.current) ro.observe(boardRef.current);
+    return () => ro.disconnect();
+  }, [size]);
+
   function getCellAtPoint(x: number, y: number): { row: number; col: number } | null {
     for (const c of cellRectsRef.current) {
       if (x >= c.left && x < c.right && y >= c.top && y < c.bottom) return { row: c.row, col: c.col };
@@ -140,11 +150,12 @@ export default function Board({
 
   function wiggleCell(row: number, col: number) {
     const cellEl = document.querySelector(`[data-cell="true"][data-row="${row}"][data-col="${col}"]`);
-    if (cellEl) {
-      cellEl.classList.remove('tile-wiggle');
-      void (cellEl as HTMLElement).offsetWidth;
-      cellEl.classList.add('tile-wiggle');
-    }
+    if (!cellEl) return;
+    // Double-rAF restarts the CSS animation without a forced synchronous reflow.
+    // (offsetWidth/offsetHeight flush layout and can stall the main thread for 1–2 s
+    //  on a 3-D board with CSS masks; rAF defers to after the current paint.)
+    cellEl.classList.remove('tile-wiggle');
+    requestAnimationFrame(() => requestAnimationFrame(() => cellEl.classList.add('tile-wiggle')));
   }
 
   function applyDragWard(row: number, col: number) {
@@ -155,21 +166,17 @@ export default function Board({
     // places or only removes; the toggle-based onCellWard is never called during drags.
     if (onCellDragRef.current) {
       onCellDragRef.current(row, col, dragActionRef.current);
-      wiggleCell(row, col);
+      // No wiggleCell here — offsetWidth forces a synchronous reflow per cell during drag
     }
   }
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0) return;
     e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    buildCellCache();
+    // e.currentTarget.setPointerCapture(e.pointerId); // DISABLED FOR PERF TESTING
 
-    // Always cancel any pending single-click from the previous gesture — if the user
-    // taps and then immediately starts dragging, the old timer must not fire mid-drag
-    // and toggle a ward unexpectedly.
+    // Cancel the double-tap expiry timer so lastTapRef doesn't get cleared mid-gesture.
     if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
-    pendingClickRef.current = null;
 
     pointerDownRef.current  = true;
     isDraggingRef.current   = false;
@@ -185,11 +192,10 @@ export default function Board({
     if (last) {
       const dx = e.clientX - last.x, dy = e.clientY - last.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < 40 && now - last.time < 300) {
+      if (dist < 40 && now - last.time < 900) {
         doubletapFiredRef.current = true;
         lastTapRef.current = null;
-        const state = playerCellsRef.current[cell.row]?.[cell.col];
-        if (state !== 'ward') onCellWatcherRef.current(cell.row, cell.col);
+        onCellWatcherRef.current(cell.row, cell.col);
         return;
       }
     }
@@ -206,14 +212,13 @@ export default function Board({
     if (!isDraggingRef.current && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
       isDraggingRef.current = true;
       onDragStartRef.current?.();
-      // Cancel any pending single-click
+      // Cancel double-tap expiry timer and clear last-tap so drag doesn't accidentally
+      // trigger double-tap on the next pointer-down.
       if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
-      pendingClickRef.current = null;
-      lastTapRef.current      = null;
-      // Apply to the cell where the drag started
-      const origin = getCellAtPoint(startPosRef.current.x, startPosRef.current.y);
-      if (origin) applyDragWard(origin.row, origin.col);
-      prevDragPosRef.current = { x: e.clientX, y: e.clientY };
+      lastTapRef.current = null;
+      // Start interpolation from the actual drag origin so the full path is covered,
+      // including cells crossed in the first 8px before drag mode was detected.
+      prevDragPosRef.current = { x: startPosRef.current.x, y: startPosRef.current.y };
     }
 
     if (isDraggingRef.current) {
@@ -241,6 +246,7 @@ export default function Board({
   }, []);
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
     if (!pointerDownRef.current) return;
     boardHandledUpRef.current = true;
     pointerDownRef.current = false;
@@ -254,30 +260,31 @@ export default function Board({
     const cell = getCellAtPoint(e.clientX, e.clientY);
     if (!cell) return;
 
-    wiggleCell(cell.row, cell.col);
-
     // Double-tap was already handled in pointerDown — just clean up and return
     if (doubletapFiredRef.current) {
       doubletapFiredRef.current = false;
       return;
     }
 
-    // Record screen position (not cell) so double-tap detection tolerates finger drift.
+    // wiggleCell(cell.row, cell.col); // DISABLED FOR PERF TESTING
+
+    // Record screen position for double-tap detection (tolerates finger drift)
     lastTapRef.current = { x: e.clientX, y: e.clientY, time: Date.now() };
 
-    // Start single-click timer — fires ward toggle if no double-tap within 300ms
+    // Place/remove ward immediately — no delay. If a double-tap follows within 900ms,
+    // handleCellWatcher reads the updated state and handles ward→watcher correctly.
+    const state = playerCellsRef.current[cell.row]?.[cell.col];
+    const _t0 = performance.now();
+    setTimeout(() => console.log(`[perf] setTimeout(0) delay: ${(performance.now() - _t0).toFixed(1)}ms`), 0);
+    requestAnimationFrame(() => console.log(`[perf] rAF delay: ${(performance.now() - _t0).toFixed(1)}ms`));
+    if (state !== 'watcher') onCellWardRef.current(cell.row, cell.col);
+
+    // Timer only expires the double-tap window (no pending action to fire)
     if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
-    pendingClickRef.current = cell;
     clickTimerRef.current = setTimeout(() => {
-      const pending = pendingClickRef.current;
-      if (pending) {
-        const state = playerCellsRef.current[pending.row]?.[pending.col];
-        if (state !== 'watcher') onCellWardRef.current(pending.row, pending.col);
-      }
-      pendingClickRef.current = null;
-      clickTimerRef.current   = null;
-      lastTapRef.current      = null;
-    }, 300);
+      clickTimerRef.current = null;
+      lastTapRef.current    = null;
+    }, 900);
   }, []);
 
 
@@ -292,7 +299,6 @@ export default function Board({
       visitedDragCellsRef.current = new Set();
       if (!boardHandledUpRef.current) {
         if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
-        pendingClickRef.current = null;
       }
       boardHandledUpRef.current = false;
     };
@@ -301,7 +307,7 @@ export default function Board({
   }, []);
 
   return (
-    <div style={{ perspective: '700px', perspectiveOrigin: '50% 50%' }}>
+    <div>
     <div
       ref={boardRef}
       className="game-board inline-block border-2 cursor-pointer"
@@ -309,18 +315,13 @@ export default function Board({
         lineHeight: 0,
         touchAction: 'none',
         borderColor: 'rgba(26, 18, 9, 0.75)',
-        boxShadow: '14px 40px 28px rgba(0, 0, 0, 0.9), 5px 12px 8px rgba(0, 0, 0, 0.75)',
-        transform: 'rotateX(18deg)',
-        transformOrigin: 'center center',
-        willChange: 'transform',
-        transformStyle: 'preserve-3d',
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
     >
       {Array.from({ length: size }, (_, row) => (
-        <div key={row} className="flex" style={{ transformStyle: 'preserve-3d' }}>
+        <div key={row} className="flex">
           {Array.from({ length: size }, (_, col) => {
             const territory = territoryMap[row][col];
             const state     = playerCells[row]?.[col] ?? 'empty';

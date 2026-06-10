@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useLayoutEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import posthog from 'posthog-js';
 import NextImage from 'next/image';
@@ -12,7 +12,7 @@ import { scorePuzzle } from '@/engine/difficulty';
 import { isSolved, canPlaceWatcher, watcherRejectionReason } from '@/engine/rules';
 import { findContradictions } from '@/engine/solver';
 import type { PlayerState, CellState, HintResult, ContradictionResult, Difficulty } from '@/engine/boardTypes';
-import Board from '@/components/Board';
+import Board, { boardRenderStart } from '@/components/Board';
 import GameControls from '@/components/GameControls';
 import HintOverlay from '@/components/HintOverlay';
 import TechniqueDiscovery from '@/components/TechniqueDiscovery';
@@ -263,6 +263,18 @@ export default function PuzzlePage() {
   useEffect(() => () => { winTimersRef.current.forEach(clearTimeout); }, []);
   useEffect(() => { playerStateRef.current = playerState; }, [playerState]);
 
+  const tapTimeRef = useRef(0);
+  useLayoutEffect(() => {
+    if (tapTimeRef.current > 0) {
+      const now = performance.now();
+      const total = now - tapTimeRef.current;
+      const render = now - boardRenderStart;
+      const schedule = total - render;
+      console.log(`[perf] total: ${total.toFixed(1)}ms | schedule-to-render: ${schedule.toFixed(1)}ms | render+commit: ${render.toFixed(1)}ms`);
+      tapTimeRef.current = 0;
+    }
+  }, [playerState]);
+
   // Shared logic for applying any cell state change
   const applyChange = useCallback(
     (row: number, col: number, next: CellState) => {
@@ -285,14 +297,19 @@ export default function PuzzlePage() {
         newUndoStack = [...current.undoStack, current.cells.map((r) => [...r])].slice(-UNDO_LIMIT);
       }
 
-      // Haptic for the cell transition
-      if (next === 'watcher' || (next === 'empty' && current.cells[row][col] === 'watcher')) haptic('medium');
-      else haptic('light');
+      // Haptic — skip during drag (vibrate per cell would be excessive and adds up)
+      if (!isDraggingRef.current) {
+        if (next === 'watcher' || (next === 'empty' && current.cells[row][col] === 'watcher')) haptic('medium');
+        else haptic('light');
+      }
 
-      hintDepthRef.current = 0;
-      setHintResult(null);
-      const contra  = findContradictions(puzzle, newCells);
-      const solved  = isSolved(puzzle, newCells);
+      const dragging = isDraggingRef.current;
+      if (!dragging) {
+        hintDepthRef.current = 0;
+        setHintResult(null);
+      }
+      const contra = dragging ? { found: false } : findContradictions(puzzle, newCells);
+      const solved = dragging ? false : isSolved(puzzle, newCells);
 
       const newState: PlayerState = {
         ...current,
@@ -304,9 +321,14 @@ export default function PuzzlePage() {
       // Sync ref update must happen before setPlayerState so the next rapid call
       // in the same frame sees this call's changes, not the stale closure state.
       playerStateRef.current = newState;
-      setContradiction(contra);
+      if (tapTimeRef.current > 0) console.log(`[perf] handleCellWard → setPlayerState: ${(performance.now() - tapTimeRef.current).toFixed(1)}ms`);
       setPlayerState(newState);
-      savePlayerState(newState);
+      if (!dragging) {
+        setContradiction(contra);
+        const t0 = performance.now();
+        savePlayerState(newState);
+        console.log(`[perf] savePlayerState: ${(performance.now() - t0).toFixed(1)}ms, undoStack length: ${newState.undoStack.length}`);
+      }
       if (solved) {
         posthog.capture('puzzle_completed', {
           puzzle_id:   puzzle.id,
@@ -338,8 +360,7 @@ export default function PuzzlePage() {
                 const el = document.querySelector(`[data-cell="true"][data-row="${r}"][data-col="${c}"]`);
                 if (el) {
                   el.classList.remove('tile-wiggle');
-                  void (el as HTMLElement).offsetWidth;
-                  el.classList.add('tile-wiggle');
+                  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('tile-wiggle')));
                 }
               }, delay);
               winTimersRef.current.push(t);
@@ -380,6 +401,8 @@ export default function PuzzlePage() {
   const handleDragEnd = useCallback(() => {
     isDraggingRef.current   = false;
     preDragCellsRef.current = null;
+    const current = playerStateRef.current;
+    if (current) savePlayerState(current);
   }, []);
 
   // Drag ward — dedicated non-toggle callback: only places when action='place', only removes
@@ -402,6 +425,7 @@ export default function PuzzlePage() {
   // was the race that caused wards to flip when dragging fast on desktop.
   const handleCellWard = useCallback(
     (row: number, col: number) => {
+      tapTimeRef.current = performance.now();
       const current = playerStateRef.current;
       if (!current) return;
       const prev = current.cells[row][col];
@@ -417,17 +441,21 @@ export default function PuzzlePage() {
       const current = playerStateRef.current;
       if (!current || !puzzle) return;
       const prev = current.cells[row][col];
-      if (prev === 'ward') return;
 
       if (prev === 'watcher') {
         applyChange(row, col, 'empty');
         return;
       }
 
-      if (!canPlaceWatcher(puzzle, current.cells, row, col)) {
-        const reason = watcherRejectionReason(puzzle, current.cells, row, col);
+      // For ward cells, test placement against the grid with that ward cleared first
+      const testCells = prev === 'ward'
+        ? current.cells.map((r, ri) => r.map((c, ci) => ri === row && ci === col ? 'empty' as CellState : c))
+        : current.cells;
+
+      if (!canPlaceWatcher(puzzle, testCells, row, col)) {
+        const reason = watcherRejectionReason(puzzle, testCells, row, col);
         haptic('error');
-        applyChange(row, col, 'ward');
+        if (prev !== 'ward') applyChange(row, col, 'ward');
         setRejectionMessage(reason);
         setFlashCells([[row, col]]);
         if (flashTimerRef.current) clearTimeout(flashTimerRef.current);

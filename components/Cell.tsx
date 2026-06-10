@@ -117,56 +117,10 @@ function Cell({
       data-col={col}
       style={{
         ...borderStyle,
-        boxShadow: 'inset 0 -4px 0 rgba(26,18,9,0.65), inset -4px 0 0 rgba(26,18,9,0.5), 0 4px 0 rgba(26,18,9,0.75), 4px 0 0 rgba(26,18,9,0.55)',
-        willChange: 'transform',
+        backgroundColor: colors.bg,
       }}
       className={`relative flex items-center justify-center select-none ${ringClass}`}
     >
-      {/* Layer 1: territory color, masked by the tile's alpha so transparent
-          edges of the tile show parchment underneath. Slight drop shadow
-          gives each cell a touch of organic lift. */}
-      <div
-        aria-hidden
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          backgroundColor: colors.bg,
-          maskImage: `url(${tileUrl})`,
-          WebkitMaskImage: `url(${tileUrl})`,
-          maskSize: 'cover',
-          WebkitMaskSize: 'cover',
-          maskPosition: 'center',
-          WebkitMaskPosition: 'center',
-          transform: `rotate(${tileRot}deg)`,
-          filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.25))',
-        }}
-      />
-      {/* Layer 2: the tile texture itself, multiplied for grunge. */}
-      <img
-        src={tileUrl}
-        alt=""
-        draggable={false}
-        aria-hidden
-        className="absolute inset-0 w-full h-full pointer-events-none select-none"
-        style={{
-          objectFit: 'cover',
-          transform: `rotate(${tileRot}deg)`,
-          mixBlendMode: 'multiply',
-          opacity: 0.7,
-        }}
-      />
-      {/* Layered stack from back to front:
-            z-10  dim overlay   — darkens the tile bg only
-            z-20  player content (watcher/ward) — always crisp on top of dim
-            z-30  hint overlays (spinner, ghost watchers, ghost/constraint wards) */}
-      {/* Directional light from top-left — matches board shadow direction */}
-      <div
-        aria-hidden
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background: 'linear-gradient(145deg, rgba(255,255,255,0.07) 0%, transparent 45%, rgba(0,0,0,0.1) 100%)',
-          zIndex: 3,
-        }}
-      />
       {isDimmed && <div className="absolute inset-0 bg-ink opacity-40 pointer-events-none z-10" />}
       {isHighlighted          && <div className="absolute inset-0 pointer-events-none z-10 hint-glow-red" />}
       {isSecondaryHighlighted && <div className="absolute inset-0 pointer-events-none z-10 hint-glow-brass" />}

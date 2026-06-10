@@ -27,6 +27,7 @@ html {
   scrollbar-gutter: stable both-edges;
   height: 100%;
   overflow-x: hidden;
+  touch-action: none;
 }
 
 body {
