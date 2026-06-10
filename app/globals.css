@@ -27,7 +27,6 @@ html {
   scrollbar-gutter: stable both-edges;
   height: 100%;
   overflow-x: hidden;
-  touch-action: none;
 }
 
 body {
@@ -127,14 +126,13 @@ button, a {
 }
 
 @keyframes tile-wiggle {
-  0%   { transform: translateZ(0px)  rotateX(0)      rotateY(0);     }
-  10%  { transform: translateZ(28px) rotateX(-10deg) rotateY(0);     }
-  28%  { transform: translateZ(22px) rotateX(4deg)   rotateY(-12deg);}
-  44%  { transform: translateZ(14px) rotateX(-3deg)  rotateY(8deg);  }
-  58%  { transform: translateZ(8px)  rotateX(2deg)   rotateY(-5deg); }
-  70%  { transform: translateZ(4px)  rotateX(-1deg)  rotateY(3deg);  }
-  82%  { transform: translateZ(1px)  rotateX(0)      rotateY(-1deg); }
-  100% { transform: translateZ(0px)  rotateX(0)      rotateY(0);     }
+  0%   { transform: scale(1.00) translateY(0px);  }
+  10%  { transform: scale(1.18) translateY(-7px); }
+  28%  { transform: scale(1.10) translateY(-4px); }
+  44%  { transform: scale(1.04) translateY(-2px); }
+  58%  { transform: scale(1.02) translateY(-1px); }
+  70%  { transform: scale(1.01) translateY(0px);  }
+  100% { transform: scale(1.00) translateY(0px);  }
 }
 
 

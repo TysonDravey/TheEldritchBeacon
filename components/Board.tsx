@@ -3,6 +3,7 @@
 import { useRef, useEffect, useCallback } from 'react';
 import type { Puzzle, CellState, ContradictionResult } from '@/engine/boardTypes';
 import Cell from './Cell';
+import BoardCanvas from './BoardCanvas';
 
 
 interface BoardProps {
@@ -312,15 +313,15 @@ export default function Board({
         boxShadow: '14px 40px 28px rgba(0, 0, 0, 0.9), 5px 12px 8px rgba(0, 0, 0, 0.75)',
         transform: 'rotateX(18deg)',
         transformOrigin: 'center center',
-        willChange: 'transform',
-        transformStyle: 'preserve-3d',
+        position: 'relative',
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
     >
+      <BoardCanvas puzzle={puzzle} />
       {Array.from({ length: size }, (_, row) => (
-        <div key={row} className="flex" style={{ transformStyle: 'preserve-3d' }}>
+        <div key={row} className="flex">
           {Array.from({ length: size }, (_, col) => {
             const territory = territoryMap[row][col];
             const state     = playerCells[row]?.[col] ?? 'empty';
