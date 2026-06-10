@@ -4,7 +4,6 @@ import { useRef, useEffect, useCallback } from 'react';
 import type { Puzzle, CellState, ContradictionResult } from '@/engine/boardTypes';
 import Cell from './Cell';
 
-export let boardRenderStart = 0;
 
 interface BoardProps {
   puzzle: Puzzle;
@@ -85,7 +84,6 @@ export default function Board({
   isCompleted = false,
   isFreshWin = false,
 }: BoardProps) {
-  boardRenderStart = performance.now();
   const { size, territoryMap } = puzzle;
 
   // Keep latest versions in refs so stable handlers don't go stale
@@ -173,7 +171,7 @@ export default function Board({
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0) return;
     e.preventDefault();
-    // e.currentTarget.setPointerCapture(e.pointerId); // DISABLED FOR PERF TESTING
+    e.currentTarget.setPointerCapture(e.pointerId);
 
     // Cancel the double-tap expiry timer so lastTapRef doesn't get cleared mid-gesture.
     if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
@@ -246,7 +244,6 @@ export default function Board({
   }, []);
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
-    e.preventDefault();
     if (!pointerDownRef.current) return;
     boardHandledUpRef.current = true;
     pointerDownRef.current = false;
@@ -266,7 +263,7 @@ export default function Board({
       return;
     }
 
-    // wiggleCell(cell.row, cell.col); // DISABLED FOR PERF TESTING
+    wiggleCell(cell.row, cell.col);
 
     // Record screen position for double-tap detection (tolerates finger drift)
     lastTapRef.current = { x: e.clientX, y: e.clientY, time: Date.now() };
@@ -274,9 +271,6 @@ export default function Board({
     // Place/remove ward immediately — no delay. If a double-tap follows within 900ms,
     // handleCellWatcher reads the updated state and handles ward→watcher correctly.
     const state = playerCellsRef.current[cell.row]?.[cell.col];
-    const _t0 = performance.now();
-    setTimeout(() => console.log(`[perf] setTimeout(0) delay: ${(performance.now() - _t0).toFixed(1)}ms`), 0);
-    requestAnimationFrame(() => console.log(`[perf] rAF delay: ${(performance.now() - _t0).toFixed(1)}ms`));
     if (state !== 'watcher') onCellWardRef.current(cell.row, cell.col);
 
     // Timer only expires the double-tap window (no pending action to fire)
@@ -307,7 +301,7 @@ export default function Board({
   }, []);
 
   return (
-    <div>
+    <div style={{ perspective: '700px', perspectiveOrigin: '50% 50%' }}>
     <div
       ref={boardRef}
       className="game-board inline-block border-2 cursor-pointer"
@@ -315,13 +309,18 @@ export default function Board({
         lineHeight: 0,
         touchAction: 'none',
         borderColor: 'rgba(26, 18, 9, 0.75)',
+        boxShadow: '14px 40px 28px rgba(0, 0, 0, 0.9), 5px 12px 8px rgba(0, 0, 0, 0.75)',
+        transform: 'rotateX(18deg)',
+        transformOrigin: 'center center',
+        willChange: 'transform',
+        transformStyle: 'preserve-3d',
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
     >
       {Array.from({ length: size }, (_, row) => (
-        <div key={row} className="flex">
+        <div key={row} className="flex" style={{ transformStyle: 'preserve-3d' }}>
           {Array.from({ length: size }, (_, col) => {
             const territory = territoryMap[row][col];
             const state     = playerCells[row]?.[col] ?? 'empty';

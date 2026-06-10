@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import posthog from 'posthog-js';
 import NextImage from 'next/image';
@@ -12,7 +12,7 @@ import { scorePuzzle } from '@/engine/difficulty';
 import { isSolved, canPlaceWatcher, watcherRejectionReason } from '@/engine/rules';
 import { findContradictions } from '@/engine/solver';
 import type { PlayerState, CellState, HintResult, ContradictionResult, Difficulty } from '@/engine/boardTypes';
-import Board, { boardRenderStart } from '@/components/Board';
+import Board from '@/components/Board';
 import GameControls from '@/components/GameControls';
 import HintOverlay from '@/components/HintOverlay';
 import TechniqueDiscovery from '@/components/TechniqueDiscovery';
@@ -263,17 +263,6 @@ export default function PuzzlePage() {
   useEffect(() => () => { winTimersRef.current.forEach(clearTimeout); }, []);
   useEffect(() => { playerStateRef.current = playerState; }, [playerState]);
 
-  const tapTimeRef = useRef(0);
-  useLayoutEffect(() => {
-    if (tapTimeRef.current > 0) {
-      const now = performance.now();
-      const total = now - tapTimeRef.current;
-      const render = now - boardRenderStart;
-      const schedule = total - render;
-      console.log(`[perf] total: ${total.toFixed(1)}ms | schedule-to-render: ${schedule.toFixed(1)}ms | render+commit: ${render.toFixed(1)}ms`);
-      tapTimeRef.current = 0;
-    }
-  }, [playerState]);
 
   // Shared logic for applying any cell state change
   const applyChange = useCallback(
@@ -308,7 +297,8 @@ export default function PuzzlePage() {
         hintDepthRef.current = 0;
         setHintResult(null);
       }
-      const contra = dragging ? { found: false } : findContradictions(puzzle, newCells);
+      const isWatcherChange = next === 'watcher' || (next === 'empty' && current.cells[row][col] === 'watcher');
+      const contra = dragging ? { found: false } : isWatcherChange ? findContradictions(puzzle, newCells) : null;
       const solved = dragging ? false : isSolved(puzzle, newCells);
 
       const newState: PlayerState = {
@@ -321,13 +311,10 @@ export default function PuzzlePage() {
       // Sync ref update must happen before setPlayerState so the next rapid call
       // in the same frame sees this call's changes, not the stale closure state.
       playerStateRef.current = newState;
-      if (tapTimeRef.current > 0) console.log(`[perf] handleCellWard → setPlayerState: ${(performance.now() - tapTimeRef.current).toFixed(1)}ms`);
       setPlayerState(newState);
       if (!dragging) {
-        setContradiction(contra);
-        const t0 = performance.now();
+        if (contra !== null) setContradiction(contra);
         savePlayerState(newState);
-        console.log(`[perf] savePlayerState: ${(performance.now() - t0).toFixed(1)}ms, undoStack length: ${newState.undoStack.length}`);
       }
       if (solved) {
         posthog.capture('puzzle_completed', {
@@ -425,7 +412,6 @@ export default function PuzzlePage() {
   // was the race that caused wards to flip when dragging fast on desktop.
   const handleCellWard = useCallback(
     (row: number, col: number) => {
-      tapTimeRef.current = performance.now();
       const current = playerStateRef.current;
       if (!current) return;
       const prev = current.cells[row][col];
