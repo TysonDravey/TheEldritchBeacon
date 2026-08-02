@@ -301,8 +301,12 @@ function buildWardHint(
       };
     }
 
-    // Twin mode: a single watcher never claims a full row or column (takes two).
-    // The contradiction comes from adjacency alone or a chain of forced placements.
+    // Twin mode: a single watcher never claims a full row or column (takes two),
+    // so "no forced watchers followed" does NOT mean the elimination was direct —
+    // a chain of pure ward eliminations (confinement, pairs, dead-ends) can still
+    // be required. Check what the hypothetical watcher's own direct reach
+    // (adjacency, plus row/col only if this placement would actually fill them)
+    // covers, rather than assuming chainLen===0 implies "adjacency alone."
     if (isTwin) {
       const forcedSteps     = computeCascadeSteps(puzzle, playerCells, row, col);
       const constraintWaves = buildCascadeConstraintWaves(puzzle, playerCells, row, col, forcedSteps);
@@ -312,10 +316,15 @@ function buildWardHint(
       const remainingVictimCells = victimCells.filter(([r, c]) => !constraintCovered.has(`${r},${c}`));
       const chainLen = forcedSteps.length;
 
+      const directCovered = new Set((constraintWaves[0] ?? []).flat().map(([r, c]) => `${r},${c}`));
+      const isDirect = victimCells.length > 0 && victimCells.every(([r, c]) => directCovered.has(`${r},${c}`));
+
       if (depth === 1) {
-        const msg = chainLen === 0
-          ? `If a Watcher rose here, its adjacency zone alone would eliminate every remaining valid cell in the ${tname(victim)} territory — leaving it with no refuge.`
-          : `If a Watcher rose here, it would force ${chainLen} more Watcher${chainLen > 1 ? 's' : ''} into fixed positions. Together that chain leaves the ${tname(victim)} territory with no valid refuge.`;
+        const msg = isDirect
+          ? `If a Watcher rose here, its immediate reach — adjacency, and its row or column once full — would eliminate every remaining valid cell in the ${tname(victim)} territory, leaving it with no refuge.`
+          : chainLen === 0
+            ? `If a Watcher rose here, a chain of eliminations across the board — confinements and shared rows or columns — would leave the ${tname(victim)} territory with no valid refuge.`
+            : `If a Watcher rose here, it would force ${chainLen} more Watcher${chainLen > 1 ? 's' : ''} into fixed positions. Together that chain leaves the ${tname(victim)} territory with no valid refuge.`;
         return {
           level: 2,
           message: msg,
@@ -325,9 +334,11 @@ function buildWardHint(
         };
       }
 
-      const msg = chainLen === 0
-        ? `A Watcher here is impossible. Its adjacency zone directly eliminates every remaining valid cell in the ${tname(victim)} territory. Mark this cell with a Ward.`
-        : `A Watcher here is impossible. It forces ${chainLen} Watcher${chainLen > 1 ? 's' : ''} into fixed positions — Watchers that have nowhere else to go. By the end of that chain, the ${tname(victim)} territory has no valid cell remaining. Mark this cell with a Ward.`;
+      const msg = isDirect
+        ? `A Watcher here is impossible. Its immediate reach — adjacency, and its row or column once full — directly eliminates every remaining valid cell in the ${tname(victim)} territory. Mark this cell with a Ward.`
+        : chainLen === 0
+          ? `A Watcher here is impossible. A chain of eliminations — confinements and shared rows or columns, not this Watcher's reach alone — leaves the ${tname(victim)} territory with no valid cell remaining. Mark this cell with a Ward.`
+          : `A Watcher here is impossible. It forces ${chainLen} Watcher${chainLen > 1 ? 's' : ''} into fixed positions — Watchers that have nowhere else to go. By the end of that chain, the ${tname(victim)} territory has no valid cell remaining. Mark this cell with a Ward.`;
       return {
         level: 3,
         message: msg,
