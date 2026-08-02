@@ -1,5 +1,5 @@
 import type { Puzzle, CellState, HintResult, DeductionResult } from './boardTypes';
-import { findContradictions, getNextDeduction, getCandidates, computeCascadeSteps, buildCascadeConstraintWaves } from './solver';
+import { findContradictions, getNextDeduction, getCandidates, computeCascadeSteps, buildCascadeConstraintWaves, traceWardChain } from './solver';
 import { getWatcherPositions } from './rules';
 
 // ---------------------------------------------------------------------------
@@ -42,6 +42,62 @@ function tnames(indices: number[]): string {
   const last = indices[indices.length - 1];
   const rest = indices.slice(0, -1);
   return `the ${rest.map(tname).join(', ')} and ${tname(last)} territories`;
+}
+
+// The reasonTypes worth narrating in a ward-chain explanation — cheap facts
+// like plain adjacency/row/col/territory-occupied wards are trivial noise.
+function describeWardChainStep(s: DeductionResult): string | null {
+  switch (s.reasonType) {
+    case 'row-confinement':
+      return s.confinedTerritory !== undefined
+        ? `the ${tname(s.confinedTerritory)} territory is confined to row ${s.row + 1}`
+        : null;
+    case 'col-confinement':
+      return s.confinedTerritory !== undefined
+        ? `the ${tname(s.confinedTerritory)} territory is confined to column ${s.col + 1}`
+        : null;
+    case 'pair-row':
+      return s.pairedTerritories?.length ? `${tnames(s.pairedTerritories)} together fill their shared rows` : null;
+    case 'pair-col':
+      return s.pairedTerritories?.length ? `${tnames(s.pairedTerritories)} together fill their shared columns` : null;
+    case 'dual-confinement':
+      return `row ${s.row + 1} and column ${s.col + 1} together force a Watcher at that cell`;
+    case 'territory-dead-end':
+      return s.confinedTerritory !== undefined
+        ? `the ${tname(s.confinedTerritory)} territory is left with no refuge`
+        : null;
+    default:
+      return null; // adjacency / row-occupied / col-occupied / territory-occupied / naked-single — too trivial to narrate
+  }
+}
+
+/**
+ * Extracts the meaningful, numbered steps of a ward-elimination chain (as
+ * traced by traceWardChain) — for the case where a hypothetical placement
+ * is impossible but no watcher was ever forced along the way. Each step
+ * carries the cell the deduction fired on, so the board can highlight it.
+ */
+function buildWardChainSteps(chain: DeductionResult[]): { cell: [number, number]; label: string }[] {
+  const steps: { cell: [number, number]; label: string }[] = [];
+  const seen = new Set<string>();
+  for (const s of chain) {
+    const desc = describeWardChainStep(s);
+    if (!desc || seen.has(desc)) continue;
+    seen.add(desc);
+    steps.push({ cell: [s.row, s.col], label: desc });
+    if (steps.length >= 4) break;
+  }
+  return steps;
+}
+
+/** Joins ward-chain steps into a single narrative clause for inline use in a sentence. */
+function narrateWardChain(steps: { cell: [number, number]; label: string }[]): string | null {
+  if (steps.length === 0) return null;
+  const labels = steps.map(s => s.label);
+  if (labels.length === 1) return labels[0];
+  const last = labels[labels.length - 1];
+  const rest = labels.slice(0, -1);
+  return `${rest.join('; ')}; then ${last}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -319,11 +375,21 @@ function buildWardHint(
       const directCovered = new Set((constraintWaves[0] ?? []).flat().map(([r, c]) => `${r},${c}`));
       const isDirect = victimCells.length > 0 && victimCells.every(([r, c]) => directCovered.has(`${r},${c}`));
 
+      // When it's not direct and no watcher was forced, trace the actual chain
+      // of ward eliminations (confinements, pairs, dead-ends) so the hint
+      // names what really happened instead of gesturing vaguely at "a chain."
+      const wardChainSteps = (!isDirect && chainLen === 0)
+        ? buildWardChainSteps(traceWardChain(puzzle, playerCells, row, col))
+        : [];
+      const wardNarrative = narrateWardChain(wardChainSteps);
+
       if (depth === 1) {
         const msg = isDirect
           ? `If a Watcher rose here, its immediate reach — adjacency, and its row or column once full — would eliminate every remaining valid cell in the ${tname(victim)} territory, leaving it with no refuge.`
           : chainLen === 0
-            ? `If a Watcher rose here, a chain of eliminations across the board — confinements and shared rows or columns — would leave the ${tname(victim)} territory with no valid refuge.`
+            ? (wardNarrative
+                ? `If a Watcher rose here, ${wardNarrative} — leaving the ${tname(victim)} territory with no valid refuge.`
+                : `If a Watcher rose here, a chain of eliminations across the board — confinements and shared rows or columns — would leave the ${tname(victim)} territory with no valid refuge.`)
             : `If a Watcher rose here, it would force ${chainLen} more Watcher${chainLen > 1 ? 's' : ''} into fixed positions. Together that chain leaves the ${tname(victim)} territory with no valid refuge.`;
         return {
           level: 2,
@@ -337,18 +403,22 @@ function buildWardHint(
       const msg = isDirect
         ? `A Watcher here is impossible. Its immediate reach — adjacency, and its row or column once full — directly eliminates every remaining valid cell in the ${tname(victim)} territory. Mark this cell with a Ward.`
         : chainLen === 0
-          ? `A Watcher here is impossible. A chain of eliminations — confinements and shared rows or columns, not this Watcher's reach alone — leaves the ${tname(victim)} territory with no valid cell remaining. Mark this cell with a Ward.`
+          ? (wardNarrative
+              ? `A Watcher here is impossible. Placing it would trigger a chain: ${wardNarrative} — leaving the ${tname(victim)} territory with no valid cell remaining. Mark this cell with a Ward.`
+              : `A Watcher here is impossible. A chain of eliminations — confinements and shared rows or columns, not this Watcher's reach alone — leaves the ${tname(victim)} territory with no valid cell remaining. Mark this cell with a Ward.`)
           : `A Watcher here is impossible. It forces ${chainLen} Watcher${chainLen > 1 ? 's' : ''} into fixed positions — Watchers that have nowhere else to go. By the end of that chain, the ${tname(victim)} territory has no valid cell remaining. Mark this cell with a Ward.`;
       return {
         level: 3,
         message: msg,
         primaryCell: [row, col],
         highlightCells: victimCells,
+        secondaryHighlightCells: wardChainSteps.length > 0 ? wardChainSteps.map(s => s.cell) : undefined,
         highlightTerritories: [victim],
         deduction: d,
         cascadeSteps: forcedSteps,
         cascadeConstraintWaves: constraintWaves,
         cascadeVictimCells: remainingVictimCells,
+        chainSteps: wardChainSteps.length > 0 ? wardChainSteps : undefined,
       };
     }
 

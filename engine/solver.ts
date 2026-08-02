@@ -1330,6 +1330,49 @@ export function computeCascadeSteps(
   return steps;
 }
 
+/**
+ * Like computeCascadeSteps, but records every deduction in the chain —
+ * ward eliminations (confinement, pair, dead-end) as well as forced watcher
+ * placements — so the hint engine can narrate *why* a hypothetical placement
+ * is impossible even when no watcher was ever forced along the way.
+ */
+export function traceWardChain(
+  puzzle: Puzzle,
+  playerCells: CellState[][],
+  hypothRow: number,
+  hypothCol: number,
+): DeductionResult[] {
+  const lim = puzzle.mode === 'twin-watchers' ? 2 : 1;
+  const cells = deepCopy(playerCells);
+  applyDeduction(cells, { type: 'watcher', row: hypothRow, col: hypothCol, reason: 'trace' }, lim);
+
+  const chain: DeductionResult[] = [];
+
+  for (let i = 0; i < 60 && chain.length < 20; i++) {
+    const contra = findContradictions(puzzle, cells);
+    if (contra.found) break;
+
+    const cands = getCandidates(puzzle, cells);
+
+    const d =
+      adjacencyElimination(puzzle, cells, cands) ??
+      dualConfinement(puzzle, cells, cands) ??
+      nakedSingle(puzzle, cells, cands) ??
+      rowConfinement(puzzle, cells, cands) ??
+      columnConfinement(puzzle, cells, cands) ??
+      pairElimination(puzzle, cells, cands) ??
+      territoryDeadEnd(puzzle, cells, cands) ??
+      hiddenSetElimination(puzzle, cells, cands);
+
+    if (!d || cells[d.row][d.col] !== 'empty') break;
+
+    chain.push(d);
+    applyDeduction(cells, d, lim);
+  }
+
+  return chain;
+}
+
 // ---------------------------------------------------------------------------
 // buildCascadeConstraintWaves — for Level III hint cascade visualization
 // ---------------------------------------------------------------------------

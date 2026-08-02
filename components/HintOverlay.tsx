@@ -79,6 +79,20 @@ export default function HintOverlay({ hint, onDismiss }: HintOverlayProps) {
             <p className="font-serif text-sm text-ink italic leading-snug">
               {hint.message}
             </p>
+
+            {/* Chain breakdown — numbered steps, highlighted cells on the board */}
+            {hint.chainSteps && hint.chainSteps.length > 0 && (
+              <ol
+                className="font-serif text-xs text-ink-light"
+                style={{ marginTop: 6, paddingLeft: 16, listStyleType: 'decimal', display: 'flex', flexDirection: 'column', gap: 2 }}
+              >
+                {hint.chainSteps.map((step, i) => (
+                  <li key={i} style={{ opacity: 0.85 }}>
+                    {step.label.charAt(0).toUpperCase() + step.label.slice(1)}
+                  </li>
+                ))}
+              </ol>
+            )}
           </div>
 
           {/* Dismiss */}
