@@ -82,27 +82,16 @@ function Cell({
         </div>
       )}
       {state === 'ward'    && <div className="relative z-20"><Ward territory={territory} size={wardSize} /></div>}
-      {isPrimaryHint && state === 'empty' && !isGhost && (
+      {(isPrimaryHint || isGhost) && state === 'empty' && (
         <img
           src="/svg/watcher_spinner.svg"
           width={watcherSize}
           height={watcherSize}
           alt=""
           draggable={false}
-          className="absolute pointer-events-none z-30"
+          className={`absolute pointer-events-none z-30 ${isGhost ? 'ghost-watcher' : ''}`}
           style={{ opacity: 0.8 }}
         />
-      )}
-      {isGhost && state === 'empty' && (
-        <div className="ghost-watcher absolute inset-0 flex items-center justify-center pointer-events-none z-30">
-          <div style={{ opacity: 0.9 }}>
-            <Watcher territory={territory} size={watcherSize} />
-          </div>
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{ background: 'rgba(139, 26, 26, 0.45)' }}
-          />
-        </div>
       )}
       {isConstraintWard && state === 'empty' && (
         <div className="ghost-ward absolute inset-0 flex items-center justify-center pointer-events-none z-30">
