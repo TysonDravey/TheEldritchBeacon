@@ -17,12 +17,14 @@ import Board from '@/components/Board';
 import GameControls from '@/components/GameControls';
 import HintOverlay from '@/components/HintOverlay';
 import TechniqueDiscovery from '@/components/TechniqueDiscovery';
+import MonthComplete from '@/components/MonthComplete';
 import { WATCHER_SVGS, WARD_PNG } from '@/theme/colors';
 import { isTechniqueNew, markTechniqueDiscovered } from '@/lib/techniques';
 
 const UNDO_LIMIT = 50;
 const DAILY_COMPLETED_KEY = 'eldritch_beacon_daily_completed';
 const DAILY_STREAK_KEY    = 'eldritch_beacon_daily_streak';
+const MONTH_AWARDS_KEY    = 'eldritch_beacon_month_awards';
 
 function getTodayStr(): string {
   const d = new Date();
@@ -85,6 +87,22 @@ function updateStreak(completedDate: string): StreakData {
     localStorage.setItem(DAILY_STREAK_KEY, JSON.stringify(streak));
     return streak;
   } catch { return { date: completedDate, count: 1 }; }
+}
+
+function loadMonthAwards(): Set<string> {
+  try {
+    const raw = localStorage.getItem(MONTH_AWARDS_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch { return new Set(); }
+}
+
+function saveMonthAward(yearMonth: string): Set<string> {
+  const existing = loadMonthAwards();
+  existing.add(yearMonth);
+  try {
+    localStorage.setItem(MONTH_AWARDS_KEY, JSON.stringify([...existing]));
+  } catch { /* storage unavailable */ }
+  return existing;
 }
 
 // 0 = Monday … 6 = Sunday
@@ -380,6 +398,9 @@ export default function DailyPage() {
   const [streak,               setStreak]              = useState<StreakData>({ date: '', count: 0 });
   const [alreadyCompleted,     setAlreadyCompleted]    = useState(false);
   const [freshlyCompletedDate, setFreshlyCompletedDate] = useState<string | null>(null);
+  const [monthAwardCount,      setMonthAwardCount]     = useState(0);
+  const [showMonthComplete,    setShowMonthComplete]   = useState(false);
+  const [monthCompleteInfo,    setMonthCompleteInfo]   = useState<{ label: string; dayCount: number; monthsCompleted: number } | null>(null);
 
   const hintDepthRef    = useRef(0);
   const flashTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -394,6 +415,7 @@ export default function DailyPage() {
     setCompletedDates(loadCompletedDates());
     setStartedDates(loadStartedDates(yearMonth));
     setStreak(loadStreak());
+    setMonthAwardCount(loadMonthAwards().size);
   }, [yearMonth]);
 
   // Preload tile images
@@ -423,6 +445,7 @@ export default function DailyPage() {
     const storageKey = `daily_${selectedDate}_${puzzle.id}`;
     const saved = loadPlayerState(storageKey);
     setShowCompletion(false);
+    setShowMonthComplete(false);
     setAlreadyCompleted(false);
     setHintResult(null);
     setContradiction({ found: false });
@@ -547,6 +570,28 @@ export default function DailyPage() {
         setIsFreshWin(true);
         setFreshlyCompletedDate(selectedDate);
 
+        // Check if this completes every day in the current calendar month
+        const monthDates = daysInMonth(yearMonth);
+        const updatedCompleted = new Set(completedDates);
+        updatedCompleted.add(selectedDate);
+        const monthAllDone = selectedDate.slice(0, 7) === yearMonth
+          && monthDates.every(d => DAILY_CALENDAR[d] != null && updatedCompleted.has(d));
+        const monthAwards = loadMonthAwards();
+        const monthJustFinished = monthAllDone && !monthAwards.has(yearMonth);
+        if (monthJustFinished) {
+          const updatedAwards = saveMonthAward(yearMonth);
+          setMonthAwardCount(updatedAwards.size);
+          const [awardYear, awardMonth] = yearMonth.split('-').map(Number);
+          const monthLabel = new Date(awardYear, awardMonth - 1, 1)
+            .toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+          setMonthCompleteInfo({
+            label: monthLabel,
+            dayCount: monthDates.filter(d => DAILY_CALENDAR[d] != null).length,
+            monthsCompleted: updatedAwards.size,
+          });
+          posthog.capture('daily_month_completed', { year_month: yearMonth, day_count: monthDates.length });
+        }
+
         winTimersRef.current.forEach(clearTimeout);
         winTimersRef.current = [];
         const watcherCells: [number, number][] = [];
@@ -570,11 +615,14 @@ export default function DailyPage() {
             }
           }
         }
-        const completionT = setTimeout(() => setShowCompletion(true), maxDelay + 500);
+        const completionT = setTimeout(() => {
+          if (monthJustFinished) setShowMonthComplete(true);
+          else setShowCompletion(true);
+        }, maxDelay + 500);
         winTimersRef.current.push(completionT);
       }
     },
-    [puzzle, selectedDate, todayStr],
+    [puzzle, selectedDate, todayStr, yearMonth, completedDates, streak],
   );
 
   const handleDragStart = useCallback(() => {
@@ -664,6 +712,7 @@ export default function DailyPage() {
     savePlayerState({ ...newState, puzzleId: storageKey });
     setContradiction(findContradictions(puzzle!, prevCells));
     setShowCompletion(false);
+    setShowMonthComplete(false);
     setIsFreshWin(false);
     winTimersRef.current.forEach(clearTimeout);
     winTimersRef.current = [];
@@ -677,6 +726,7 @@ export default function DailyPage() {
     savePlayerState(fresh);
     setContradiction({ found: false });
     setShowCompletion(false);
+    setShowMonthComplete(false);
     setIsFreshWin(false);
     setHintResult(null);
     winTimersRef.current.forEach(clearTimeout);
@@ -716,6 +766,12 @@ export default function DailyPage() {
               {streak.count}-day streak
             </p>
           )}
+          {monthAwardCount > 0 && (
+            <p className="font-serif text-xs text-ink mt-1 flex items-center justify-center gap-1" style={{ opacity: 0.6 }}>
+              <NextImage src="/svg/beacon_seal.svg" alt="" width={12} height={12} />
+              {monthAwardCount} seal{monthAwardCount !== 1 ? 's' : ''} earned
+            </p>
+          )}
         </div>
 
         {/* Difficulty legend */}
@@ -745,19 +801,6 @@ export default function DailyPage() {
           maxWidth: 400,
           position: 'relative',
         }}>
-          {/* Dev preview — replay the watcher emergence on today's cell */}
-          <button
-            onClick={() => { setFreshlyCompletedDate(null); setTimeout(() => setFreshlyCompletedDate(todayStr), 16); }}
-            title="Preview watcher emergence"
-            style={{
-              position: 'absolute', top: 12, right: 12,
-              background: 'rgba(26,18,9,0.08)', border: '1px solid rgba(26,18,9,0.2)',
-              borderRadius: 4, padding: '2px 7px', cursor: 'pointer',
-              fontFamily: 'Georgia, serif', fontSize: 11, color: 'rgba(26,18,9,0.5)',
-            }}
-          >
-            ↺ preview
-          </button>
           <MonthCalendar
             yearMonth={yearMonth}
             completedDates={completedDates}
@@ -957,6 +1000,15 @@ export default function DailyPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {showMonthComplete && monthCompleteInfo && (
+        <MonthComplete
+          monthLabel={monthCompleteInfo.label}
+          dayCount={monthCompleteInfo.dayCount}
+          monthsCompleted={monthCompleteInfo.monthsCompleted}
+          onDismiss={() => { setShowMonthComplete(false); setView('calendar'); }}
+        />
       )}
 
     </main>
