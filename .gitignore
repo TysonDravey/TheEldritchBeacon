@@ -20,3 +20,10 @@ tsconfig.tsbuildinfo
 
 # Vercel
 .vercel
+
+# Puzzle generation job runtime state
+scripts/.genstatus.json
+scripts/.genlog.txt
+scripts/.genraw.log
+scripts/.genstop
+tools/*.lnk
