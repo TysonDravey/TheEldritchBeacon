@@ -857,10 +857,18 @@ export function getNextDeduction(
  */
 function territoryDeadEnd(
   puzzle: Puzzle,
-  _playerCells: CellState[][],
+  playerCells: CellState[][],
   candidates: Map<number, [number, number][]>
 ): DeductionResult | null {
   const n = puzzle.size;
+  const limit = puzzle.mode === 'twin-watchers' ? 2 : 1;
+  const watchers = getWatcherPositions(playerCells);
+  const rowCounts = new Map<number, number>();
+  const colCounts = new Map<number, number>();
+  for (const [wr, wc] of watchers) {
+    rowCounts.set(wr, (rowCounts.get(wr) ?? 0) + 1);
+    colCounts.set(wc, (colCounts.get(wc) ?? 0) + 1);
+  }
 
   // Pre-compute which territories are already satisfied
   const satisfiedTerritories = new Set<number>();
@@ -874,12 +882,14 @@ function territoryDeadEnd(
     if (cands.length === 0) continue;
 
     for (const [r, c] of cands) {
-      // Build the set of cells that a watcher at (r,c) would immediately ward:
-      // adjacency (8-directional) + entire row + entire col.
-      // (Own-territory cells are also warded, but those are already excluded
-      // from other territories' candidate lists.)
-      const wardsRow = r;
-      const wardsCol = c;
+      // A watcher at (r,c) only fully claims its row/col once that row/col
+      // reaches its limit (2 in twin mode) — in single mode (limit=1) this
+      // placement always completes the row/col immediately, same as before.
+      const rowWouldBeFull = (rowCounts.get(r) ?? 0) + 1 >= limit;
+      const colWouldBeFull = (colCounts.get(c) ?? 0) + 1 >= limit;
+
+      // Build the set of cells that a watcher at (r,c) would immediately ward
+      // via adjacency (8-directional) — this always applies regardless of mode.
       const adjSet = new Set<string>();
       for (let dr = -1; dr <= 1; dr++) {
         for (let dc = -1; dc <= 1; dc++) {
@@ -896,8 +906,8 @@ function territoryDeadEnd(
 
         // Check if every candidate for t2 is eliminated by the watcher at (r,c)
         const allKilled = tc.every(([r2, c2]) =>
-          r2 === wardsRow ||
-          c2 === wardsCol ||
+          (rowWouldBeFull && r2 === r) ||
+          (colWouldBeFull && c2 === c) ||
           adjSet.has(`${r2},${c2}`)
         );
 
