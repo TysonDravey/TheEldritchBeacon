@@ -289,6 +289,7 @@ export default function HomePage() {
   const campaignStarted = completedIds.size > 0;
 
   const shatteredPuzzles = SAMPLE_PUZZLES.filter(p => p.mode === 'shattered-realms');
+  const twinPuzzles = SAMPLE_PUZZLES.filter(p => p.mode === 'twin-watchers');
 
   return (
     <>
@@ -436,6 +437,44 @@ export default function HomePage() {
                     </div>
                     <p className="font-serif text-xs text-ink-light italic mt-0.5" style={{ textShadow: OUTLINE }}>
                       Territories may be scattered — one Watcher per color, wherever it falls
+                    </p>
+                  </div>
+                </div>
+                <div className="border-t border-ink opacity-30 mb-4" />
+                {current && (
+                  <div>
+                    <PuzzleCard puzzle={current} completed={false} />
+                    <p className="mt-2 font-serif text-xs text-center text-ink-light" style={{ textShadow: OUTLINE }}>
+                      Puzzle {currentIdx + 1} of {sorted.length}
+                    </p>
+                  </div>
+                )}
+              </section>
+            );
+          })()}
+
+          {/* Twin Watchers */}
+          {twinPuzzles.length > 0 && (() => {
+            const sorted = [...twinPuzzles].sort((a, b) => (PUZZLE_SCORE.get(a.id) ?? 0) - (PUZZLE_SCORE.get(b.id) ?? 0));
+            const completedCount = sorted.filter(p => completedIds.has(p.id)).length;
+            const current = sorted.find(p => !completedIds.has(p.id)) ?? null;
+            const currentIdx = sorted.findIndex(p => !completedIds.has(p.id));
+            const allDone = completedCount === sorted.length;
+            return (
+              <section>
+                <div className="flex items-start gap-4 mb-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <h2 className="font-lovecraftian text-xl text-ink" style={{ textShadow: OUTLINE }}>
+                        Twin Watchers
+                        {allDone && <span className="ml-2 text-brass text-base font-serif">✓</span>}
+                      </h2>
+                      <span className="font-serif text-xs text-ink-light shrink-0" style={{ textShadow: OUTLINE }}>
+                        {completedCount}/{sorted.length}
+                      </span>
+                    </div>
+                    <p className="font-serif text-xs text-ink-light italic mt-0.5" style={{ textShadow: OUTLINE }}>
+                      Two Watchers per row, column, and territory now — neither may touch the other
                     </p>
                   </div>
                 </div>
