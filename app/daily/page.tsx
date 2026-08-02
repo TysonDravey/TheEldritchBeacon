@@ -125,6 +125,12 @@ function daysInMonth(yearMonth: string): string[] {
   return days;
 }
 
+function shiftMonth(yearMonth: string, delta: number): string {
+  const [year, month] = yearMonth.split('-').map(Number);
+  const d = new Date(year, month - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
 // Tier colour — Mon lightest (ivory), Sun darkest (deep crimson)
 const TIER_COLORS = [
   'rgba(200,180,140,0.25)',  // Mon — barely tinted
@@ -219,6 +225,10 @@ function MonthCalendar({
   todayStr,
   freshlyCompletedDate,
   onSelectDate,
+  onPrevMonth,
+  onNextMonth,
+  canGoPrev,
+  canGoNext,
 }: {
   yearMonth: string;
   completedDates: Set<string>;
@@ -226,6 +236,10 @@ function MonthCalendar({
   todayStr: string;
   freshlyCompletedDate?: string | null;
   onSelectDate: (date: string) => void;
+  onPrevMonth: () => void;
+  onNextMonth: () => void;
+  canGoPrev: boolean;
+  canGoNext: boolean;
 }) {
   const days     = daysInMonth(yearMonth);
   const firstDow = dayOfWeekMon0(days[0]);
@@ -242,7 +256,39 @@ function MonthCalendar({
   return (
     <div className="w-full max-w-md">
       <div className="flex items-center justify-between mb-4">
+        <button
+          onClick={onPrevMonth}
+          disabled={!canGoPrev}
+          aria-label="Previous month"
+          className="font-serif transition-opacity"
+          style={{
+            fontSize: 18,
+            lineHeight: 1,
+            padding: '2px 10px',
+            color: 'rgba(26,18,9,0.6)',
+            opacity: canGoPrev ? 1 : 0.25,
+            cursor: canGoPrev ? 'pointer' : 'default',
+          }}
+        >
+          &lsaquo;
+        </button>
         <h2 className="font-lovecraftian text-xl text-ink">{monthName}</h2>
+        <button
+          onClick={onNextMonth}
+          disabled={!canGoNext}
+          aria-label="Next month"
+          className="font-serif transition-opacity"
+          style={{
+            fontSize: 18,
+            lineHeight: 1,
+            padding: '2px 10px',
+            color: 'rgba(26,18,9,0.6)',
+            opacity: canGoNext ? 1 : 0.25,
+            cursor: canGoNext ? 'pointer' : 'default',
+          }}
+        >
+          &rsaquo;
+        </button>
       </div>
 
       {/* Day-of-week headers */}
@@ -379,6 +425,11 @@ export default function DailyPage() {
   const [selectedDate,    setSelectedDate]   = useState<string>(todayStr);
   const [completedDates,  setCompletedDates] = useState<Set<string>>(new Set());
   const [startedDates,    setStartedDates]   = useState<Set<string>>(new Set());
+  const [viewedMonth,     setViewedMonth]    = useState<string>(yearMonth);
+
+  const earliestMonth = shiftMonth(yearMonth, -1);
+  const canGoPrevMonth = viewedMonth > earliestMonth;
+  const canGoNextMonth = viewedMonth < yearMonth;
 
   const puzzleId = DAILY_CALENDAR[selectedDate] ?? null;
   const puzzle   = puzzleId ? getPuzzleById(puzzleId) : null;
@@ -410,13 +461,17 @@ export default function DailyPage() {
   const preDragCellsRef = useRef<CellState[][] | null>(null);
   const playerStateRef  = useRef<PlayerState | null>(null);
 
-  // Load completed dates, started dates and streak from localStorage on mount
+  // Load completed dates, streak and month awards from localStorage on mount
   useEffect(() => {
     setCompletedDates(loadCompletedDates());
-    setStartedDates(loadStartedDates(yearMonth));
     setStreak(loadStreak());
     setMonthAwardCount(loadMonthAwards().size);
-  }, [yearMonth]);
+  }, []);
+
+  // Load started dates for whichever month is currently in view
+  useEffect(() => {
+    setStartedDates(loadStartedDates(viewedMonth));
+  }, [viewedMonth]);
 
   // Preload tile images
   useEffect(() => {
@@ -570,18 +625,18 @@ export default function DailyPage() {
         setIsFreshWin(true);
         setFreshlyCompletedDate(selectedDate);
 
-        // Check if this completes every day in the current calendar month
-        const monthDates = daysInMonth(yearMonth);
+        // Check if this completes every day in selectedDate's calendar month (current or a past month)
+        const targetMonth = selectedDate.slice(0, 7);
+        const monthDates = daysInMonth(targetMonth);
         const updatedCompleted = new Set(completedDates);
         updatedCompleted.add(selectedDate);
-        const monthAllDone = selectedDate.slice(0, 7) === yearMonth
-          && monthDates.every(d => DAILY_CALENDAR[d] != null && updatedCompleted.has(d));
+        const monthAllDone = monthDates.every(d => DAILY_CALENDAR[d] != null && updatedCompleted.has(d));
         const monthAwards = loadMonthAwards();
-        const monthJustFinished = monthAllDone && !monthAwards.has(yearMonth);
+        const monthJustFinished = monthAllDone && !monthAwards.has(targetMonth);
         if (monthJustFinished) {
-          const updatedAwards = saveMonthAward(yearMonth);
+          const updatedAwards = saveMonthAward(targetMonth);
           setMonthAwardCount(updatedAwards.size);
-          const [awardYear, awardMonth] = yearMonth.split('-').map(Number);
+          const [awardYear, awardMonth] = targetMonth.split('-').map(Number);
           const monthLabel = new Date(awardYear, awardMonth - 1, 1)
             .toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
           setMonthCompleteInfo({
@@ -589,7 +644,7 @@ export default function DailyPage() {
             dayCount: monthDates.filter(d => DAILY_CALENDAR[d] != null).length,
             monthsCompleted: updatedAwards.size,
           });
-          posthog.capture('daily_month_completed', { year_month: yearMonth, day_count: monthDates.length });
+          posthog.capture('daily_month_completed', { year_month: targetMonth, day_count: monthDates.length });
         }
 
         winTimersRef.current.forEach(clearTimeout);
@@ -622,7 +677,7 @@ export default function DailyPage() {
         winTimersRef.current.push(completionT);
       }
     },
-    [puzzle, selectedDate, todayStr, yearMonth, completedDates, streak],
+    [puzzle, selectedDate, todayStr, completedDates, streak],
   );
 
   const handleDragStart = useCallback(() => {
@@ -802,12 +857,16 @@ export default function DailyPage() {
           position: 'relative',
         }}>
           <MonthCalendar
-            yearMonth={yearMonth}
+            yearMonth={viewedMonth}
             completedDates={completedDates}
             startedDates={startedDates}
             todayStr={todayStr}
             freshlyCompletedDate={freshlyCompletedDate}
             onSelectDate={(date) => { setFreshlyCompletedDate(null); setSelectedDate(date); setView('puzzle'); }}
+            onPrevMonth={() => canGoPrevMonth && setViewedMonth(m => shiftMonth(m, -1))}
+            onNextMonth={() => canGoNextMonth && setViewedMonth(m => shiftMonth(m, 1))}
+            canGoPrev={canGoPrevMonth}
+            canGoNext={canGoNextMonth}
           />
         </div>
 
