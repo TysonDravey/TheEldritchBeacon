@@ -99,6 +99,7 @@ export default function PuzzlePage() {
 
   const [playerState,      setPlayerState]      = useState<PlayerState | null>(null);
   const [hintResult,       setHintResult]       = useState<HintResult | null>(null);
+  const [activeChainStep,  setActiveChainStep]  = useState(0);
   const [pendingDiscovery, setPendingDiscovery] = useState<string | null>(null);
   const [showCompletion,   setShowCompletion]   = useState(false);
   const [tilesReady,       setTilesReady]       = useState(false);
@@ -471,6 +472,7 @@ export default function PuzzlePage() {
     setPlayerState(newState);
     savePlayerState(newState);
     setHintResult(hint);
+    setActiveChainStep(0);
     if (hint.techniqueName && isTechniqueNew(hint.techniqueName)) {
       markTechniqueDiscovered(hint.techniqueName);
       setPendingDiscovery(hint.techniqueName);
@@ -631,7 +633,11 @@ export default function PuzzlePage() {
             onDragEnd={handleDragEnd}
             primaryCell={hintResult?.primaryCell}
             highlightCells={hintResult?.highlightCells}
-            secondaryHighlightCells={hintResult?.secondaryHighlightCells}
+            secondaryHighlightCells={
+              hintResult?.chainSteps?.length
+                ? hintResult.chainSteps[activeChainStep]?.cells
+                : hintResult?.secondaryHighlightCells
+            }
             highlightTerritories={hintResult?.highlightTerritories}
             secondaryHighlightTerritories={hintResult?.secondaryHighlightTerritories}
             highlightRows={hintResult?.highlightRows}
@@ -673,7 +679,12 @@ export default function PuzzlePage() {
       {/* ── Fixed overlays — never affect layout ── */}
 
       {/* Hint overlay */}
-      <HintOverlay hint={hintResult} onDismiss={() => setHintResult(null)} />
+      <HintOverlay
+        hint={hintResult}
+        onDismiss={() => setHintResult(null)}
+        activeChainStep={activeChainStep}
+        onSelectChainStep={setActiveChainStep}
+      />
 
       {pendingDiscovery && (
         <TechniqueDiscovery

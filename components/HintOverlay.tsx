@@ -5,13 +5,16 @@ import type { HintResult } from '@/engine/boardTypes';
 interface HintOverlayProps {
   hint: HintResult | null;
   onDismiss: () => void;
+  /** Which chainSteps entry is currently isolated on the board (defaults to 0). */
+  activeChainStep?: number;
+  onSelectChainStep?: (index: number) => void;
 }
 
 const LEVEL_LABELS: Record<number, string> = {
   1: 'I', 2: 'II', 3: 'III', 4: 'IV',
 };
 
-export default function HintOverlay({ hint, onDismiss }: HintOverlayProps) {
+export default function HintOverlay({ hint, onDismiss, activeChainStep = 0, onSelectChainStep }: HintOverlayProps) {
   if (!hint) return null;
 
   return (
@@ -80,18 +83,42 @@ export default function HintOverlay({ hint, onDismiss }: HintOverlayProps) {
               {hint.message}
             </p>
 
-            {/* Chain breakdown — numbered steps, highlighted cells on the board */}
+            {/* Chain breakdown — tap a step to isolate just its cells on the board */}
             {hint.chainSteps && hint.chainSteps.length > 0 && (
-              <ol
-                className="font-serif text-xs text-ink-light"
-                style={{ marginTop: 6, paddingLeft: 16, listStyleType: 'decimal', display: 'flex', flexDirection: 'column', gap: 2 }}
-              >
-                {hint.chainSteps.map((step, i) => (
-                  <li key={i} style={{ opacity: 0.85 }}>
-                    {step.label.charAt(0).toUpperCase() + step.label.slice(1)}
-                  </li>
-                ))}
-              </ol>
+              <>
+                {hint.chainSteps.length > 1 && (
+                  <p className="font-serif" style={{ fontSize: 10, color: 'rgba(26,18,9,0.4)', marginTop: 6, fontStyle: 'italic' }}>
+                    Tap a step to see just that part of the chain on the board.
+                  </p>
+                )}
+                <ol
+                  className="font-serif text-xs"
+                  style={{ marginTop: hint.chainSteps.length > 1 ? 2 : 6, paddingLeft: 16, listStyleType: 'decimal', display: 'flex', flexDirection: 'column', gap: 2 }}
+                >
+                  {hint.chainSteps.map((step, i) => {
+                    const active = i === activeChainStep;
+                    return (
+                      <li key={i}>
+                        <button
+                          onClick={() => onSelectChainStep?.(i)}
+                          className="text-left transition-colors"
+                          style={{
+                            font: 'inherit',
+                            color: active ? 'rgba(139,26,26,0.9)' : 'rgba(26,18,9,0.7)',
+                            fontWeight: active ? 700 : 400,
+                            background: active ? 'rgba(139,26,26,0.08)' : 'transparent',
+                            borderRadius: 3,
+                            padding: '1px 4px',
+                            margin: '-1px -4px',
+                          }}
+                        >
+                          {step.label.charAt(0).toUpperCase() + step.label.slice(1)}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </>
             )}
           </div>
 
