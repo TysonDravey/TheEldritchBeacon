@@ -56,38 +56,39 @@ function cellListPhrase(cells: [number, number][]): string {
 // Each classified step carries a grouping key (same underlying cause —
 // e.g. the same territory confined to the same row — collapses into one
 // combined step instead of repeating near-identical lines per cell) and a
-// builder that names the specific cells it acts on and why.
+// builder that leads with the concrete action (Ward/Watcher, which cells)
+// and follows with the reason, rather than burying the action in a clause.
 function classifyWardChainStep(s: DeductionResult): { key: string; build: (cells: [number, number][]) => string } | null {
   switch (s.reasonType) {
     case 'row-confinement':
       return s.confinedTerritory !== undefined ? {
         key: `row-confinement:${s.confinedTerritory}:${s.row}`,
-        build: (cells) => `the ${tname(s.confinedTerritory!)} territory needs every open slot in row ${s.row + 1}, so ${cellListPhrase(cells)} ${cells.length > 1 ? 'become Wards' : 'becomes a Ward'}`,
+        build: (cells) => `${cellListPhrase(cells)} must ${cells.length > 1 ? 'become Wards' : 'become a Ward'} — the ${tname(s.confinedTerritory!)} territory needs every open slot in row ${s.row + 1}`,
       } : null;
     case 'col-confinement':
       return s.confinedTerritory !== undefined ? {
         key: `col-confinement:${s.confinedTerritory}:${s.col}`,
-        build: (cells) => `the ${tname(s.confinedTerritory!)} territory needs every open slot in column ${s.col + 1}, so ${cellListPhrase(cells)} ${cells.length > 1 ? 'become Wards' : 'becomes a Ward'}`,
+        build: (cells) => `${cellListPhrase(cells)} must ${cells.length > 1 ? 'become Wards' : 'become a Ward'} — the ${tname(s.confinedTerritory!)} territory needs every open slot in column ${s.col + 1}`,
       } : null;
     case 'pair-row':
       return s.pairedTerritories?.length ? {
         key: `pair-row:${[...s.pairedTerritories].sort((a, b) => a - b).join(',')}`,
-        build: (cells) => `${tnames(s.pairedTerritories!)} together need every open slot across their shared rows, so ${cellListPhrase(cells)} ${cells.length > 1 ? 'become Wards' : 'becomes a Ward'}`,
+        build: (cells) => `${cellListPhrase(cells)} must ${cells.length > 1 ? 'become Wards' : 'become a Ward'} — ${tnames(s.pairedTerritories!)} together need every open slot across their shared rows`,
       } : null;
     case 'pair-col':
       return s.pairedTerritories?.length ? {
         key: `pair-col:${[...s.pairedTerritories].sort((a, b) => a - b).join(',')}`,
-        build: (cells) => `${tnames(s.pairedTerritories!)} together need every open slot across their shared columns, so ${cellListPhrase(cells)} ${cells.length > 1 ? 'become Wards' : 'becomes a Ward'}`,
+        build: (cells) => `${cellListPhrase(cells)} must ${cells.length > 1 ? 'become Wards' : 'become a Ward'} — ${tnames(s.pairedTerritories!)} together need every open slot across their shared columns`,
       } : null;
     case 'dual-confinement':
       return {
         key: `dual-confinement:${s.row}:${s.col}`,
-        build: (cells) => `${cellListPhrase(cells)} is the only cell its territory has left once other territories' row and column locks are applied, so a Watcher is forced there`,
+        build: (cells) => `a Watcher is forced at ${cellListPhrase(cells)} — the only cell left to its territory once other territories' row and column locks are applied`,
       };
     case 'territory-dead-end':
       return s.confinedTerritory !== undefined ? {
         key: `territory-dead-end:${s.confinedTerritory}`,
-        build: (cells) => `a Watcher at ${cellListPhrase(cells)} would leave the ${tname(s.confinedTerritory!)} territory with no refuge, so ${cells.length > 1 ? 'those cells become Wards' : 'that cell becomes a Ward'} instead`,
+        build: (cells) => `${cellListPhrase(cells)} must ${cells.length > 1 ? 'become Wards' : 'become a Ward'} instead of a Watcher — that would leave the ${tname(s.confinedTerritory!)} territory with no refuge`,
       } : null;
     default:
       return null; // adjacency / row-occupied / col-occupied / territory-occupied / naked-single — too trivial to narrate
@@ -119,16 +120,6 @@ function buildWardChainSteps(chain: DeductionResult[]): { cells: [number, number
     const g = groups.get(key)!;
     return { cells: g.cells, label: g.build(g.cells) };
   });
-}
-
-/** Joins ward-chain steps into a single narrative clause for inline use in a sentence. */
-function narrateWardChain(steps: { cells: [number, number][]; label: string }[]): string | null {
-  if (steps.length === 0) return null;
-  const labels = steps.map(s => s.label);
-  if (labels.length === 1) return labels[0];
-  const last = labels[labels.length - 1];
-  const rest = labels.slice(0, -1);
-  return `${rest.join('; ')}; then ${last}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -409,18 +400,17 @@ function buildWardHint(
       // When it's not direct and no watcher was forced, trace the actual chain
       // of ward eliminations (confinements, pairs, dead-ends) so the hint
       // names what really happened instead of gesturing vaguely at "a chain."
+      // The steps themselves (not this message) carry the detail — no need
+      // to repeat them inline in the paragraph too.
       const wardChainSteps = (!isDirect && chainLen === 0)
         ? buildWardChainSteps(traceWardChain(puzzle, playerCells, row, col))
         : [];
-      const wardNarrative = narrateWardChain(wardChainSteps);
 
       if (depth === 1) {
         const msg = isDirect
           ? `If a Watcher rose here, its immediate reach — adjacency, and its row or column once full — would eliminate every remaining valid cell in the ${tname(victim)} territory, leaving it with no refuge.`
           : chainLen === 0
-            ? (wardNarrative
-                ? `If a Watcher rose here, ${wardNarrative} — leaving the ${tname(victim)} territory with no valid refuge.`
-                : `If a Watcher rose here, a chain of eliminations across the board — confinements and shared rows or columns — would leave the ${tname(victim)} territory with no valid refuge.`)
+            ? `If a Watcher rose here, a chain of eliminations across the board would leave the ${tname(victim)} territory with no valid refuge.`
             : `If a Watcher rose here, it would force ${chainLen} more Watcher${chainLen > 1 ? 's' : ''} into fixed positions. Together that chain leaves the ${tname(victim)} territory with no valid refuge.`;
         return {
           level: 2,
@@ -434,9 +424,7 @@ function buildWardHint(
       const msg = isDirect
         ? `A Watcher here is impossible. Its immediate reach — adjacency, and its row or column once full — directly eliminates every remaining valid cell in the ${tname(victim)} territory. Mark this cell with a Ward.`
         : chainLen === 0
-          ? (wardNarrative
-              ? `A Watcher here is impossible. Placing it would trigger a chain: ${wardNarrative} — leaving the ${tname(victim)} territory with no valid cell remaining. Mark this cell with a Ward.`
-              : `A Watcher here is impossible. A chain of eliminations — confinements and shared rows or columns, not this Watcher's reach alone — leaves the ${tname(victim)} territory with no valid cell remaining. Mark this cell with a Ward.`)
+          ? `A Watcher here is impossible — the chain below leaves the ${tname(victim)} territory with no valid cell remaining. Mark this cell with a Ward.`
           : `A Watcher here is impossible. It forces ${chainLen} Watcher${chainLen > 1 ? 's' : ''} into fixed positions — Watchers that have nowhere else to go. By the end of that chain, the ${tname(victim)} territory has no valid cell remaining. Mark this cell with a Ward.`;
       return {
         level: 3,
