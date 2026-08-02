@@ -574,6 +574,14 @@ function pairElimination(
   playerCells: CellState[][],
   candidates: Map<number, [number, number][]>
 ): DeductionResult | null {
+  const limit = puzzle.mode === 'twin-watchers' ? 2 : 1;
+  const watchers = getWatcherPositions(playerCells);
+  const territoryCounts = new Map<number, number>();
+  for (const [wr, wc] of watchers) {
+    const t = puzzle.territoryMap[wr][wc];
+    territoryCounts.set(t, (territoryCounts.get(t) ?? 0) + 1);
+  }
+
   // Collect the set of rows each territory can use
   const territoryRows = new Map<number, Set<number>>();
   const territoryCols = new Map<number, Set<number>>();
@@ -586,7 +594,8 @@ function pairElimination(
 
   const territories = Array.from(territoryRows.keys());
 
-  // Check all subsets of territories of size k, see if their combined rows = k rows
+  // Check all subsets of territories of size k, see if their combined remaining
+  // need exactly fills the row/col capacity their candidates are confined to
   for (let k = 2; k <= Math.min(territories.length, puzzle.size - 1); k++) {
     const result = checkPairElimination(
       puzzle,
@@ -594,6 +603,8 @@ function pairElimination(
       candidates,
       territories,
       territoryRows,
+      territoryCounts,
+      limit,
       k,
       'row'
     );
@@ -605,6 +616,8 @@ function pairElimination(
       candidates,
       territories,
       territoryCols,
+      territoryCounts,
+      limit,
       k,
       'col'
     );
@@ -620,6 +633,8 @@ function checkPairElimination(
   candidates: Map<number, [number, number][]>,
   territories: number[],
   territoryDimension: Map<number, Set<number>>,
+  territoryCounts: Map<number, number>,
+  limit: number,
   k: number,
   dimension: 'row' | 'col'
 ): DeductionResult | null {
@@ -635,9 +650,15 @@ function checkPairElimination(
       }
     }
 
-    if (unionSet.size !== k) continue;
+    // These territories are only "confined" — with no slack left over — if
+    // their combined remaining need (limit - watchers already placed, per
+    // territory) exactly fills the capacity of the rows/cols their candidates
+    // span (limit per row/col). In single-watcher mode (limit=1) a territory
+    // only ever appears here with 0 already placed, so this reduces to the
+    // original "k territories confined to k rows" check.
+    const totalNeed = combo.reduce((sum, t) => sum + (limit - (territoryCounts.get(t) ?? 0)), 0);
+    if (unionSet.size * limit !== totalNeed) continue;
 
-    // These k territories are confined to exactly k rows/cols.
     // Any other territory that has candidates in those rows/cols can be eliminated.
     const comboSet = new Set(combo);
 
