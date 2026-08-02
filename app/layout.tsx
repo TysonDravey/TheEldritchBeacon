@@ -3,6 +3,7 @@ import { Caveat } from 'next/font/google';
 import './globals.css';
 import Backdrop from '@/components/Backdrop';
 import RegisterSW from '@/components/RegisterSW';
+import BuildBadge from '@/components/BuildBadge';
 
 const caveat = Caveat({ subsets: ['latin'], variable: '--font-caveat' });
 
@@ -47,6 +48,7 @@ export default function RootLayout({
       </head>
       <body className={`${caveat.variable} text-ink font-serif min-h-screen`}>
         <RegisterSW />
+        <BuildBadge />
         <Backdrop />
         {children}
       </body>
