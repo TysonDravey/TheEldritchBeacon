@@ -44,28 +44,51 @@ function tnames(indices: number[]): string {
   return `the ${rest.map(tname).join(', ')} and ${tname(last)} territories`;
 }
 
+function cellListPhrase(cells: [number, number][]): string {
+  if (cells.length === 1) return `row ${cells[0][0] + 1}, column ${cells[0][1] + 1}`;
+  const shown = cells.slice(0, 3).map(([r, c]) => `row ${r + 1}, column ${c + 1}`);
+  const extra = cells.length - shown.length;
+  return shown.join('; ') + (extra > 0 ? `; and ${extra} more cell${extra > 1 ? 's' : ''}` : '');
+}
+
 // The reasonTypes worth narrating in a ward-chain explanation — cheap facts
 // like plain adjacency/row/col/territory-occupied wards are trivial noise.
-function describeWardChainStep(s: DeductionResult): string | null {
+// Each classified step carries a grouping key (same underlying cause —
+// e.g. the same territory confined to the same row — collapses into one
+// combined step instead of repeating near-identical lines per cell) and a
+// builder that names the specific cells it acts on and why.
+function classifyWardChainStep(s: DeductionResult): { key: string; build: (cells: [number, number][]) => string } | null {
   switch (s.reasonType) {
     case 'row-confinement':
-      return s.confinedTerritory !== undefined
-        ? `the ${tname(s.confinedTerritory)} territory is confined to row ${s.row + 1}`
-        : null;
+      return s.confinedTerritory !== undefined ? {
+        key: `row-confinement:${s.confinedTerritory}:${s.row}`,
+        build: (cells) => `the ${tname(s.confinedTerritory!)} territory needs every open slot in row ${s.row + 1}, so ${cellListPhrase(cells)} ${cells.length > 1 ? 'become Wards' : 'becomes a Ward'}`,
+      } : null;
     case 'col-confinement':
-      return s.confinedTerritory !== undefined
-        ? `the ${tname(s.confinedTerritory)} territory is confined to column ${s.col + 1}`
-        : null;
+      return s.confinedTerritory !== undefined ? {
+        key: `col-confinement:${s.confinedTerritory}:${s.col}`,
+        build: (cells) => `the ${tname(s.confinedTerritory!)} territory needs every open slot in column ${s.col + 1}, so ${cellListPhrase(cells)} ${cells.length > 1 ? 'become Wards' : 'becomes a Ward'}`,
+      } : null;
     case 'pair-row':
-      return s.pairedTerritories?.length ? `${tnames(s.pairedTerritories)} together fill their shared rows` : null;
+      return s.pairedTerritories?.length ? {
+        key: `pair-row:${[...s.pairedTerritories].sort((a, b) => a - b).join(',')}`,
+        build: (cells) => `${tnames(s.pairedTerritories!)} together need every open slot across their shared rows, so ${cellListPhrase(cells)} ${cells.length > 1 ? 'become Wards' : 'becomes a Ward'}`,
+      } : null;
     case 'pair-col':
-      return s.pairedTerritories?.length ? `${tnames(s.pairedTerritories)} together fill their shared columns` : null;
+      return s.pairedTerritories?.length ? {
+        key: `pair-col:${[...s.pairedTerritories].sort((a, b) => a - b).join(',')}`,
+        build: (cells) => `${tnames(s.pairedTerritories!)} together need every open slot across their shared columns, so ${cellListPhrase(cells)} ${cells.length > 1 ? 'become Wards' : 'becomes a Ward'}`,
+      } : null;
     case 'dual-confinement':
-      return `row ${s.row + 1} and column ${s.col + 1} together force a Watcher at that cell`;
+      return {
+        key: `dual-confinement:${s.row}:${s.col}`,
+        build: (cells) => `${cellListPhrase(cells)} is the only cell its territory has left once other territories' row and column locks are applied, so a Watcher is forced there`,
+      };
     case 'territory-dead-end':
-      return s.confinedTerritory !== undefined
-        ? `the ${tname(s.confinedTerritory)} territory is left with no refuge`
-        : null;
+      return s.confinedTerritory !== undefined ? {
+        key: `territory-dead-end:${s.confinedTerritory}`,
+        build: (cells) => `a Watcher at ${cellListPhrase(cells)} would leave the ${tname(s.confinedTerritory!)} territory with no refuge, so ${cells.length > 1 ? 'those cells become Wards' : 'that cell becomes a Ward'} instead`,
+      } : null;
     default:
       return null; // adjacency / row-occupied / col-occupied / territory-occupied / naked-single — too trivial to narrate
   }
@@ -73,25 +96,33 @@ function describeWardChainStep(s: DeductionResult): string | null {
 
 /**
  * Extracts the meaningful, numbered steps of a ward-elimination chain (as
- * traced by traceWardChain) — for the case where a hypothetical placement
- * is impossible but no watcher was ever forced along the way. Each step
- * carries the cell the deduction fired on, so the board can highlight it.
+ * traced by traceWardChain), grouping cells that share the same underlying
+ * cause into one step — for the case where a hypothetical placement is
+ * impossible but no watcher was ever forced along the way.
  */
-function buildWardChainSteps(chain: DeductionResult[]): { cell: [number, number]; label: string }[] {
-  const steps: { cell: [number, number]; label: string }[] = [];
-  const seen = new Set<string>();
+function buildWardChainSteps(chain: DeductionResult[]): { cells: [number, number][]; label: string }[] {
+  const groups = new Map<string, { cells: [number, number][]; build: (cells: [number, number][]) => string }>();
+  const order: string[] = [];
   for (const s of chain) {
-    const desc = describeWardChainStep(s);
-    if (!desc || seen.has(desc)) continue;
-    seen.add(desc);
-    steps.push({ cell: [s.row, s.col], label: desc });
-    if (steps.length >= 4) break;
+    const classified = classifyWardChainStep(s);
+    if (!classified) continue;
+    let group = groups.get(classified.key);
+    if (!group) {
+      group = { cells: [], build: classified.build };
+      groups.set(classified.key, group);
+      order.push(classified.key);
+    }
+    group.cells.push([s.row, s.col]);
+    if (order.length > 4) break;
   }
-  return steps;
+  return order.slice(0, 4).map(key => {
+    const g = groups.get(key)!;
+    return { cells: g.cells, label: g.build(g.cells) };
+  });
 }
 
 /** Joins ward-chain steps into a single narrative clause for inline use in a sentence. */
-function narrateWardChain(steps: { cell: [number, number]; label: string }[]): string | null {
+function narrateWardChain(steps: { cells: [number, number][]; label: string }[]): string | null {
   if (steps.length === 0) return null;
   const labels = steps.map(s => s.label);
   if (labels.length === 1) return labels[0];
@@ -412,7 +443,7 @@ function buildWardHint(
         message: msg,
         primaryCell: [row, col],
         highlightCells: victimCells,
-        secondaryHighlightCells: wardChainSteps.length > 0 ? wardChainSteps.map(s => s.cell) : undefined,
+        secondaryHighlightCells: wardChainSteps.length > 0 ? wardChainSteps.flatMap(s => s.cells) : undefined,
         highlightTerritories: [victim],
         deduction: d,
         cascadeSteps: forcedSteps,

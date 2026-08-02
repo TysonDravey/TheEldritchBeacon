@@ -93,7 +93,7 @@ export interface HintResult {
   cascadeConstraintWaves?: [number, number][][][]; // Level III hypothetical: per-watcher waves [watcherIdx][waveIdx] = cells
   cascadeVictimCells?: [number, number][];       // Level III hypothetical: victim cells NOT covered by constraint waves
   /** Twin mode: named, numbered breakdown of a ward-elimination chain (no forced watchers involved) */
-  chainSteps?: { cell: [number, number]; label: string }[];
+  chainSteps?: { cells: [number, number][]; label: string }[];
 }
 
 export interface ContradictionResult {
