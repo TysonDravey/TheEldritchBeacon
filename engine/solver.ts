@@ -381,7 +381,8 @@ function twinNakedPair(
     const [r, c] = cands[0];
     return {
       type: 'watcher', row: r, col: c,
-      reason: `Territory ${territory + 1} has only two valid cells — both must hold a Watcher.`,
+      pairedCell: cands[1],
+      reason: `Territory ${territory + 1} has only two valid cells left — both must hold a Watcher.`,
       reasonType: 'naked-single-territory',
       affectedTerritories: [territory],
     };

@@ -71,6 +71,8 @@ export interface DeductionResult {
   pairedTerritories?: number[];
   /** For row/col occupied: the watcher position that blocks this */
   blockedBy?: [number, number];
+  /** Twin mode only: the other cell that's equally forced alongside this one */
+  pairedCell?: [number, number];
   affectedCells?: [number, number][];
   affectedTerritories?: number[];
 }

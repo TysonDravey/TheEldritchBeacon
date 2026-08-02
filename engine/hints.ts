@@ -434,7 +434,12 @@ function buildWatcherHint(d: DeductionResult, puzzle: Puzzle): HintResult {
   const isTwin = puzzle.mode === 'twin-watchers';
 
   let message: string;
-  if (d.reasonType === 'naked-single-row') {
+  if (d.pairedCell) {
+    // Twin mode: a territory with exactly 2 candidates and no watcher yet —
+    // both cells are forced, not just the one this deduction is anchored on.
+    const [pr, pc] = d.pairedCell;
+    message = `The ${name} territory has only two valid cells left, at row ${d.row + 1}, column ${d.col + 1} and row ${pr + 1}, column ${pc + 1} — both must hold a Watcher.`;
+  } else if (d.reasonType === 'naked-single-row') {
     message = isTwin
       ? `Row ${d.row + 1} has only one valid cell left for its next Watcher — this one, belonging to the ${name} territory. A Watcher must rise here.`
       : `Row ${d.row + 1} has only one cell that can still receive a Watcher — this one, belonging to the ${name} territory. A Watcher must rise here.`;
@@ -449,7 +454,7 @@ function buildWatcherHint(d: DeductionResult, puzzle: Puzzle): HintResult {
   return {
     level: 4,
     message,
-    highlightCells: [[d.row, d.col]],
+    highlightCells: d.pairedCell ? [[d.row, d.col], d.pairedCell] : [[d.row, d.col]],
     highlightTerritories: [territory],
     deduction: d,
   };
