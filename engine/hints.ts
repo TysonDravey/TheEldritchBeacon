@@ -363,6 +363,10 @@ function buildWardHint(
   if (reasonType === 'hypothetical' && confinedTerritory !== undefined) {
     const victim = confinedTerritory;
     const isTwin = puzzle.mode === 'twin-watchers';
+    // Must match the depth getHint used to find this deduction in the first
+    // place (getNextDeduction's own maxDepth) — otherwise the trace can stall
+    // before reaching the same conclusion the solver actually proved.
+    const solverDepth = isTwin ? 2 : 1;
 
     // Compute victim's remaining valid candidates
     const allCandidates = getCandidates(puzzle, playerCells);
@@ -386,7 +390,7 @@ function buildWardHint(
     // (adjacency, plus row/col only if this placement would actually fill them)
     // covers, rather than assuming chainLen===0 implies "adjacency alone."
     if (isTwin) {
-      const forcedSteps     = computeCascadeSteps(puzzle, playerCells, row, col);
+      const forcedSteps     = computeCascadeSteps(puzzle, playerCells, row, col, solverDepth);
       const constraintWaves = buildCascadeConstraintWaves(puzzle, playerCells, row, col, forcedSteps);
       const constraintCovered = new Set(
         constraintWaves.flatMap(ww => ww.flat()).map(([r, c]) => `${r},${c}`)
@@ -403,7 +407,7 @@ function buildWardHint(
       // The steps themselves (not this message) carry the detail — no need
       // to repeat them inline in the paragraph too.
       const wardChainSteps = (!isDirect && chainLen === 0)
-        ? buildWardChainSteps(traceWardChain(puzzle, playerCells, row, col))
+        ? buildWardChainSteps(traceWardChain(puzzle, playerCells, row, col, solverDepth))
         : [];
 
       if (depth === 1) {
@@ -486,7 +490,7 @@ function buildWardHint(
         highlightCols: [col],
       };
     }
-    const forcedSteps      = computeCascadeSteps(puzzle, playerCells, row, col);
+    const forcedSteps      = computeCascadeSteps(puzzle, playerCells, row, col, solverDepth);
     const constraintWaves  = buildCascadeConstraintWaves(puzzle, playerCells, row, col, forcedSteps);
     const constraintCovered = new Set(
       constraintWaves.flatMap(ww => ww.flat()).map(([r, c]) => `${r},${c}`)

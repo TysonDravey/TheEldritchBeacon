@@ -1293,39 +1293,94 @@ export function hasUniqueSolution(puzzle: Puzzle): boolean {
  * watcher placement that follows. Used by the hint engine to animate the
  * chain of consequences that leads to contradiction.
  */
+// Mirrors contradictionTest's own internal propagation exactly: the narrower
+// technique set it actually uses to validate a hypothesis (adjacency, naked
+// single, row/col confinement — NOT pairElimination/territoryDeadEnd/
+// dualConfinement, which are skipped there for performance), plus its
+// recursive sub-contradiction-test pass ("Forced Territory Chain"). Using the
+// broader getNextDeduction technique set here would retrace a DIFFERENT
+// reasoning path than the one that actually proved the hypothesis — possibly
+// one that never reaches the same conclusion at all.
+function replayContradictionProof(
+  puzzle: Puzzle,
+  cells: CellState[][],
+  lim: number,
+  maxDepth: number,
+  onStep: (d: DeductionResult) => void,
+  stepLimit: number,
+): void {
+  // The exact success condition contradictionTest itself uses — a territory
+  // whose candidate list is empty while it still needs more watchers. This is
+  // narrower than findContradictions (which also flags over-placement
+  // conflicts) — using the wrong condition here can make the replay stop
+  // early via an unrelated conflict, attributing the impossibility to the
+  // wrong cause instead of the one that actually proved it.
+  function anyTerritoryStranded(): boolean {
+    const cands = getCandidates(puzzle, cells);
+    const watcherCnts = new Map<number, number>();
+    for (const [wr, wc] of getWatcherPositions(cells)) {
+      const t = puzzle.territoryMap[wr][wc];
+      watcherCnts.set(t, (watcherCnts.get(t) ?? 0) + 1);
+    }
+    for (const [t2, tc] of cands) {
+      if (tc.length === 0 && (watcherCnts.get(t2) ?? 0) < lim) return true;
+    }
+    return false;
+  }
+
+  let outerChanged = true;
+  while (outerChanged && stepLimit > 0) {
+    outerChanged = false;
+
+    let innerChanged = true;
+    while (innerChanged) {
+      innerChanged = false;
+      if (anyTerritoryStranded()) return;
+      const cands = getCandidates(puzzle, cells);
+      const d =
+        adjacencyElimination(puzzle, cells, cands) ??
+        nakedSingle(puzzle, cells, cands) ??
+        rowConfinement(puzzle, cells, cands) ??
+        columnConfinement(puzzle, cells, cands);
+      if (d && cells[d.row][d.col] === 'empty') {
+        onStep(d);
+        stepLimit--;
+        applyDeduction(cells, d, lim);
+        innerChanged = true;
+        if (stepLimit <= 0) return;
+      }
+    }
+
+    if (anyTerritoryStranded()) return;
+
+    if (maxDepth > 0) {
+      const cands = getCandidates(puzzle, cells);
+      const sub = contradictionTest(puzzle, cells, cands, maxDepth - 1, puzzle.size);
+      if (sub && cells[sub.row][sub.col] === 'empty') {
+        onStep(sub);
+        stepLimit--;
+        applyDeduction(cells, sub, lim);
+        outerChanged = true;
+      }
+    }
+  }
+}
+
 export function computeCascadeSteps(
   puzzle: Puzzle,
   playerCells: CellState[][],
   hypothRow: number,
   hypothCol: number,
+  maxDepth: number = 1,
 ): [number, number][] {
   const lim = puzzle.mode === 'twin-watchers' ? 2 : 1;
   const cells = deepCopy(playerCells);
   applyDeduction(cells, { type: 'watcher', row: hypothRow, col: hypothCol, reason: 'cascade' }, lim);
 
   const steps: [number, number][] = [];
-
-  for (let i = 0; i < 60 && steps.length < 8; i++) {
-    const contra = findContradictions(puzzle, cells);
-    if (contra.found) break;
-
-    const cands = getCandidates(puzzle, cells);
-
-    const d =
-      adjacencyElimination(puzzle, cells, cands) ??
-      dualConfinement(puzzle, cells, cands) ??
-      nakedSingle(puzzle, cells, cands) ??
-      rowConfinement(puzzle, cells, cands) ??
-      columnConfinement(puzzle, cells, cands) ??
-      pairElimination(puzzle, cells, cands) ??
-      territoryDeadEnd(puzzle, cells, cands) ??
-      hiddenSetElimination(puzzle, cells, cands);
-
-    if (!d || cells[d.row][d.col] !== 'empty') break;
-
+  replayContradictionProof(puzzle, cells, lim, maxDepth, (d) => {
     if (d.type === 'watcher') steps.push([d.row, d.col]);
-    applyDeduction(cells, d, lim);
-  }
+  }, 8);
 
   return steps;
 }
@@ -1341,34 +1396,14 @@ export function traceWardChain(
   playerCells: CellState[][],
   hypothRow: number,
   hypothCol: number,
+  maxDepth: number = 1,
 ): DeductionResult[] {
   const lim = puzzle.mode === 'twin-watchers' ? 2 : 1;
   const cells = deepCopy(playerCells);
   applyDeduction(cells, { type: 'watcher', row: hypothRow, col: hypothCol, reason: 'trace' }, lim);
 
   const chain: DeductionResult[] = [];
-
-  for (let i = 0; i < 60 && chain.length < 20; i++) {
-    const contra = findContradictions(puzzle, cells);
-    if (contra.found) break;
-
-    const cands = getCandidates(puzzle, cells);
-
-    const d =
-      adjacencyElimination(puzzle, cells, cands) ??
-      dualConfinement(puzzle, cells, cands) ??
-      nakedSingle(puzzle, cells, cands) ??
-      rowConfinement(puzzle, cells, cands) ??
-      columnConfinement(puzzle, cells, cands) ??
-      pairElimination(puzzle, cells, cands) ??
-      territoryDeadEnd(puzzle, cells, cands) ??
-      hiddenSetElimination(puzzle, cells, cands);
-
-    if (!d || cells[d.row][d.col] !== 'empty') break;
-
-    chain.push(d);
-    applyDeduction(cells, d, lim);
-  }
+  replayContradictionProof(puzzle, cells, lim, maxDepth, (d) => chain.push(d), 20);
 
   return chain;
 }
