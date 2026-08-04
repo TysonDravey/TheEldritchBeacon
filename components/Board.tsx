@@ -106,17 +106,11 @@ export default function Board({
   const startPosRef     = useRef({ x: 0, y: 0 });
   const prevDragPosRef  = useRef({ x: 0, y: 0 });
   const dragActionRef   = useRef<'place' | 'remove'>('place');
-  const pointerTypeRef  = useRef<string>('mouse');
   const visitedDragCellsRef = useRef<Set<string>>(new Set());
-  // A completed tap doesn't commit a Ward right away — it waits out DOUBLE_TAP_MS in case a
-  // second tap arrives, in which case the pending Ward is cancelled and the pair is promoted
-  // straight to a Watcher instead. This is the only way to guarantee a double-tap never
-  // visibly (or logically) passes through a Ward state first.
-  const DOUBLE_TAP_MS      = 350;
-  const DOUBLE_TAP_PX      = 40;
-  const pendingTapRef      = useRef<{ x: number; y: number; time: number; row: number; col: number } | null>(null);
-  const pendingWardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clickTimerRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTapRef         = useRef<{ x: number; y: number; time: number; row: number; col: number } | null>(null);
   const doubletapFiredRef  = useRef(false);
+  const boardHandledUpRef  = useRef(false);
   const boardRef = useRef<HTMLDivElement>(null);
 
   // Cache of cell screen rects — built once after mount and on resize.
@@ -193,11 +187,13 @@ export default function Board({
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
 
+    // Cancel the double-tap expiry timer so lastTapRef doesn't get cleared mid-gesture.
+    if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
+
     pointerDownRef.current  = true;
     isDraggingRef.current   = false;
     visitedDragCellsRef.current = new Set();
     startPosRef.current     = { x: e.clientX, y: e.clientY };
-    pointerTypeRef.current  = e.pointerType;
 
     const cell = getCellAtPoint(e.clientX, e.clientY);
     if (!cell) return;
@@ -206,18 +202,15 @@ export default function Board({
     // Target the cell tap A actually landed on, not wherever tap B's own (drifted) position
     // resolves to — on small cells a few px of natural drift can land tap B on a neighboring
     // cell, which is very often already a Ward, causing a spurious rejection.
-    const now     = Date.now();
-    const pending = pendingTapRef.current;
-    if (pending) {
-      const dx = e.clientX - pending.x, dy = e.clientY - pending.y;
+    const now  = Date.now();
+    const last = lastTapRef.current;
+    if (last) {
+      const dx = e.clientX - last.x, dy = e.clientY - last.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < DOUBLE_TAP_PX && now - pending.time < DOUBLE_TAP_MS) {
-        // Confirmed double-tap — cancel tap A's still-pending Ward so it never commits,
-        // and promote straight to a Watcher.
-        if (pendingWardTimerRef.current) { clearTimeout(pendingWardTimerRef.current); pendingWardTimerRef.current = null; }
+      if (dist < 40 && now - last.time < 900) {
         doubletapFiredRef.current = true;
-        pendingTapRef.current = null;
-        onCellWatcherRef.current(pending.row, pending.col);
+        lastTapRef.current = null;
+        onCellWatcherRef.current(last.row, last.col);
         return;
       }
     }
@@ -231,17 +224,13 @@ export default function Board({
     const dx = e.clientX - startPosRef.current.x;
     const dy = e.clientY - startPosRef.current.y;
 
-    // Touch contact points naturally drift a few px during a still tap — a tight threshold
-    // misclassifies ordinary taps as drags, which drops them from the double-tap sequence
-    // (a drag's pointerUp never records a pending tap) and forces the user to start over.
-    const dragThreshold = pointerTypeRef.current === 'touch' ? 16 : 8;
-    if (!isDraggingRef.current && (Math.abs(dx) > dragThreshold || Math.abs(dy) > dragThreshold)) {
+    if (!isDraggingRef.current && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
       isDraggingRef.current = true;
       onDragStartRef.current?.();
-      // Clear the pending-tap marker so this drag doesn't get paired as tap B of a stale
-      // double-tap later. Leave pendingWardTimerRef running — it belongs to an earlier,
-      // already-completed tap and should still commit on its own schedule.
-      pendingTapRef.current = null;
+      // Cancel double-tap expiry timer and clear last-tap so drag doesn't accidentally
+      // trigger double-tap on the next pointer-down.
+      if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
+      lastTapRef.current = null;
       // Start interpolation from the actual drag origin so the full path is covered,
       // including cells crossed in the first 8px before drag mode was detected.
       prevDragPosRef.current = { x: startPosRef.current.x, y: startPosRef.current.y };
@@ -273,6 +262,7 @@ export default function Board({
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     if (!pointerDownRef.current) return;
+    boardHandledUpRef.current = true;
     pointerDownRef.current = false;
 
     if (isDraggingRef.current) {
@@ -292,25 +282,25 @@ export default function Board({
 
     wiggleCell(cell.row, cell.col);
 
-    // Record screen position + the cell it resolved to, for pairing with a possible tap B
+    // Record screen position + the cell it resolved to for double-tap detection
     // (position tolerates finger drift; the cell itself stays anchored to this tap).
-    pendingTapRef.current = { x: e.clientX, y: e.clientY, time: Date.now(), row: cell.row, col: cell.col };
+    lastTapRef.current = { x: e.clientX, y: e.clientY, time: Date.now(), row: cell.row, col: cell.col };
 
-    // Don't commit the Ward yet — wait out the double-tap window. If tap B arrives, it cancels
-    // this timer (in handlePointerDown) and promotes straight to a Watcher instead, so a
-    // double-tap never visibly passes through a Ward state.
+    // Place/remove ward immediately — no delay. If a double-tap follows within 900ms,
+    // handleCellWatcher reads the updated state and handles ward→watcher correctly.
     const state = playerCellsRef.current[cell.row]?.[cell.col];
-    if (state !== 'watcher') {
-      if (pendingWardTimerRef.current) clearTimeout(pendingWardTimerRef.current);
-      pendingWardTimerRef.current = setTimeout(() => {
-        pendingWardTimerRef.current = null;
-        onCellWardRef.current(cell.row, cell.col);
-      }, DOUBLE_TAP_MS);
-    }
+    if (state !== 'watcher') onCellWardRef.current(cell.row, cell.col);
+
+    // Timer only expires the double-tap window (no pending action to fire)
+    if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+    clickTimerRef.current = setTimeout(() => {
+      clickTimerRef.current = null;
+      lastTapRef.current    = null;
+    }, 900);
   }, []);
 
 
-  useEffect(() => () => { if (pendingWardTimerRef.current) clearTimeout(pendingWardTimerRef.current); }, []);
+  useEffect(() => () => { if (clickTimerRef.current) clearTimeout(clickTimerRef.current); }, []);
 
   // Safety net: reset drag state whenever the pointer is released anywhere on the page.
   useEffect(() => {
@@ -319,6 +309,10 @@ export default function Board({
       pointerDownRef.current  = false;
       isDraggingRef.current   = false;
       visitedDragCellsRef.current = new Set();
+      if (!boardHandledUpRef.current) {
+        if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
+      }
+      boardHandledUpRef.current = false;
     };
     window.addEventListener('pointerup', onGlobalUp);
     return () => window.removeEventListener('pointerup', onGlobalUp);
