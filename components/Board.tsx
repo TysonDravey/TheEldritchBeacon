@@ -106,6 +106,7 @@ export default function Board({
   const startPosRef     = useRef({ x: 0, y: 0 });
   const prevDragPosRef  = useRef({ x: 0, y: 0 });
   const dragActionRef   = useRef<'place' | 'remove'>('place');
+  const pointerTypeRef  = useRef<string>('mouse');
   const visitedDragCellsRef = useRef<Set<string>>(new Set());
   const clickTimerRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTapRef         = useRef<{ x: number; y: number; time: number; row: number; col: number } | null>(null);
@@ -194,6 +195,7 @@ export default function Board({
     isDraggingRef.current   = false;
     visitedDragCellsRef.current = new Set();
     startPosRef.current     = { x: e.clientX, y: e.clientY };
+    pointerTypeRef.current  = e.pointerType;
 
     const cell = getCellAtPoint(e.clientX, e.clientY);
     if (!cell) return;
@@ -224,7 +226,11 @@ export default function Board({
     const dx = e.clientX - startPosRef.current.x;
     const dy = e.clientY - startPosRef.current.y;
 
-    if (!isDraggingRef.current && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+    // Touch contact points naturally drift a few px during a still tap — an 8px threshold
+    // (fine for a precise mouse) misclassifies ordinary taps as drags on a finger, which
+    // drops them from the double-tap sequence (a drag's pointerUp never records lastTapRef).
+    const dragThreshold = pointerTypeRef.current === 'touch' ? 16 : 8;
+    if (!isDraggingRef.current && (Math.abs(dx) > dragThreshold || Math.abs(dy) > dragThreshold)) {
       isDraggingRef.current = true;
       onDragStartRef.current?.();
       // Cancel double-tap expiry timer and clear last-tap so drag doesn't accidentally
