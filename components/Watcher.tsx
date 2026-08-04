@@ -13,11 +13,13 @@ export default function Watcher({ territory, size, isFreshWin }: WatcherProps) {
   const pulseAnim = `watcher-glow`;
   const pulseTime = [2.1,1.8,2.4,2.0,1.9,2.3,2.6,2.2,1.7,2.5][territory] ?? 2.0;
 
-  // Fresh win: all watchers rise together (no stagger), slam, then resume glow pulse.
-  // Reload of already-complete puzzle: just the ambient glow pulse.
+  // Glow plays once when the Watcher mounts (fresh placement, or reload of a solved cell)
+  // then settles — an infinite per-Watcher filter/drop-shadow animation is expensive to
+  // repaint and doesn't scale once several Watchers are on the board at once on mobile.
+  // The static filter here matches the animation's rest frame so there's no jump when it ends.
   const animation = isFreshWin
-    ? `${pulseAnim} ${pulseTime}s ease-in-out infinite, watcher-rise-slam 2.2s linear 200ms both`
-    : `${pulseAnim} ${pulseTime}s ease-in-out infinite`;
+    ? `${pulseAnim} ${pulseTime}s ease-in-out 1, watcher-rise-slam 2.2s linear 200ms both`
+    : `${pulseAnim} ${pulseTime}s ease-in-out 1`;
 
   return (
     <img
@@ -29,6 +31,7 @@ export default function Watcher({ territory, size, isFreshWin }: WatcherProps) {
       style={{
         animation,
         transform: 'translateY(-4px)',
+        filter: 'brightness(1.0) saturate(1.0) drop-shadow(3px 6px 4px rgba(0,0,0,0.95)) drop-shadow(1px 2px 2px rgba(0,0,0,0.75))',
       }}
     />
   );
