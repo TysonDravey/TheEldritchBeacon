@@ -145,7 +145,20 @@ export default function Board({
     for (const c of cellRectsRef.current) {
       if (x >= c.left && x < c.right && y >= c.top && y < c.bottom) return { row: c.row, col: c.col };
     }
-    return null;
+    // Fall back to the nearest cell within a small tolerance. Adjacent cells' rects come from
+    // getBoundingClientRect() under a rotateX() transform, which can leave sub-pixel rounding
+    // gaps between them — on a ~36px cell a tap landing in that gap would otherwise resolve to
+    // nothing at all (dropped silently, no ward, no wiggle).
+    const NEAR_PX = 4;
+    let best: { row: number; col: number } | null = null;
+    let bestDist = NEAR_PX;
+    for (const c of cellRectsRef.current) {
+      const dx = x < c.left ? c.left - x : x > c.right  ? x - c.right  : 0;
+      const dy = y < c.top  ? c.top  - y : y > c.bottom ? y - c.bottom : 0;
+      const dist = Math.max(dx, dy);
+      if (dist < bestDist) { bestDist = dist; best = { row: c.row, col: c.col }; }
+    }
+    return best;
   }
 
   function wiggleCell(row: number, col: number) {
