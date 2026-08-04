@@ -106,9 +106,10 @@ export default function Board({
   const startPosRef     = useRef({ x: 0, y: 0 });
   const prevDragPosRef  = useRef({ x: 0, y: 0 });
   const dragActionRef   = useRef<'place' | 'remove'>('place');
+  const pointerTypeRef  = useRef<string>('mouse');
   const visitedDragCellsRef = useRef<Set<string>>(new Set());
   const clickTimerRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastTapRef         = useRef<{ x: number; y: number; time: number } | null>(null);
+  const lastTapRef         = useRef<{ x: number; y: number; time: number; row: number; col: number } | null>(null);
   const doubletapFiredRef  = useRef(false);
   const boardHandledUpRef  = useRef(false);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -181,11 +182,15 @@ export default function Board({
     isDraggingRef.current   = false;
     visitedDragCellsRef.current = new Set();
     startPosRef.current     = { x: e.clientX, y: e.clientY };
+    pointerTypeRef.current  = e.pointerType;
 
     const cell = getCellAtPoint(e.clientX, e.clientY);
     if (!cell) return;
 
     // Detect double-tap by proximity (not exact cell) — finger position varies on mobile.
+    // Target the cell tap A actually landed on, not wherever tap B's own (drifted) position
+    // resolves to — on small cells a few px of natural drift can land tap B on a neighboring
+    // cell, which is very often already a Ward, causing a spurious rejection.
     const now  = Date.now();
     const last = lastTapRef.current;
     if (last) {
@@ -194,7 +199,7 @@ export default function Board({
       if (dist < 40 && now - last.time < 900) {
         doubletapFiredRef.current = true;
         lastTapRef.current = null;
-        onCellWatcherRef.current(cell.row, cell.col);
+        onCellWatcherRef.current(last.row, last.col);
         return;
       }
     }
@@ -208,7 +213,11 @@ export default function Board({
     const dx = e.clientX - startPosRef.current.x;
     const dy = e.clientY - startPosRef.current.y;
 
-    if (!isDraggingRef.current && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+    // Touch contact points naturally drift a few px during a still tap — a tight threshold
+    // misclassifies ordinary taps as drags, which drops them from the double-tap sequence
+    // (a drag's pointerUp never records lastTapRef) and forces the user to start over.
+    const dragThreshold = pointerTypeRef.current === 'touch' ? 16 : 8;
+    if (!isDraggingRef.current && (Math.abs(dx) > dragThreshold || Math.abs(dy) > dragThreshold)) {
       isDraggingRef.current = true;
       onDragStartRef.current?.();
       // Cancel double-tap expiry timer and clear last-tap so drag doesn't accidentally
@@ -266,8 +275,9 @@ export default function Board({
 
     wiggleCell(cell.row, cell.col);
 
-    // Record screen position for double-tap detection (tolerates finger drift)
-    lastTapRef.current = { x: e.clientX, y: e.clientY, time: Date.now() };
+    // Record screen position + the cell it resolved to for double-tap detection
+    // (position tolerates finger drift; the cell itself stays anchored to this tap).
+    lastTapRef.current = { x: e.clientX, y: e.clientY, time: Date.now(), row: cell.row, col: cell.col };
 
     // Place/remove ward immediately — no delay. If a double-tap follows within 900ms,
     // handleCellWatcher reads the updated state and handles ward→watcher correctly.
