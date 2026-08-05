@@ -167,16 +167,16 @@ button, a {
   }
   38%  {
     transform: translateY(-36px) rotateZ(200deg) scale(1.10);
-    filter: drop-shadow(0 0 12px rgba(255,210,90,0.55)) drop-shadow(0 8px 16px rgba(0,0,0,0.9));
+    filter: drop-shadow(0 0 12px rgba(var(--glow-rgb, 255, 210, 90), 0.55)) drop-shadow(0 8px 16px rgba(0,0,0,0.9));
   }
   60%  {
     transform: translateY(-54px) rotateZ(340deg) scale(1.14);
-    filter: drop-shadow(0 0 20px rgba(255,220,110,0.85)) drop-shadow(0 10px 22px rgba(0,0,0,0.9));
+    filter: drop-shadow(0 0 20px rgba(var(--glow-rgb, 255, 210, 90), 0.85)) drop-shadow(0 10px 22px rgba(0,0,0,0.9));
   }
   /* Hover at peak — almost still */
   68%  {
     transform: translateY(-56px) rotateZ(370deg) scale(1.12);
-    filter: drop-shadow(0 0 18px rgba(255,215,90,0.75)) drop-shadow(0 10px 20px rgba(0,0,0,0.85));
+    filter: drop-shadow(0 0 18px rgba(var(--glow-rgb, 255, 210, 90), 0.75)) drop-shadow(0 10px 20px rgba(0,0,0,0.85));
   }
   /* Fast slam */
   80%  {
