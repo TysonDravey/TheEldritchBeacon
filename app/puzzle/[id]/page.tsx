@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import posthog from 'posthog-js';
 import NextImage from 'next/image';
@@ -522,6 +522,20 @@ export default function PuzzlePage() {
     winTimersRef.current = [];
   }, [puzzle]);
 
+  // Scoring every puzzle in a tier to sort it is real, non-trivial work (measured over a full
+  // second for the ~35-puzzle "Eldritch" tier) -- it only actually needs to happen when the
+  // tier changes, but living in the component body (pre-existing, not something this session
+  // introduced) meant it re-ran on every render, including after every single tap. On a large
+  // tier that's a multi-hundred-millisecond-plus synchronous block on every interaction, which
+  // is more than enough to make a double-tap's second tap land outside the detection window.
+  // Must be called before any early return below (hooks can't be conditional).
+  const regionPuzzles = useMemo(() => {
+    if (!puzzle) return [];
+    return SAMPLE_PUZZLES
+      .filter(p => p.difficulty === puzzle.difficulty && p.mode === 'initiate')
+      .sort((a, b) => scorePuzzle(a) - scorePuzzle(b));
+  }, [puzzle]);
+
   if (!puzzle) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center px-6">
@@ -545,9 +559,6 @@ export default function PuzzlePage() {
   }
 
   const region = REGION_BY_DIFFICULTY[puzzle.difficulty] ?? null;
-  const regionPuzzles = SAMPLE_PUZZLES
-    .filter(p => p.difficulty === puzzle.difficulty && p.mode === 'initiate')
-    .sort((a, b) => scorePuzzle(a) - scorePuzzle(b));
   const currentIdx = regionPuzzles.findIndex(p => p.id === puzzle.id);
   const nextPuzzle = currentIdx >= 0 && currentIdx < regionPuzzles.length - 1
     ? regionPuzzles[currentIdx + 1]
