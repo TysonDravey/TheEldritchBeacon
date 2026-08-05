@@ -112,6 +112,7 @@ export default function Board({
   const lastTapRef         = useRef<{ x: number; y: number; time: number; row: number; col: number } | null>(null);
   const doubletapFiredRef  = useRef(false);
   const boardHandledUpRef  = useRef(false);
+  const lastCacheBuildRef  = useRef(0);
   const boardRef = useRef<HTMLDivElement>(null);
 
   // Cache of cell screen rects, rebuilt fresh at the start of every pointer gesture (see
@@ -132,11 +133,26 @@ export default function Board({
       if (row >= 0 && col >= 0) cache.push({ row, col, left: r.left, top: r.top, right: r.right, bottom: r.bottom });
     }
     cellRectsRef.current = cache;
+    lastCacheBuildRef.current = Date.now();
+  }
+
+  // Rebuild at the start of a gesture, but throttled. A full board's worth of
+  // getBoundingClientRect() calls (forced synchronous layout reads) on every single tap is a
+  // real, size-scaling cost — noticeably slow on an 8x8+ board on a modest phone, since it's
+  // paid on every tap and every drag-start, not just occasionally. The staleness this guards
+  // against (layout shifting shortly after mount — a font or image settling in late) only
+  // matters in the first moment of a session, not on every gesture for the rest of a long play
+  // session, so rebuilding at most once a second is plenty to catch it without paying the full
+  // cost on every tap.
+  const CACHE_REBUILD_THROTTLE_MS = 1000;
+  function buildCellCacheThrottled() {
+    if (Date.now() - lastCacheBuildRef.current < CACHE_REBUILD_THROTTLE_MS) return;
+    buildCellCache();
   }
 
   // Baseline cache on mount and whenever the board resizes (orientation change, zoom, etc.) —
-  // handlePointerDown rebuilds it again per-gesture, so this just covers the window before the
-  // first interaction.
+  // handlePointerDown rebuilds it again per-gesture (throttled), so this just covers the window
+  // before the first interaction.
   useEffect(() => {
     buildCellCache();
     const ro = new ResizeObserver(() => buildCellCache());
@@ -191,13 +207,8 @@ export default function Board({
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
 
-    // Rebuild the cell-rect cache fresh for this gesture. The mount/resize-only cache (below)
-    // can go stale if anything shifts the board's layout without triggering a resize — a font
-    // or image finishing its load shortly after mount, for instance — which silently makes
-    // every getCellAtPoint() call in the gesture return null (drag registers as movement but
-    // never touches any cell). Rebuilding here is a bit more work per gesture-start, but that's
-    // a much lower-frequency event than pointermove, so it's cheap where it matters.
-    buildCellCache();
+    // Throttled rebuild — see buildCellCacheThrottled for why this isn't unconditional.
+    buildCellCacheThrottled();
 
     // Cancel the double-tap expiry timer so lastTapRef doesn't get cleared mid-gesture.
     if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
