@@ -114,9 +114,10 @@ export default function Board({
   const boardHandledUpRef  = useRef(false);
   const boardRef = useRef<HTMLDivElement>(null);
 
-  // Cache of cell screen rects — built once after mount and on resize.
-  // elementFromPoint is unreliable with preserve-3d and transparent tile corners;
-  // using getBoundingClientRect per cell is exact regardless of 3D transforms.
+  // Cache of cell screen rects, rebuilt fresh at the start of every pointer gesture (see
+  // handlePointerDown) plus on mount/resize as a baseline so it's never empty before the
+  // first interaction. elementFromPoint is unreliable with preserve-3d and transparent tile
+  // corners; using getBoundingClientRect per cell is exact regardless of 3D transforms.
   type CellRect = { row: number; col: number; left: number; top: number; right: number; bottom: number };
   const cellRectsRef = useRef<CellRect[]>([]);
 
@@ -133,7 +134,9 @@ export default function Board({
     cellRectsRef.current = cache;
   }
 
-  // Build cache on mount and whenever the board resizes (orientation change, zoom, etc.)
+  // Baseline cache on mount and whenever the board resizes (orientation change, zoom, etc.) —
+  // handlePointerDown rebuilds it again per-gesture, so this just covers the window before the
+  // first interaction.
   useEffect(() => {
     buildCellCache();
     const ro = new ResizeObserver(() => buildCellCache());
@@ -187,6 +190,14 @@ export default function Board({
     if (e.button !== 0) return;
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
+
+    // Rebuild the cell-rect cache fresh for this gesture. The mount/resize-only cache (below)
+    // can go stale if anything shifts the board's layout without triggering a resize — a font
+    // or image finishing its load shortly after mount, for instance — which silently makes
+    // every getCellAtPoint() call in the gesture return null (drag registers as movement but
+    // never touches any cell). Rebuilding here is a bit more work per gesture-start, but that's
+    // a much lower-frequency event than pointermove, so it's cheap where it matters.
+    buildCellCache();
 
     // Cancel the double-tap expiry timer so lastTapRef doesn't get cleared mid-gesture.
     if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
