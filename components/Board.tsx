@@ -254,20 +254,33 @@ export default function Board({
     }
 
     if (isDraggingRef.current) {
-      // Use coalesced events for the actual pointer path, fall back to interpolation
+      // Chrome's getCoalescedEvents() always returns at least the current event, even when no
+      // real OS-level batching happened — so "coalesced events exist" does NOT mean "no gap to
+      // fill." At medium drag speed the browser is fast enough that consecutive points land
+      // 30-50px apart, but not fast enough to trigger real coalescing, so a single-entry
+      // "coalesced" list combined with skipping interpolation silently jumped clean over
+      // several cells. Slow drags avoid this because consecutive points are naturally close;
+      // fast drags avoid it because the browser actually does coalesce multiple real samples.
+      // Fix: always interpolate every segment of the path (prevDragPos -> each waypoint in
+      // turn), regardless of whether those waypoints came from real coalescing or not.
       const rawEvents = e.nativeEvent.getCoalescedEvents?.() ?? [];
-      const points: { x: number; y: number }[] = rawEvents.length > 0
+      const waypoints: { x: number; y: number }[] = rawEvents.length > 0
         ? rawEvents.map(ev => ({ x: ev.clientX, y: ev.clientY }))
-        : (() => {
-            const px = prevDragPosRef.current.x, py = prevDragPosRef.current.y;
-            const cx = e.clientX, cy = e.clientY;
-            const dist  = Math.sqrt((cx - px) ** 2 + (cy - py) ** 2);
-            const steps = Math.max(1, Math.ceil(dist / 6));
-            return Array.from({ length: steps }, (_, i) => ({
-              x: px + (cx - px) * ((i + 1) / steps),
-              y: py + (cy - py) * ((i + 1) / steps),
-            }));
-          })();
+        : [{ x: e.clientX, y: e.clientY }];
+
+      const points: { x: number; y: number }[] = [];
+      let segStart = prevDragPosRef.current;
+      for (const waypoint of waypoints) {
+        const dist  = Math.sqrt((waypoint.x - segStart.x) ** 2 + (waypoint.y - segStart.y) ** 2);
+        const steps = Math.max(1, Math.ceil(dist / 6));
+        for (let i = 1; i <= steps; i++) {
+          points.push({
+            x: segStart.x + (waypoint.x - segStart.x) * (i / steps),
+            y: segStart.y + (waypoint.y - segStart.y) * (i / steps),
+          });
+        }
+        segStart = waypoint;
+      }
 
       for (const pt of points) {
         const cell = getCellAtPoint(pt.x, pt.y);
