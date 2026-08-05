@@ -262,7 +262,18 @@ export default function PuzzlePage() {
   }, [hintResult]);
 
   useEffect(() => () => { winTimersRef.current.forEach(clearTimeout); }, []);
-  useEffect(() => { playerStateRef.current = playerState; }, [playerState]);
+  // Skip during an active drag: applyChange already keeps playerStateRef.current synchronously
+  // up to date on every cell (see comment there), strictly ahead of what's been rendered. Under
+  // the flood of rapid-fire setPlayerState calls a fast drag produces, React can commit and fire
+  // this effect for an older, intermediate playerState snapshot *after* later applyChange calls
+  // have already advanced the ref past it -- rewinding the ref and silently erasing whichever
+  // cells were added in between (they're never revisited, since visitedDragCellsRef already
+  // marked them touched). Letting the imperative writes stay authoritative for the drag's
+  // duration avoids that race entirely.
+  useEffect(() => {
+    if (isDraggingRef.current) return;
+    playerStateRef.current = playerState;
+  }, [playerState]);
 
 
   // Shared logic for applying any cell state change
