@@ -24,7 +24,7 @@ const LOG_PATH    = join(ROOT, 'scripts', '.genlog.txt');
 interface BatchParams {
   sizes: number[];
   perSize: number;
-  mode?: 'initiate' | 'shattered-realms';
+  mode?: 'initiate' | 'shattered-realms' | 'twin-watchers';
   depth?: number;
   difficulty?: string;
   base?: string;
@@ -75,18 +75,29 @@ let label: string;
 if (job === 'batch') {
   const p = params as BatchParams;
   const base = p.base && p.base.trim() ? p.base.trim() : `eldritch-custom-${Date.now()}`;
-  cmd = [
-    'tsx', 'scripts/generateBatch.ts',
-    '--per-size', String(p.perSize ?? 10),
-    '--sizes', (p.sizes ?? [5, 6, 7, 8]).join(','),
-    '--mode', p.mode ?? 'shattered-realms',
-    '--base', base,
-  ];
-  if (p.depth != null) cmd.push('--depth', String(p.depth));
-  if (p.difficulty) cmd.push('--difficulty', p.difficulty);
-  if (p.bias != null) cmd.push('--bias', String(p.bias));
-  if (p.attempts != null) cmd.push('--attempts', String(p.attempts));
-  label = `custom batch — sizes [${(p.sizes ?? []).join(',')}] × ${p.perSize ?? 10} (${p.mode ?? 'shattered-realms'})`;
+  if (p.mode === 'twin-watchers') {
+    const size = (p.sizes ?? [9])[0] ?? 9;
+    cmd = [
+      'tsx', 'scripts/generateTwin.ts',
+      '--count', String(p.perSize ?? 10),
+      '--size', String(size),
+      '--base', base,
+    ];
+    label = `twin-watchers batch — size ${size} × ${p.perSize ?? 10}`;
+  } else {
+    cmd = [
+      'tsx', 'scripts/generateBatch.ts',
+      '--per-size', String(p.perSize ?? 10),
+      '--sizes', (p.sizes ?? [5, 6, 7, 8]).join(','),
+      '--mode', p.mode ?? 'shattered-realms',
+      '--base', base,
+    ];
+    if (p.depth != null) cmd.push('--depth', String(p.depth));
+    if (p.difficulty) cmd.push('--difficulty', p.difficulty);
+    if (p.bias != null) cmd.push('--bias', String(p.bias));
+    if (p.attempts != null) cmd.push('--attempts', String(p.attempts));
+    label = `custom batch — sizes [${(p.sizes ?? []).join(',')}] × ${p.perSize ?? 10} (${p.mode ?? 'shattered-realms'})`;
+  }
 } else if (job === 'calendar') {
   const p = params as CalendarParams;
   cmd = ['tsx', 'scripts/buildMonthlyCalendar.ts'];

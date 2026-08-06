@@ -198,16 +198,17 @@ const PAGE = `<!doctype html>
         </div>
         <div class="field">
           <label>Mode</label>
-          <select id="batchMode">
+          <select id="batchMode" onchange="onBatchModeChange()">
             <option value="shattered-realms" selected>shattered-realms</option>
             <option value="initiate">initiate</option>
+            <option value="twin-watchers">twin-watchers</option>
           </select>
         </div>
-        <div class="field">
+        <div class="field" id="batchDepthField">
           <label>Depth (0 = forward only)</label>
           <input id="batchDepth" type="number" value="0" min="0">
         </div>
-        <div class="field">
+        <div class="field" id="batchDifficultyField">
           <label>Difficulty filter (optional)</label>
           <input id="batchDifficulty" placeholder="e.g. Archon">
         </div>
@@ -215,6 +216,9 @@ const PAGE = `<!doctype html>
           <label>Seed base (optional)</label>
           <input id="batchBase" placeholder="auto">
         </div>
+      </div>
+      <div id="batchTwinHint" style="display:none; opacity:0.7; font-size:0.85em; margin-top:-8px;">
+        twin-watchers uses only the first Sizes value, and it must be 9 or larger (8×8 and below only have two possible solution grids). Per size = how many puzzles to generate.
       </div>
       <button id="batchBtn" onclick="startBatch()">Run custom batch</button>
     </div>
@@ -237,6 +241,13 @@ const PAGE = `<!doctype html>
   </div>
 
 <script>
+function onBatchModeChange() {
+  const isTwin = document.getElementById('batchMode').value === 'twin-watchers';
+  document.getElementById('batchTwinHint').style.display = isTwin ? 'block' : 'none';
+  document.getElementById('batchDepthField').style.display = isTwin ? 'none' : '';
+  document.getElementById('batchDifficultyField').style.display = isTwin ? 'none' : '';
+}
+
 function setButtonsEnabled(running) {
   document.getElementById('yearEndBtn').disabled = running;
   document.getElementById('batchBtn').disabled = running;
