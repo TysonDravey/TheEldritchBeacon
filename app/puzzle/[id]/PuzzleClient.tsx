@@ -91,7 +91,7 @@ function scrollIndexForId(s: string): number {
   return (Math.abs(h) % 3) + 1;
 }
 
-export default function PuzzlePage() {
+export default function PuzzleClient() {
   const params = useParams();
   const router = useRouter();
   const id     = typeof params.id === 'string' ? params.id : params.id?.[0] ?? '';
