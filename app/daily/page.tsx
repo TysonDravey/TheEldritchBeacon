@@ -456,6 +456,7 @@ export default function DailyPage() {
   const hintDepthRef    = useRef(0);
   const flashTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cascadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const contradictionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const winTimersRef    = useRef<ReturnType<typeof setTimeout>[]>([]);
   const isDraggingRef   = useRef(false);
   const preDragCellsRef = useRef<CellState[][] | null>(null);
@@ -567,6 +568,7 @@ export default function DailyPage() {
   }, [hintResult]);
 
   useEffect(() => () => { winTimersRef.current.forEach(clearTimeout); }, []);
+  useEffect(() => () => { if (contradictionTimerRef.current) clearTimeout(contradictionTimerRef.current); }, []);
   useEffect(() => { playerStateRef.current = playerState; }, [playerState]);
 
   const applyChange = useCallback(
@@ -598,7 +600,24 @@ export default function DailyPage() {
       const newState: PlayerState = { ...current, cells: newCells, undoStack: newUndoStack, completed: solved };
 
       playerStateRef.current = newState;
-      setContradiction(contra);
+
+      // A tap always commits its Ward instantly (see Board.tsx), so the first half of a
+      // double-tap-to-Watcher gesture briefly leaves the board in a state findContradictions
+      // may flag — e.g. warding the last empty cell of a row/column/territory. Showing that
+      // immediately means every such double-tap flashes a contradiction banner an instant
+      // before the second tap promotes the Ward into the (valid) Watcher and clears it.
+      // Holding a newly-found contradiction for one double-tap window gives the second tap a
+      // chance to resolve it first; clearing one is still shown immediately since that's
+      // always good news.
+      if (contradictionTimerRef.current) { clearTimeout(contradictionTimerRef.current); contradictionTimerRef.current = null; }
+      if (contra.found) {
+        contradictionTimerRef.current = setTimeout(() => {
+          contradictionTimerRef.current = null;
+          setContradiction(contra);
+        }, 900);
+      } else {
+        setContradiction(contra);
+      }
       setPlayerState(newState);
       savePlayerState({ ...newState, puzzleId: storageKey });
 
@@ -775,6 +794,7 @@ export default function DailyPage() {
     const newState: PlayerState = { ...playerState, cells: prevCells, undoStack: stack, completed: false };
     setPlayerState(newState);
     savePlayerState({ ...newState, puzzleId: storageKey });
+    if (contradictionTimerRef.current) { clearTimeout(contradictionTimerRef.current); contradictionTimerRef.current = null; }
     setContradiction(findContradictions(puzzle!, prevCells));
     setShowCompletion(false);
     setShowMonthComplete(false);
@@ -789,6 +809,7 @@ export default function DailyPage() {
     const fresh = createFreshPlayerState(storageKey, puzzle.size);
     setPlayerState(fresh);
     savePlayerState(fresh);
+    if (contradictionTimerRef.current) { clearTimeout(contradictionTimerRef.current); contradictionTimerRef.current = null; }
     setContradiction({ found: false });
     setShowCompletion(false);
     setShowMonthComplete(false);
