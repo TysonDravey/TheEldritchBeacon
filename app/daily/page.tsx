@@ -718,12 +718,22 @@ export default function DailyPage() {
       const current = playerStateRef.current;
       if (!current || !puzzle) return;
       const prev = current.cells[row][col];
-      if (prev === 'ward') return;
       if (prev === 'watcher') { applyChange(row, col, 'empty'); return; }
-      if (!canPlaceWatcher(puzzle, current.cells, row, col)) {
-        const reason = watcherRejectionReason(puzzle, current.cells, row, col);
+
+      // For a Ward cell, test placement against the grid with that Ward cleared first — the
+      // tap that lands here always commits a Ward instantly (see Board.tsx), so by the time a
+      // double-tap promotes it to a Watcher attempt, this cell is never actually 'empty'
+      // anymore. Testing against the uncleared grid means canPlaceWatcher's own leading
+      // `!== 'empty'` check rejects every single promotion attempt, no matter how valid the
+      // Watcher placement would otherwise be.
+      const testCells = prev === 'ward'
+        ? current.cells.map((r, ri) => r.map((c, ci) => ri === row && ci === col ? 'empty' as CellState : c))
+        : current.cells;
+
+      if (!canPlaceWatcher(puzzle, testCells, row, col)) {
+        const reason = watcherRejectionReason(puzzle, testCells, row, col);
         haptic('error');
-        applyChange(row, col, 'ward');
+        if (prev !== 'ward') applyChange(row, col, 'ward');
         setRejectionMessage(reason);
         setFlashCells([[row, col]]);
         if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
