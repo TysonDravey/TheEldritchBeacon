@@ -27,27 +27,43 @@ function gitShortSha(): string {
   }
 }
 
+// Set by `npm run build:ios` only. Produces a fully static `out/` folder for
+// Capacitor to embed in the iOS app — no Node server ships on a phone, so
+// this build can't use rewrites, API routes, or the on-demand image
+// optimizer. The regular `npm run build` (Vercel/web) is unaffected.
+const MOBILE_BUILD = process.env.MOBILE_BUILD === "1";
+
 const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_BUILD_VERSION: buildVersion(),
     NEXT_PUBLIC_BUILD_SHA: gitShortSha(),
+    // No server on a phone to run the /ingest proxy rewrite below, so
+    // PostHog has to be told to hit its collection endpoint directly.
+    NEXT_PUBLIC_MOBILE_BUILD: MOBILE_BUILD ? "1" : "",
   },
-  async rewrites() {
-    return [
-      {
-        source: "/ingest/static/:path*",
-        destination: "https://us-assets.i.posthog.com/static/:path*",
-      },
-      {
-        source: "/ingest/array/:path*",
-        destination: "https://us-assets.i.posthog.com/array/:path*",
-      },
-      {
-        source: "/ingest/:path*",
-        destination: "https://us.i.posthog.com/:path*",
-      },
-    ];
-  },
+  ...(MOBILE_BUILD
+    ? {
+        output: "export" as const,
+        images: { unoptimized: true },
+      }
+    : {
+        async rewrites() {
+          return [
+            {
+              source: "/ingest/static/:path*",
+              destination: "https://us-assets.i.posthog.com/static/:path*",
+            },
+            {
+              source: "/ingest/array/:path*",
+              destination: "https://us-assets.i.posthog.com/array/:path*",
+            },
+            {
+              source: "/ingest/:path*",
+              destination: "https://us.i.posthog.com/:path*",
+            },
+          ];
+        },
+      }),
   skipTrailingSlashRedirect: true,
 };
 
