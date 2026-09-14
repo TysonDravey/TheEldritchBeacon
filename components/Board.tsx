@@ -29,6 +29,9 @@ interface BoardProps {
   constraintWardCells?: [number, number][];
   isCompleted?: boolean;
   isFreshWin?: boolean;
+  /** Optional: per-cell outline colors, keyed "row,col". Used by the Dual
+   *  Realms prototype to mark reversible tiles; unused elsewhere. */
+  reversibleOutlines?: Map<string, string>;
 }
 
 // Red outline — only explicit cells and territories, NOT rows/cols
@@ -84,6 +87,7 @@ export default function Board({
   constraintWardCells,
   isCompleted = false,
   isFreshWin = false,
+  reversibleOutlines,
 }: BoardProps) {
   const { size, territoryMap } = puzzle;
 
@@ -413,6 +417,7 @@ export default function Board({
                 isGhost={isGhost}
                 isGhostWard={isGhostWard}
                 isConstraintWard={isConstraintWard}
+                reversibleOutline={reversibleOutlines?.get(`${row},${col}`)}
                 size={size}
                 thickTop={row === 0          || territoryMap[row - 1][col] !== territory}
                 thickBottom={row === size - 1 || territoryMap[row + 1][col] !== territory}

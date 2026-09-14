@@ -1,0 +1,323 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Board from '@/components/Board';
+import type { CellState, Puzzle, ContradictionResult } from '@/engine/boardTypes';
+import { canPlaceWatcher, watcherRejectionReason, isSolved } from '@/engine/rules';
+import { findContradictions } from '@/engine/solver';
+import { TERRITORY_COLORS, TERRITORY_NAMES } from '@/theme/colors';
+import { DUAL_REALMS_PUZZLE_SCATTERED } from './lib/puzzle-variant-scattered';
+import { DUAL_REALMS_PUZZLE_MIXED } from './lib/puzzle-variant-8-mixed';
+import { DUAL_REALMS_PUZZLE_9 } from './lib/puzzle-variant-9-mixed';
+import { DUAL_REALMS_PUZZLE_10 } from './lib/puzzle-variant-10-mixed';
+import { DUAL_REALMS_PUZZLE_11 } from './lib/puzzle-variant-11-mixed';
+import { DUAL_REALMS_PUZZLE_12 } from './lib/puzzle-variant-12-mixed3-6x6';
+import { DUAL_REALMS_PUZZLE_13 } from './lib/puzzle-variant-13-allwatcher3-6x6';
+import { deriveTerritoryMap } from './lib/deriveTerritoryMap';
+import type { DualRealmsPuzzle, FaceId } from './lib/types';
+
+const PUZZLE_OPTIONS: { label: string; puzzle: DualRealmsPuzzle }[] = [
+  { label: 'Puzzle 1', puzzle: DUAL_REALMS_PUZZLE_SCATTERED },
+  { label: 'Puzzle 8 (2 Rifts, mixed types)', puzzle: DUAL_REALMS_PUZZLE_MIXED },
+  { label: 'Puzzle 9 (2 Rifts, mixed types)', puzzle: DUAL_REALMS_PUZZLE_9 },
+  { label: 'Puzzle 10 (2 Rifts, mixed types)', puzzle: DUAL_REALMS_PUZZLE_10 },
+  { label: 'Puzzle 11 (2 Rifts, mixed types)', puzzle: DUAL_REALMS_PUZZLE_11 },
+  { label: 'Puzzle 12 (3 Rifts, 6×6, mixed types)', puzzle: DUAL_REALMS_PUZZLE_12 },
+  { label: 'Puzzle 13 (3 Rifts, 6×6, all watcher-type)', puzzle: DUAL_REALMS_PUZZLE_13 },
+];
+
+function emptyGrid(size: number): CellState[][] {
+  return Array.from({ length: size }, () => Array.from({ length: size }, (): CellState => 'empty'));
+}
+
+// Randomize each tile's starting orientation independently, rather than
+// always starting every tile flipped away from the answer — otherwise, once
+// you've played more than one puzzle, "whatever's currently showing must be
+// wrong" becomes a free meta-shortcut that needs no board logic at all.
+// Still guards against starting fully pre-solved (nothing left to figure out).
+function randomStartFlips(solutionFlips: boolean[]): boolean[] {
+  let flips = solutionFlips.map(() => Math.random() < 0.5);
+  if (flips.every((f, i) => f === solutionFlips[i])) {
+    const i = Math.floor(Math.random() * flips.length);
+    flips = flips.map((f, idx) => (idx === i ? !f : f));
+  }
+  return flips;
+}
+
+function toPuzzle(territoryMap: number[][], size: number): Puzzle {
+  return {
+    id: 'dual-realms-v1',
+    title: 'Dual Realms (prototype)',
+    mode: 'initiate',
+    size,
+    territoryMap,
+    solution: [],
+    difficulty: 'Initiate',
+    seed: 'dual-realms-v1',
+    createdAt: '',
+  };
+}
+
+interface FaceProps {
+  label: string;
+  puzzle: Puzzle;
+  cells: CellState[][];
+  onWard: (row: number, col: number) => void;
+  onWatcher: (row: number, col: number) => void;
+  contradiction: ContradictionResult;
+  solved: boolean;
+  reversibleOutlines: Map<string, string>;
+}
+
+function FaceBoard({ label, puzzle, cells, onWard, onWatcher, contradiction, solved, reversibleOutlines }: FaceProps) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+      <div style={{ fontWeight: 'bold', fontSize: 18, background: 'rgba(255,255,255,0.9)', borderRadius: 6, padding: '4px 14px' }}>
+        Face {label} {solved && '— SOLVED'}
+      </div>
+      <Board
+        puzzle={puzzle}
+        playerCells={cells}
+        onCellWard={onWard}
+        onCellWatcher={onWatcher}
+        contradiction={contradiction}
+        reversibleOutlines={reversibleOutlines}
+      />
+      {contradiction.found && (
+        <div style={{ color: '#8B1A1A', fontFamily: 'monospace', fontSize: 12, maxWidth: 260, textAlign: 'center' }}>
+          {contradiction.message}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function DualRealmsClient() {
+  const [puzzleIndex, setPuzzleIndex] = useState(0);
+  const DUAL_REALMS_PUZZLE = PUZZLE_OPTIONS[puzzleIndex].puzzle;
+  const { size, baseTerritoryMapA, baseTerritoryMapB, reversibleTiles, solutionFlips } = DUAL_REALMS_PUZZLE;
+
+  // Deterministic initial value (matches what the server renders) — the real
+  // per-tile randomization happens client-only, right after mount, in the
+  // effect below. Randomizing directly in this initializer would run during
+  // SSR too, and since Math.random() gives a different answer server vs.
+  // client, React would flag a hydration mismatch on first paint.
+  const [flips, setFlips] = useState<boolean[]>(solutionFlips.map(f => !f));
+  const [cellsA, setCellsA] = useState<CellState[][]>(() => emptyGrid(size));
+  const [cellsB, setCellsB] = useState<CellState[][]>(() => emptyGrid(size));
+  const [activeFace, setActiveFace] = useState<FaceId>('A');
+  const [sideBySide, setSideBySide] = useState(false);
+  const [rejection, setRejection] = useState<string | null>(null);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setFlips(randomStartFlips(solutionFlips)); }, []);
+
+  function selectPuzzle(index: number) {
+    const p = PUZZLE_OPTIONS[index].puzzle;
+    setPuzzleIndex(index);
+    setCellsA(emptyGrid(p.size));
+    setCellsB(emptyGrid(p.size));
+    setFlips(randomStartFlips(p.solutionFlips));
+    setActiveFace('A');
+  }
+
+  const territoryMapA = useMemo(
+    () => deriveTerritoryMap('A', baseTerritoryMapA, reversibleTiles, flips),
+    [baseTerritoryMapA, reversibleTiles, flips],
+  );
+  const territoryMapB = useMemo(
+    () => deriveTerritoryMap('B', baseTerritoryMapB, reversibleTiles, flips),
+    [baseTerritoryMapB, reversibleTiles, flips],
+  );
+  const puzzleA = useMemo(() => toPuzzle(territoryMapA, size), [territoryMapA, size]);
+  const puzzleB = useMemo(() => toPuzzle(territoryMapB, size), [territoryMapB, size]);
+
+  // Ring color for each reversible tile = the color it's CURRENTLY showing on
+  // the OTHER face (the outline, per the design brief's core+outline mockup).
+  const outlinesA = useMemo(() => {
+    const map = new Map<string, string>();
+    reversibleTiles.forEach((tile, i) => {
+      const currentColorOnFaceB = flips[i] ? tile.colorOnA : tile.colorOnB;
+      map.set(`${tile.row},${tile.col}`, TERRITORY_COLORS[currentColorOnFaceB]?.bg ?? '#999');
+    });
+    return map;
+  }, [reversibleTiles, flips]);
+  const outlinesB = useMemo(() => {
+    const map = new Map<string, string>();
+    reversibleTiles.forEach((tile, i) => {
+      const currentColorOnFaceA = flips[i] ? tile.colorOnB : tile.colorOnA;
+      map.set(`${tile.row},${tile.col}`, TERRITORY_COLORS[currentColorOnFaceA]?.bg ?? '#999');
+    });
+    return map;
+  }, [reversibleTiles, flips]);
+
+  const contradictionA = useMemo(() => findContradictions(puzzleA, cellsA), [puzzleA, cellsA]);
+  const contradictionB = useMemo(() => findContradictions(puzzleB, cellsB), [puzzleB, cellsB]);
+  const solvedA = useMemo(() => isSolved(puzzleA, cellsA), [puzzleA, cellsA]);
+  const solvedB = useMemo(() => isSolved(puzzleB, cellsB), [puzzleB, cellsB]);
+
+  const makeHandlers = useCallback(
+    (puzzle: Puzzle, cells: CellState[][], setCells: (c: CellState[][]) => void) => {
+      const onWard = (row: number, col: number) => {
+        const prev = cells[row][col];
+        if (prev === 'watcher') return;
+        const next = cells.map(r => [...r]);
+        next[row][col] = prev === 'empty' ? 'ward' : 'empty';
+        setCells(next);
+      };
+      const onWatcher = (row: number, col: number) => {
+        const prev = cells[row][col];
+        if (prev === 'watcher') {
+          const next = cells.map(r => [...r]);
+          next[row][col] = 'empty';
+          setCells(next);
+          return;
+        }
+        const testCells = prev === 'ward'
+          ? cells.map((r, ri) => r.map((c, ci) => (ri === row && ci === col ? ('empty' as CellState) : c)))
+          : cells;
+        if (!canPlaceWatcher(puzzle, testCells, row, col)) {
+          setRejection(watcherRejectionReason(puzzle, testCells, row, col));
+          setTimeout(() => setRejection(null), 1600);
+          const next = cells.map(r => [...r]);
+          if (prev !== 'ward') next[row][col] = 'ward';
+          setCells(next);
+          return;
+        }
+        const next = testCells.map(r => [...r]);
+        next[row][col] = 'watcher';
+        setCells(next);
+      };
+      return { onWard, onWatcher };
+    },
+    [],
+  );
+
+  const handlersA = makeHandlers(puzzleA, cellsA, setCellsA);
+  const handlersB = makeHandlers(puzzleB, cellsB, setCellsB);
+
+  function flipTile(index: number) {
+    setFlips(prev => prev.map((f, i) => (i === index ? !f : f)));
+  }
+
+  function resetAll() {
+    setCellsA(emptyGrid(size));
+    setCellsB(emptyGrid(size));
+    setFlips(randomStartFlips(solutionFlips));
+  }
+
+  const bothSolved = solvedA && solvedB;
+
+  return (
+    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, fontFamily: 'sans-serif' }}>
+      <div style={{ background: 'rgba(255,255,255,0.9)', borderRadius: 8, padding: '12px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+        <h1 style={{ fontSize: 22, margin: 0 }}>Dual Realms — prototype (rough)</h1>
+        <p style={{ maxWidth: 560, textAlign: 'center', fontSize: 13, opacity: 0.75, margin: 0 }}>
+          Two {size}×{size} Beacon boards share {reversibleTiles.length} Rifts. Each Rift shows a big
+          core color (its current territory on THIS face) and a thin outline (its color
+          on the OTHER face). Click a Rift in the list below to flip it — both faces
+          update at once. Solve both faces to win.
+        </p>
+
+        {bothSolved && (
+          <div style={{ fontSize: 20, fontWeight: 'bold', color: '#2E7D32' }}>Both faces solved! 🎉</div>
+        )}
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          {PUZZLE_OPTIONS.map((opt, i) => (
+            <button
+              key={opt.label}
+              onClick={() => selectPuzzle(i)}
+              disabled={i === puzzleIndex}
+              style={i === puzzleIndex ? { fontWeight: 'bold' } : undefined}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setActiveFace('A')} disabled={activeFace === 'A' || sideBySide}>
+            View Face A
+          </button>
+          <button onClick={() => setActiveFace('B')} disabled={activeFace === 'B' || sideBySide}>
+            View Face B
+          </button>
+          <button onClick={() => setSideBySide(s => !s)}>
+            {sideBySide ? 'Hide' : 'Show'} debug side-by-side
+          </button>
+          <button onClick={resetAll}>Reset</button>
+        </div>
+      </div>
+
+      {rejection && (
+        <div style={{ color: '#8B1A1A', fontWeight: 'bold' }}>{rejection}</div>
+      )}
+
+      <div style={{ display: 'flex', gap: 32 }}>
+        {(sideBySide || activeFace === 'A') && (
+          <FaceBoard
+            label="A"
+            puzzle={puzzleA}
+            cells={cellsA}
+            onWard={handlersA.onWard}
+            onWatcher={handlersA.onWatcher}
+            contradiction={contradictionA}
+            solved={solvedA}
+            reversibleOutlines={outlinesA}
+          />
+        )}
+        {(sideBySide || activeFace === 'B') && (
+          <FaceBoard
+            label="B"
+            puzzle={puzzleB}
+            cells={cellsB}
+            onWard={handlersB.onWard}
+            onWatcher={handlersB.onWatcher}
+            contradiction={contradictionB}
+            solved={solvedB}
+            reversibleOutlines={outlinesB}
+          />
+        )}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+        <div style={{ fontWeight: 'bold', background: 'rgba(255,255,255,0.9)', borderRadius: 6, padding: '4px 10px', display: 'inline-block', textAlign: 'center' }}>
+          Rifts
+        </div>
+        {reversibleTiles.map((tile, i) => {
+          const flipped = flips[i];
+          const currentA = flipped ? tile.colorOnB : tile.colorOnA;
+          const currentB = flipped ? tile.colorOnA : tile.colorOnB;
+          const nameA = TERRITORY_NAMES[currentA];
+          const nameB = TERRITORY_NAMES[currentB];
+          const bgA = TERRITORY_COLORS[currentA]?.bg ?? '#999';
+          const bgB = TERRITORY_COLORS[currentB]?.bg ?? '#999';
+          return (
+            <button
+              key={i}
+              onClick={() => flipTile(i)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '6px 12px',
+                border: '2px solid #333',
+                borderRadius: 6,
+                cursor: 'pointer',
+                background: 'white',
+              }}
+            >
+              <span>Rift {i + 1} at ({tile.row + 1}, {tile.col + 1}):</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 18, height: 18, borderRadius: '50%', background: bgA, border: `3px solid ${bgB}` }} />
+                Face A = {nameA} (Face B = {nameB})
+              </span>
+              <span style={{ opacity: 0.6, fontSize: 12 }}>click to flip</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

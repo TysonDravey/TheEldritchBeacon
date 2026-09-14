@@ -23,6 +23,10 @@ interface CellProps {
   isConstraintWard: boolean;
   isCompleted: boolean;
   isFreshWin: boolean;
+  /** Optional: draws a colored ring inset from the cell edge. Used by the
+   *  Dual Realms prototype to mark a reversible tile's opposite-face color;
+   *  unused (and thus invisible) everywhere else in the game. */
+  reversibleOutline?: string;
   size: number;
   thickTop?: boolean;
   thickRight?: boolean;
@@ -46,6 +50,7 @@ function Cell({
   isConstraintWard,
   isCompleted,
   isFreshWin,
+  reversibleOutline,
   size,
   thickTop,
   thickRight,
@@ -73,6 +78,12 @@ function Cell({
       style={{ width: `${px}px`, height: `${px}px` }}
       className={`relative flex items-center justify-center select-none ${ringClass}`}
     >
+      {reversibleOutline && (
+        <div
+          className="absolute inset-0 pointer-events-none z-10"
+          style={{ boxShadow: `inset 0 0 0 4px ${reversibleOutline}` }}
+        />
+      )}
       {isDimmed && <div className="absolute inset-0 bg-ink opacity-40 pointer-events-none z-10" />}
       {isHighlighted          && <div className="absolute inset-0 pointer-events-none z-10 hint-glow-red" />}
       {isSecondaryHighlighted && <div className="absolute inset-0 pointer-events-none z-10 hint-glow-brass" />}
