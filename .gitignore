@@ -27,3 +27,7 @@ scripts/.genlog.txt
 scripts/.genraw.log
 scripts/.genstop
 tools/*.lnk
+
+# Affinity Designer/Photo source files (large binaries; keep only exported .png)
+*.af
+*.af~lock~
