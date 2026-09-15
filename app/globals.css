@@ -135,27 +135,69 @@ button, a {
   100% { transform: scale(1.00) translateY(0px);  }
 }
 
-/* Dual Realms reversible-tile ("Rift") outline — flickery, irregular-timed
-   box-shadow spikes instead of a smooth pulse, to read as electric/crackling
-   rather than a gentle glow. Color comes from --rift-color, set inline per
-   cell since it depends on which territory the tile shows on the OTHER face. */
-@keyframes reversible-lightning {
-  0%   { box-shadow: inset 0 0 0 4px var(--rift-color), inset 0 0 6px 1px var(--rift-color); opacity: 1; }
-  6%   { box-shadow: inset 0 0 0 2px var(--rift-color), inset 0 0 2px 0px var(--rift-color); opacity: 0.55; }
-  11%  { box-shadow: inset 0 0 0 5px var(--rift-color), inset 0 0 14px 4px var(--rift-color); opacity: 1; }
-  17%  { box-shadow: inset 0 0 0 3px var(--rift-color), inset 0 0 4px 1px var(--rift-color); opacity: 0.75; }
-  24%  { box-shadow: inset 0 0 0 4px var(--rift-color), inset 0 0 8px 2px var(--rift-color); opacity: 1; }
-  33%  { box-shadow: inset 0 0 0 4px var(--rift-color), inset 0 0 6px 1px var(--rift-color); opacity: 0.9; }
-  41%  { box-shadow: inset 0 0 0 2px var(--rift-color), inset 0 0 2px 0px var(--rift-color); opacity: 0.5; }
-  47%  { box-shadow: inset 0 0 0 5px var(--rift-color), inset 0 0 16px 5px var(--rift-color); opacity: 1; }
-  58%  { box-shadow: inset 0 0 0 4px var(--rift-color), inset 0 0 8px 2px var(--rift-color); opacity: 1; }
-  70%  { box-shadow: inset 0 0 0 3px var(--rift-color), inset 0 0 4px 1px var(--rift-color); opacity: 0.8; }
-  78%  { box-shadow: inset 0 0 0 5px var(--rift-color), inset 0 0 12px 3px var(--rift-color); opacity: 1; }
-  89%  { box-shadow: inset 0 0 0 2px var(--rift-color), inset 0 0 2px 0px var(--rift-color); opacity: 0.6; }
-  100% { box-shadow: inset 0 0 0 4px var(--rift-color), inset 0 0 6px 1px var(--rift-color); opacity: 1; }
+/* Dual Realms reversible-tile ("Rift") outline — a jagged closed loop (see the
+   polyline points in Cell.tsx) traded for the old smooth box-shadow ring, so
+   it reads as a crack of lightning skirting the cell edge rather than a glow.
+   Two independent animations desync on purpose: the dash pattern crawls at
+   its own rate (a travelling live current) while opacity flickers on a
+   different, irregular schedule (dead current / arcing) — together they never
+   repeat the same combined look twice in a row, which is what actually sells
+   "broken" over a single looping animation. Color comes from --rift-color,
+   set inline per cell since it depends on which territory the tile shows on
+   the OTHER face. */
+@keyframes rift-lightning-crawl {
+  0%   { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -68; }
 }
-.reversible-lightning {
-  animation: reversible-lightning 1.6s linear infinite;
+@keyframes rift-lightning-flicker {
+  0%   { opacity: 1;    }
+  5%   { opacity: 0.35; }
+  9%   { opacity: 1;    }
+  14%  { opacity: 0.6;  }
+  22%  { opacity: 1;    }
+  27%  { opacity: 0.25; }
+  33%  { opacity: 0.9;  }
+  40%  { opacity: 1;    }
+  48%  { opacity: 0.4;  }
+  55%  { opacity: 1;    }
+  63%  { opacity: 0.7;  }
+  71%  { opacity: 1;    }
+  77%  { opacity: 0.3;  }
+  85%  { opacity: 1;    }
+  92%  { opacity: 0.55; }
+  100% { opacity: 1;    }
+}
+.rift-lightning-path {
+  fill: none;
+  stroke: var(--rift-color);
+  stroke-width: 5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  stroke-dasharray: 7 4 3 6 5 3 8 4;
+  filter: drop-shadow(0 0 3px var(--rift-color));
+  animation:
+    rift-lightning-crawl 2.4s linear infinite,
+    rift-lightning-flicker 1.85s ease-in-out infinite;
+}
+
+/* Dual Realms Rift flip — a solid-color square doesn't need two printed
+   faces to avoid a mirrored-backface look, so one rotating layer whose
+   background-color hard-cuts to the new territory color at the 90°
+   edge-on point (when it's too thin to read, per the brightness dip) is
+   enough to sell a physical card flip. --flip-delay staggers cells by
+   distance from the flip-all button so the flip visibly radiates outward;
+   --flip-from/--flip-to are the territory colors this cell shows before
+   and after, set inline since they depend on this tile and this face. */
+@keyframes rift-flip-reveal {
+  0%    { transform: rotateY(0deg);   background-color: var(--flip-from); filter: brightness(1) saturate(1); }
+  46%   { transform: rotateY(88deg);  background-color: var(--flip-from); filter: brightness(0.35) saturate(0.5); }
+  50%   { transform: rotateY(90deg);  background-color: var(--flip-to);   filter: brightness(0.3) saturate(0.5); }
+  54%   { transform: rotateY(92deg);  background-color: var(--flip-to);   filter: brightness(0.35) saturate(0.5); }
+  100%  { transform: rotateY(180deg); background-color: var(--flip-to);   filter: brightness(1) saturate(1); }
+}
+.rift-flip-reveal {
+  animation: rift-flip-reveal 520ms cubic-bezier(.45, .05, .35, 1) both;
+  animation-delay: var(--flip-delay, 0ms);
 }
 
 

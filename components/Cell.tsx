@@ -27,6 +27,12 @@ interface CellProps {
    *  Dual Realms prototype to mark a reversible tile's opposite-face color;
    *  unused (and thus invisible) everywhere else in the game. */
   reversibleOutline?: string;
+  /** Optional: stages a 3D flip-reveal on this cell — delayMs staggers a
+   *  wave radiating out from wherever the flip was triggered, from/to are
+   *  the territory colors this cell shows on this face before and after.
+   *  Used by the Dual Realms prototype's "flip all" gem button; unused
+   *  everywhere else. */
+  flipReveal?: { delayMs: number; from: string; to: string };
   size: number;
   thickTop?: boolean;
   thickRight?: boolean;
@@ -51,6 +57,7 @@ function Cell({
   isCompleted,
   isFreshWin,
   reversibleOutline,
+  flipReveal,
   size,
   thickTop,
   thickRight,
@@ -75,13 +82,31 @@ function Cell({
       data-cell="true"
       data-row={row}
       data-col={col}
-      style={{ width: `${px}px`, height: `${px}px` }}
+      style={{ width: `${px}px`, height: `${px}px`, perspective: 500 }}
       className={`relative flex items-center justify-center select-none ${ringClass}`}
     >
       {reversibleOutline && (
-        <div
-          className="absolute inset-0 pointer-events-none z-10 reversible-lightning"
+        <svg
+          className="absolute inset-0 pointer-events-none z-10"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
           style={{ '--rift-color': reversibleOutline } as React.CSSProperties}
+        >
+          <polyline
+            className="rift-lightning-path"
+            vectorEffect="non-scaling-stroke"
+            points="4,6 14,3 22,8 30,2 40,7 48,3 58,8 66,2 76,7 86,3 96,6 93,16 97,26 92,36 96,46 91,56 97,66 92,76 96,86 94,96 84,93 74,97 66,92 56,96 46,91 36,97 26,92 16,96 6,94 8,84 2,74 7,64 3,54 8,44 2,34 7,24 3,14 4,6"
+          />
+        </svg>
+      )}
+      {flipReveal && (
+        <div
+          className="absolute inset-0 pointer-events-none z-10 rift-flip-reveal"
+          style={{
+            '--flip-from': flipReveal.from,
+            '--flip-to': flipReveal.to,
+            '--flip-delay': `${flipReveal.delayMs}ms`,
+          } as React.CSSProperties}
         />
       )}
       {isDimmed && <div className="absolute inset-0 bg-ink opacity-40 pointer-events-none z-10" />}

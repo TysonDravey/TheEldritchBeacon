@@ -36,6 +36,9 @@ interface BoardProps {
   /** Optional: per-cell outline colors, keyed "row,col". Used by the Dual
    *  Realms prototype to mark reversible tiles; unused elsewhere. */
   reversibleOutlines?: Map<string, string>;
+  /** Optional: per-cell 3D flip-reveal stagings, keyed "row,col". Used by
+   *  the Dual Realms prototype's "flip all" gem button; unused elsewhere. */
+  flipReveals?: Map<string, { delayMs: number; from: string; to: string }>;
 }
 
 // Red outline — only explicit cells and territories, NOT rows/cols
@@ -93,6 +96,7 @@ export default function Board({
   isCompleted = false,
   isFreshWin = false,
   reversibleOutlines,
+  flipReveals,
 }: BoardProps) {
   const { size, territoryMap } = puzzle;
 
@@ -462,6 +466,7 @@ export default function Board({
                 isGhostWard={isGhostWard}
                 isConstraintWard={isConstraintWard}
                 reversibleOutline={reversibleOutlines?.get(`${row},${col}`)}
+                flipReveal={flipReveals?.get(`${row},${col}`)}
                 size={size}
                 thickTop={row === 0          || territoryMap[row - 1][col] !== territory}
                 thickBottom={row === size - 1 || territoryMap[row + 1][col] !== territory}

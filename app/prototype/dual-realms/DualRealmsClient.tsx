@@ -88,6 +88,11 @@ function toPuzzle(territoryMap: number[][], size: number): Puzzle {
   };
 }
 
+type FlipReveal = { delayMs: number; from: string; to: string };
+// Stable empty map for the side-by-side debug view, where both Faces are
+// always visible at once so there's nothing to flip-reveal.
+const EMPTY_FLIP_REVEALS = new Map<string, FlipReveal>();
+
 interface FaceProps {
   label: string;
   puzzle: Puzzle;
@@ -101,14 +106,54 @@ interface FaceProps {
   contradiction: ContradictionResult;
   solved: boolean;
   reversibleOutlines: Map<string, string>;
+  flipReveals: Map<string, FlipReveal>;
+  leftActive: boolean;
+  rightActive: boolean;
+  onFlipLeft: () => void;
+  onFlipRight: () => void;
 }
 
-function FaceBoard({ label, puzzle, cells, onWard, onWatcher, onDrag, onDragStart, onDragEnd, onLongPress, contradiction, solved, reversibleOutlines }: FaceProps) {
+// The two gem halves of the board-flip control, mounted at the top edge of
+// the board. Lit = currently viewing that Face (left = A, right = B);
+// clicking the dim side flips the whole board over to show it.
+function FlipGemButton({ leftActive, rightActive, onLeft, onRight }: {
+  leftActive: boolean;
+  rightActive: boolean;
+  onLeft: () => void;
+  onRight: () => void;
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', marginBottom: -16, zIndex: 5, position: 'relative' }}>
+      <img
+        src={leftActive ? '/dual-realms/left-on.png' : '/dual-realms/left-off.png'}
+        alt="Flip to Face A"
+        title="Flip to Face A"
+        onClick={onLeft}
+        draggable={false}
+        style={{ width: 52, height: 52, cursor: 'pointer', filter: 'drop-shadow(0 3px 5px rgba(0,0,0,0.6))' }}
+      />
+      <img
+        src={rightActive ? '/dual-realms/right-on.png' : '/dual-realms/right-off.png'}
+        alt="Flip to Face B"
+        title="Flip to Face B"
+        onClick={onRight}
+        draggable={false}
+        style={{ width: 52, height: 52, cursor: 'pointer', filter: 'drop-shadow(0 3px 5px rgba(0,0,0,0.6))' }}
+      />
+    </div>
+  );
+}
+
+function FaceBoard({
+  label, puzzle, cells, onWard, onWatcher, onDrag, onDragStart, onDragEnd, onLongPress,
+  contradiction, solved, reversibleOutlines, flipReveals, leftActive, rightActive, onFlipLeft, onFlipRight,
+}: FaceProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
       <div style={{ fontWeight: 'bold', fontSize: 18, background: 'rgba(255,255,255,0.9)', borderRadius: 6, padding: '4px 14px' }}>
         Face {label} {solved && '— SOLVED'}
       </div>
+      <FlipGemButton leftActive={leftActive} rightActive={rightActive} onLeft={onFlipLeft} onRight={onFlipRight} />
       <Board
         puzzle={puzzle}
         playerCells={cells}
@@ -120,6 +165,7 @@ function FaceBoard({ label, puzzle, cells, onWard, onWatcher, onDrag, onDragStar
         onCellLongPress={onLongPress}
         contradiction={contradiction}
         reversibleOutlines={reversibleOutlines}
+        flipReveals={flipReveals}
       />
       {contradiction.found && (
         <div style={{ color: '#8B1A1A', fontFamily: 'monospace', fontSize: 12, maxWidth: 260, textAlign: 'center' }}>
@@ -276,9 +322,56 @@ export default function DualRealmsClient() {
     setFlips(prev => prev.map((f, i) => (i === index ? !f : f)));
   }
 
-  function flipAllTiles() {
-    setFlips(prev => prev.map(f => !f));
+  // Must match the rift-flip-reveal animation duration in globals.css.
+  const FLIP_ANIM_MS = 520;
+  // Per unit of distance from the gem button — tuned so a 6x6 board's
+  // farthest corner finishes noticeably later than a cell right next to it,
+  // without the whole sequence dragging past a second.
+  const FLIP_STAGGER_MS = 70;
+  const flipRevealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [flipReveals, setFlipReveals] = useState<Map<string, FlipReveal>>(new Map());
+
+  // The gem button flips the WHOLE board over to the other Face (same job as
+  // the View Face A/B buttons, just with a 3D reveal). Every cell whose color
+  // actually differs between the two Faces gets staged — most of the board,
+  // not just the Rifts — with a delay proportional to distance from just
+  // above the board's top-center, where the gem button sits, so the flip
+  // visibly radiates outward from there.
+  function buildBoardFlipReveals(fromMap: number[][], toMap: number[][]) {
+    const anchorRow = -1.5;
+    const anchorCol = (size - 1) / 2;
+    const map = new Map<string, FlipReveal>();
+    for (let r = 0; r < size; r++) {
+      for (let c = 0; c < size; c++) {
+        if (fromMap[r][c] === toMap[r][c]) continue;
+        const dist = Math.hypot(r - anchorRow, c - anchorCol);
+        map.set(`${r},${c}`, {
+          delayMs: Math.round(dist * FLIP_STAGGER_MS),
+          from: TERRITORY_COLORS[fromMap[r][c]]?.bg ?? '#999',
+          to:   TERRITORY_COLORS[toMap[r][c]]?.bg ?? '#999',
+        });
+      }
+    }
+    return map;
   }
+
+  function flipToFace(target: FaceId) {
+    if (activeFace === target) return;
+    const fromMap = activeFace === 'A' ? territoryMapA : territoryMapB;
+    const toMap = target === 'A' ? territoryMapA : territoryMapB;
+    const map = buildBoardFlipReveals(fromMap, toMap);
+    setActiveFace(target);
+    setFlipReveals(map);
+    const maxDelay = Math.max(0, ...[...map.values()].map(v => v.delayMs));
+    if (flipRevealTimerRef.current) clearTimeout(flipRevealTimerRef.current);
+    flipRevealTimerRef.current = setTimeout(() => {
+      setFlipReveals(new Map());
+    }, maxDelay + FLIP_ANIM_MS + 80);
+  }
+
+  useEffect(() => () => {
+    if (flipRevealTimerRef.current) clearTimeout(flipRevealTimerRef.current);
+  }, []);
 
   // Long-press directly on a Rift cell flips it — same tile list as the
   // button row below, just reachable without scrolling down to it. Both
@@ -299,6 +392,8 @@ export default function DualRealmsClient() {
   }
 
   const bothSolved = solvedA && solvedB;
+  const onFlipLeft = useCallback(() => flipToFace('A'), [activeFace, territoryMapA, territoryMapB, size]);
+  const onFlipRight = useCallback(() => flipToFace('B'), [activeFace, territoryMapA, territoryMapB, size]);
 
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, fontFamily: 'sans-serif' }}>
@@ -308,7 +403,8 @@ export default function DualRealmsClient() {
           Two {size}×{size} Beacon boards share {reversibleTiles.length} Rifts. Each Rift shows a big
           core color (its current territory on THIS face) and a thin outline (its color
           on the OTHER face). Click a Rift in the list below to flip it, or press and hold
-          it directly on the board — both faces update at once. Solve both faces to win.
+          it directly on the board — both faces update at once. The gem pair at the top of
+          the board flips the whole board over to the other Face. Solve both faces to win.
         </p>
 
         {bothSolved && (
@@ -334,16 +430,15 @@ export default function DualRealmsClient() {
         </div>
 
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setActiveFace('A')} disabled={activeFace === 'A' || sideBySide}>
+          <button onClick={() => flipToFace('A')} disabled={activeFace === 'A' || sideBySide}>
             View Face A
           </button>
-          <button onClick={() => setActiveFace('B')} disabled={activeFace === 'B' || sideBySide}>
+          <button onClick={() => flipToFace('B')} disabled={activeFace === 'B' || sideBySide}>
             View Face B
           </button>
           <button onClick={() => setSideBySide(s => !s)}>
             {sideBySide ? 'Hide' : 'Show'} debug side-by-side
           </button>
-          <button onClick={flipAllTiles}>Flip All Rifts</button>
           <button onClick={resetAll}>Reset</button>
         </div>
       </div>
@@ -356,36 +451,66 @@ export default function DualRealmsClient() {
       </div>
 
       <div style={{ display: 'flex', gap: 32 }}>
-        {(sideBySide || activeFace === 'A') && (
+        {sideBySide ? (
+          <>
+            <FaceBoard
+              label="A"
+              puzzle={puzzleA}
+              cells={cellsA}
+              onWard={handlersA.onWard}
+              onWatcher={handlersA.onWatcher}
+              onDrag={handlersA.onDrag}
+              onDragStart={noopDragStart}
+              onDragEnd={noopDragEnd}
+              onLongPress={onRiftLongPress}
+              contradiction={contradictionA}
+              solved={solvedA}
+              reversibleOutlines={outlinesA}
+              flipReveals={EMPTY_FLIP_REVEALS}
+              leftActive={activeFace === 'A'}
+              rightActive={activeFace === 'B'}
+              onFlipLeft={onFlipLeft}
+              onFlipRight={onFlipRight}
+            />
+            <FaceBoard
+              label="B"
+              puzzle={puzzleB}
+              cells={cellsB}
+              onWard={handlersB.onWard}
+              onWatcher={handlersB.onWatcher}
+              onDrag={handlersB.onDrag}
+              onDragStart={noopDragStart}
+              onDragEnd={noopDragEnd}
+              onLongPress={onRiftLongPress}
+              contradiction={contradictionB}
+              solved={solvedB}
+              reversibleOutlines={outlinesB}
+              flipReveals={EMPTY_FLIP_REVEALS}
+              leftActive={activeFace === 'A'}
+              rightActive={activeFace === 'B'}
+              onFlipLeft={onFlipLeft}
+              onFlipRight={onFlipRight}
+            />
+          </>
+        ) : (
           <FaceBoard
-            label="A"
-            puzzle={puzzleA}
-            cells={cellsA}
-            onWard={handlersA.onWard}
-            onWatcher={handlersA.onWatcher}
-            onDrag={handlersA.onDrag}
+            label={activeFace}
+            puzzle={activeFace === 'A' ? puzzleA : puzzleB}
+            cells={activeFace === 'A' ? cellsA : cellsB}
+            onWard={activeFace === 'A' ? handlersA.onWard : handlersB.onWard}
+            onWatcher={activeFace === 'A' ? handlersA.onWatcher : handlersB.onWatcher}
+            onDrag={activeFace === 'A' ? handlersA.onDrag : handlersB.onDrag}
             onDragStart={noopDragStart}
             onDragEnd={noopDragEnd}
             onLongPress={onRiftLongPress}
-            contradiction={contradictionA}
-            solved={solvedA}
-            reversibleOutlines={outlinesA}
-          />
-        )}
-        {(sideBySide || activeFace === 'B') && (
-          <FaceBoard
-            label="B"
-            puzzle={puzzleB}
-            cells={cellsB}
-            onWard={handlersB.onWard}
-            onWatcher={handlersB.onWatcher}
-            onDrag={handlersB.onDrag}
-            onDragStart={noopDragStart}
-            onDragEnd={noopDragEnd}
-            onLongPress={onRiftLongPress}
-            contradiction={contradictionB}
-            solved={solvedB}
-            reversibleOutlines={outlinesB}
+            contradiction={activeFace === 'A' ? contradictionA : contradictionB}
+            solved={activeFace === 'A' ? solvedA : solvedB}
+            reversibleOutlines={activeFace === 'A' ? outlinesA : outlinesB}
+            flipReveals={flipReveals}
+            leftActive={activeFace === 'A'}
+            rightActive={activeFace === 'B'}
+            onFlipLeft={onFlipLeft}
+            onFlipRight={onFlipRight}
           />
         )}
       </div>
