@@ -14,6 +14,10 @@ interface BoardProps {
   onCellDrag?: (row: number, col: number, action: 'place' | 'remove') => void;
   onDragStart?: () => void;
   onDragEnd?: () => void;
+  /** Optional: fires after holding a cell still for ~500ms. Used by the
+   *  Dual Realms prototype to flip a reversible tile via long-press;
+   *  unused (and thus never wired up, so no behavior change) elsewhere. */
+  onCellLongPress?: (row: number, col: number) => void;
   primaryCell?: [number, number];
   highlightCells?: [number, number][];
   secondaryHighlightCells?: [number, number][];
@@ -72,6 +76,7 @@ export default function Board({
   onCellDrag,
   onDragStart,
   onDragEnd,
+  onCellLongPress,
   primaryCell,
   highlightCells,
   secondaryHighlightCells,
@@ -97,12 +102,14 @@ export default function Board({
   const onCellDragRef    = useRef(onCellDrag);
   const onDragStartRef   = useRef(onDragStart);
   const onDragEndRef     = useRef(onDragEnd);
+  const onCellLongPressRef = useRef(onCellLongPress);
   const playerCellsRef   = useRef(playerCells);
   useEffect(() => { onCellWardRef.current    = onCellWard;    }, [onCellWard]);
   useEffect(() => { onCellWatcherRef.current = onCellWatcher; }, [onCellWatcher]);
   useEffect(() => { onCellDragRef.current    = onCellDrag;    }, [onCellDrag]);
   useEffect(() => { onDragStartRef.current   = onDragStart;   }, [onDragStart]);
   useEffect(() => { onDragEndRef.current     = onDragEnd;     }, [onDragEnd]);
+  useEffect(() => { onCellLongPressRef.current = onCellLongPress; }, [onCellLongPress]);
   useEffect(() => { playerCellsRef.current   = playerCells;   }, [playerCells]);
 
   const pointerDownRef  = useRef(false);
@@ -115,6 +122,9 @@ export default function Board({
   const clickTimerRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTapRef         = useRef<{ x: number; y: number; time: number; row: number; col: number } | null>(null);
   const doubletapFiredRef  = useRef(false);
+  const longPressTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFiredRef  = useRef(false);
+  const LONG_PRESS_MS = 500;
   const boardHandledUpRef  = useRef(false);
   const lastCacheBuildRef  = useRef(0);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -209,7 +219,12 @@ export default function Board({
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0) return;
     e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
+    // setPointerCapture can throw (NotFoundError) if the browser doesn't consider this
+    // pointer id "active" at the moment of the call — seen with some stylus/multi-touch
+    // sequences. It's a nice-to-have (keeps the gesture tracking this element through a
+    // drag that leaves the board's bounds), not a correctness requirement — the rest of
+    // the gesture logic works fine without it, so a failure here shouldn't abort the tap.
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* not fatal, see above */ }
 
     // Throttled rebuild — see buildCellCacheThrottled for why this isn't unconditional.
     buildCellCacheThrottled();
@@ -245,6 +260,20 @@ export default function Board({
 
     const state = playerCellsRef.current[cell.row]?.[cell.col];
     dragActionRef.current = state === 'ward' ? 'remove' : 'place';
+
+    // Long-press: only armed when a consumer actually wants it (Dual Realms'
+    // Rift-flip gesture) — cancelled below on drag or early pointerUp, so a
+    // plain tap/double-tap/drag never triggers it.
+    if (onCellLongPressRef.current) {
+      longPressFiredRef.current = false;
+      const pressRow = cell.row, pressCol = cell.col;
+      longPressTimerRef.current = setTimeout(() => {
+        longPressTimerRef.current = null;
+        if (!pointerDownRef.current || isDraggingRef.current) return;
+        longPressFiredRef.current = true;
+        onCellLongPressRef.current?.(pressRow, pressCol);
+      }, LONG_PRESS_MS);
+    }
   }, []);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
@@ -263,6 +292,8 @@ export default function Board({
       // trigger double-tap on the next pointer-down.
       if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
       lastTapRef.current = null;
+      // A real drag means this was never a long-press-and-hold.
+      if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
       // Start interpolation from the actual drag origin so the full path is covered,
       // including cells crossed in the first 8px before drag mode was detected.
       prevDragPosRef.current = { x: startPosRef.current.x, y: startPosRef.current.y };
@@ -310,6 +341,8 @@ export default function Board({
     boardHandledUpRef.current = true;
     pointerDownRef.current = false;
 
+    if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+
     if (isDraggingRef.current) {
       isDraggingRef.current = false;
       onDragEndRef.current?.();
@@ -318,6 +351,13 @@ export default function Board({
 
     const cell = getCellAtPoint(e.clientX, e.clientY);
     if (!cell) return;
+
+    // Long-press already fired its own action in pointerDown's timer — don't
+    // also place a ward on release.
+    if (longPressFiredRef.current) {
+      longPressFiredRef.current = false;
+      return;
+    }
 
     // Double-tap was already handled in pointerDown — just clean up and return
     if (doubletapFiredRef.current) {
@@ -345,7 +385,10 @@ export default function Board({
   }, []);
 
 
-  useEffect(() => () => { if (clickTimerRef.current) clearTimeout(clickTimerRef.current); }, []);
+  useEffect(() => () => {
+    if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+  }, []);
 
   // Safety net: reset drag state whenever the pointer is released anywhere on the page.
   useEffect(() => {
@@ -354,6 +397,7 @@ export default function Board({
       pointerDownRef.current  = false;
       isDraggingRef.current   = false;
       visitedDragCellsRef.current = new Set();
+      if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
       if (!boardHandledUpRef.current) {
         if (clickTimerRef.current) { clearTimeout(clickTimerRef.current); clickTimerRef.current = null; }
       }

@@ -135,6 +135,29 @@ button, a {
   100% { transform: scale(1.00) translateY(0px);  }
 }
 
+/* Dual Realms reversible-tile ("Rift") outline — flickery, irregular-timed
+   box-shadow spikes instead of a smooth pulse, to read as electric/crackling
+   rather than a gentle glow. Color comes from --rift-color, set inline per
+   cell since it depends on which territory the tile shows on the OTHER face. */
+@keyframes reversible-lightning {
+  0%   { box-shadow: inset 0 0 0 4px var(--rift-color), inset 0 0 6px 1px var(--rift-color); opacity: 1; }
+  6%   { box-shadow: inset 0 0 0 2px var(--rift-color), inset 0 0 2px 0px var(--rift-color); opacity: 0.55; }
+  11%  { box-shadow: inset 0 0 0 5px var(--rift-color), inset 0 0 14px 4px var(--rift-color); opacity: 1; }
+  17%  { box-shadow: inset 0 0 0 3px var(--rift-color), inset 0 0 4px 1px var(--rift-color); opacity: 0.75; }
+  24%  { box-shadow: inset 0 0 0 4px var(--rift-color), inset 0 0 8px 2px var(--rift-color); opacity: 1; }
+  33%  { box-shadow: inset 0 0 0 4px var(--rift-color), inset 0 0 6px 1px var(--rift-color); opacity: 0.9; }
+  41%  { box-shadow: inset 0 0 0 2px var(--rift-color), inset 0 0 2px 0px var(--rift-color); opacity: 0.5; }
+  47%  { box-shadow: inset 0 0 0 5px var(--rift-color), inset 0 0 16px 5px var(--rift-color); opacity: 1; }
+  58%  { box-shadow: inset 0 0 0 4px var(--rift-color), inset 0 0 8px 2px var(--rift-color); opacity: 1; }
+  70%  { box-shadow: inset 0 0 0 3px var(--rift-color), inset 0 0 4px 1px var(--rift-color); opacity: 0.8; }
+  78%  { box-shadow: inset 0 0 0 5px var(--rift-color), inset 0 0 12px 3px var(--rift-color); opacity: 1; }
+  89%  { box-shadow: inset 0 0 0 2px var(--rift-color), inset 0 0 2px 0px var(--rift-color); opacity: 0.6; }
+  100% { box-shadow: inset 0 0 0 4px var(--rift-color), inset 0 0 6px 1px var(--rift-color); opacity: 1; }
+}
+.reversible-lightning {
+  animation: reversible-lightning 1.6s linear infinite;
+}
+
 
 /* Watcher eye pulse — brightness/saturate boost makes the iris flare without outer glow */
 @keyframes watcher-glow {

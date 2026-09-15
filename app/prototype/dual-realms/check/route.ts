@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import fs from 'fs';
 import type { Puzzle, CellState } from '@/engine/boardTypes';
 import { hasUniqueSolution, solveLogically, solveWithTrace } from '@/engine/solver';
 import { getWatcherPositions, canPlaceWatcher, isSolved } from '@/engine/rules';
@@ -17,7 +18,20 @@ import { DUAL_REALMS_PUZZLE_10 } from '../lib/puzzle-variant-10-mixed';
 import { DUAL_REALMS_PUZZLE_11 } from '../lib/puzzle-variant-11-mixed';
 import { DUAL_REALMS_PUZZLE_12 } from '../lib/puzzle-variant-12-mixed3-6x6';
 import { DUAL_REALMS_PUZZLE_13 } from '../lib/puzzle-variant-13-allwatcher3-6x6';
+import { DUAL_REALMS_PUZZLE_14 } from '../lib/puzzle-variant-14-allwatcher3-6x6';
+import { DUAL_REALMS_PUZZLE_15 } from '../lib/puzzle-variant-15-allwatcher3-6x6';
+import { DUAL_REALMS_PUZZLE_16 } from '../lib/puzzle-variant-16-allwatcher3-6x6';
+import { DUAL_REALMS_PUZZLE_17 } from '../lib/puzzle-variant-17-allwatcher3-6x6';
+import { DUAL_REALMS_PUZZLE_18 } from '../lib/puzzle-variant-18-allwatcher3-6x6';
+import { DUAL_REALMS_PUZZLE_19 } from '../lib/puzzle-variant-19-shattered3-6x6';
+import { DUAL_REALMS_PUZZLE_20 } from '../lib/puzzle-variant-20-shattered3-6x6';
+import { DUAL_REALMS_PUZZLE_21 } from '../lib/puzzle-variant-21-shattered3-6x6';
+import { DUAL_REALMS_PUZZLE_22 } from '../lib/puzzle-variant-22-allwatcher2-6x6';
+import { DUAL_REALMS_PUZZLE_24 } from '../lib/puzzle-variant-24-allwatcher2-6x6';
+import { DUAL_REALMS_PUZZLE_25 } from '../lib/puzzle-variant-25-allwatcher3-6x6';
+import { DUAL_REALMS_PUZZLE_26 } from '../lib/puzzle-variant-26-allwatcher2-6x6';
 import { deriveTerritoryMap } from '../lib/deriveTerritoryMap';
+import { tryBuildAllWatcherThreeTilePuzzle } from '../lib/allWatcherSearch';
 
 const LIVE_PUZZLES: Record<string, typeof DUAL_REALMS_PUZZLE> = {
   '1': DUAL_REALMS_PUZZLE_SCATTERED,
@@ -33,6 +47,18 @@ const LIVE_PUZZLES: Record<string, typeof DUAL_REALMS_PUZZLE> = {
   '11': DUAL_REALMS_PUZZLE_11,
   '12': DUAL_REALMS_PUZZLE_12,
   '13': DUAL_REALMS_PUZZLE_13,
+  '14': DUAL_REALMS_PUZZLE_14,
+  '15': DUAL_REALMS_PUZZLE_15,
+  '16': DUAL_REALMS_PUZZLE_16,
+  '17': DUAL_REALMS_PUZZLE_17,
+  '18': DUAL_REALMS_PUZZLE_18,
+  '19': DUAL_REALMS_PUZZLE_19,
+  '20': DUAL_REALMS_PUZZLE_20,
+  '21': DUAL_REALMS_PUZZLE_21,
+  '22': DUAL_REALMS_PUZZLE_22,
+  '24': DUAL_REALMS_PUZZLE_24,
+  '25': DUAL_REALMS_PUZZLE_25,
+  '26': DUAL_REALMS_PUZZLE_26,
 };
 
 // A cell with 3 same-colored neighbors and one lone poke of a different
@@ -108,6 +134,38 @@ function isTerritoryConnected(map: number[][], size: number, color: number): boo
     }
   }
   return visited.size === cells.length;
+}
+
+// Counts connected components (islands) for a color. Used for
+// shattered-realms territories, where "is this fully connected" is the
+// wrong question by design — every color is EXPECTED to have a few
+// separate islands. What matters there is capping the count (2-3, not the
+// "popcorn" 5-6 islands an unconstrained shattered generator can produce),
+// so a Rift's flip doesn't need to hide inside a fake single-blob illusion.
+function countComponents(map: number[][], size: number, color: number): number {
+  const cellSet = new Set<string>();
+  for (let r = 0; r < size; r++)
+    for (let c = 0; c < size; c++)
+      if (map[r][c] === color) cellSet.add(`${r},${c}`);
+  const visited = new Set<string>();
+  let components = 0;
+  for (const key of cellSet) {
+    if (visited.has(key)) continue;
+    components++;
+    const [sr, sc] = key.split(',').map(Number);
+    const stack: [number, number][] = [[sr, sc]];
+    visited.add(key);
+    while (stack.length > 0) {
+      const [cr, cc] = stack.pop()!;
+      for (const [nr, nc] of [[cr - 1, cc], [cr + 1, cc], [cr, cc - 1], [cr, cc + 1]] as [number, number][]) {
+        const nk = `${nr},${nc}`;
+        if (!cellSet.has(nk) || visited.has(nk)) continue;
+        visited.add(nk);
+        stack.push([nr, nc]);
+      }
+    }
+  }
+  return components;
 }
 
 // A tile sitting in the middle of a LONG straight run of one color reads as
@@ -899,241 +957,11 @@ function tryBuildMixedThreeTilePuzzle(
   return fallback;
 }
 
-// Experiment: THREE Facets, ALL watcher-type (two tied to Face A's own
-// win-check, one to Face B's) — no "ordinary, forced-by-B" tile at all.
-// Built directly in response to a confirmed bug: the ordinary-type tile
-// only ever produced AMBIGUITY when wrong (multiple valid placements still
-// satisfy isSolved), never a genuine dead end — which let a player fully
-// solve a puzzle without ever flipping a Facet, whenever the random start
-// happened to land with the ordinary tile wrong but the watcher tiles
-// already correct. Diagnostic instrumentation confirmed watcher-type tiles
-// don't have this problem (0 solutions when wrong, every time observed),
-// so this hard-requires that explicitly instead of assuming it: every tile
-// here must reduce its own face to ZERO valid solutions when wrong alone,
-// not just make the true solution fail isSolved.
-function tryBuildAllWatcherThreeTilePuzzle(
-  size: number,
-  mode: 'initiate' | 'shattered-realms',
-  strictContinuity = false,
-) {
-  function toPuzzle(territoryMap: number[][]): Puzzle {
-    return { id: 'gen', title: 'gen', mode: 'initiate', size, territoryMap, solution: [], difficulty: 'Initiate', seed: 'gen', createdAt: '' };
-  }
-  function cellKey(r: number, c: number) { return `${r},${c}`; }
 
-  // Generation is cheap here (seconds, not the 30-40s/attempt of the mixed
-  // 2-tile builder), so keep searching for a LOW-risk candidate instead of
-  // returning the first thing that satisfies the math — only stop early on
-  // a perfect (risk 0) find.
-  type Result = {
-    size: number;
-    baseTerritoryMapA: number[][];
-    baseTerritoryMapB: number[][];
-    reversibleTiles: { row: number; col: number; colorOnA: number; colorOnB: number }[];
-    solutionFlips: boolean[];
-    solutionA: [number, number][];
-    solutionB: [number, number][];
-    visualRisk: number;
-  };
-  let best: Result | null = null;
-
-  // Watcher-type tile positions are pinned to actual solution cells — far
-  // less freedom than an ordinary tile's "any open cell" choice, so hard
-  // continuity filters here starved the search (0/6 successes with them
-  // hard; 5/5 in under 2s with them off entirely). Score visual risk
-  // instead (0 = clean, higher = worse) and use it only to prefer the
-  // least-risky candidate first; never hard-reject on it.
-  function evaluateCell(
-    puzzleA: NonNullable<ReturnType<typeof generatePuzzle>>,
-    puzzleB: NonNullable<ReturnType<typeof generatePuzzle>>,
-    r: number, c: number,
-  ): { colorOnA: number; colorOnB: number; visualRisk: number } | null {
-    const colorOnA = puzzleA.territoryMap[r][c];
-    let colorOnB = puzzleB.territoryMap[r][c];
-    if (colorOnB === colorOnA) {
-      const nb = ([[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]] as [number, number][])
-        .filter(([nr, nc]) => nr >= 0 && nr < size && nc >= 0 && nc < size)
-        .map(([nr, nc]) => puzzleB.territoryMap[nr][nc]).filter(v => v !== colorOnA);
-      colorOnB = nb[0] ?? (colorOnA + 1) % size;
-    }
-    let visualRisk = 0;
-    if (strictContinuity) {
-      if (!isBalancedCorner(puzzleA.territoryMap, size, r, c, colorOnA, colorOnB)) visualRisk++;
-      if (!isBalancedCorner(puzzleB.territoryMap, size, r, c, colorOnA, colorOnB)) visualRisk++;
-      if (wouldFractureIfRemoved(puzzleA.territoryMap, size, colorOnA, r, c)) visualRisk++;
-      if (wouldFractureIfRemoved(puzzleB.territoryMap, size, colorOnB, r, c)) visualRisk++;
-      if (isNotchRisk(puzzleA.territoryMap, size, r, c, colorOnA, colorOnB)) visualRisk++;
-      if (isNotchRisk(puzzleB.territoryMap, size, r, c, colorOnA, colorOnB)) visualRisk++;
-    }
-    return { colorOnA, colorOnB, visualRisk };
-  }
-
-  // evaluateCell (and its per-candidate visualRisk) checks each tile in
-  // ISOLATION against the pristine pre-insertion map — it can't see that a
-  // DIFFERENT tile's insertion might change one of ITS neighbors. Two tiles
-  // sitting next to each other can silently fracture a territory that way
-  // (confirmed in the field: two adjacent Rifts, one tile's insertion
-  // turned the other's only remaining same-color neighbor into a different
-  // color, splitting that color's territory into two disconnected pieces —
-  // invisible to any single-tile check). Re-verify against the FULLY
-  // combined home-state map once all three tiles are chosen. A genuine
-  // fracture here is a hard reject, not just a risk point — it's an
-  // objectively broken-looking board, not a borderline case.
-  function combinedRisk(
-    mapA: number[][], mapB: number[][],
-    tiles: { row: number; col: number; colorOnA: number; colorOnB: number }[],
-  ): { risk: number; fractured: boolean } {
-    const homeA = mapA.map(row => [...row]);
-    const homeB = mapB.map(row => [...row]);
-    tiles.forEach(t => { homeA[t.row][t.col] = t.colorOnA; homeB[t.row][t.col] = t.colorOnB; });
-    let risk = 0;
-    let fractured = false;
-    const checkedA = new Set<number>();
-    const checkedB = new Set<number>();
-    for (const t of tiles) {
-      // Territory-as-displayed connectivity (catches multi-tile interaction
-      // fractures) — check each distinct territory touched at most once.
-      if (!checkedA.has(t.colorOnA)) {
-        checkedA.add(t.colorOnA);
-        if (!isTerritoryConnected(homeA, size, t.colorOnA)) fractured = true;
-      }
-      if (!checkedB.has(t.colorOnB)) {
-        checkedB.add(t.colorOnB);
-        if (!isTerritoryConnected(homeB, size, t.colorOnB)) fractured = true;
-      }
-      // Bridge-cell check (would the AWAY state, missing this cell, fracture it).
-      if (wouldFractureIfRemoved(homeA, size, t.colorOnA, t.row, t.col)) fractured = true;
-      if (wouldFractureIfRemoved(homeB, size, t.colorOnB, t.row, t.col)) fractured = true;
-      if (!isBalancedCorner(homeA, size, t.row, t.col, t.colorOnA, t.colorOnB)) risk++;
-      if (!isBalancedCorner(homeB, size, t.row, t.col, t.colorOnA, t.colorOnB)) risk++;
-      if (isNotchRisk(homeA, size, t.row, t.col, t.colorOnA, t.colorOnB)) risk++;
-      if (isNotchRisk(homeB, size, t.row, t.col, t.colorOnA, t.colorOnB)) risk++;
-    }
-    return { risk, fractured };
-  }
-
-  // Verify a watcher-type tile: wrong-alone must reduce ITS OWN face to
-  // zero solutions (a real dead end), and leave the OTHER face uniquely
-  // solvable (indifferent).
-  function watcherTileHolds(
-    puzzleOwn: NonNullable<ReturnType<typeof generatePuzzle>>,
-    puzzleOther: NonNullable<ReturnType<typeof generatePuzzle>>,
-    r: number, c: number, colorOwnHome: number, colorOwnAway: number, colorOtherAway: number,
-  ): boolean {
-    const flippedOwn = puzzleOwn.territoryMap.map(row => [...row]);
-    flippedOwn[r][c] = colorOwnAway;
-    if (enumerateSolutions(toPuzzle(flippedOwn), 1).length !== 0) return false;
-    const flippedOther = puzzleOther.territoryMap.map(row => [...row]);
-    flippedOther[r][c] = colorOtherAway;
-    if (!hasUniqueSolution(toPuzzle(flippedOther))) return false;
-    return true;
-  }
-
-  for (let seedAttempt = 0; seedAttempt < 150; seedAttempt++) {
-    const seedA = `dr-aw3-A-${Date.now()}-${seedAttempt}-${Math.random()}`;
-    const seedB = `dr-aw3-B-${Date.now()}-${seedAttempt}-${Math.random()}`;
-    const puzzleA = generatePuzzle({ size, seed: seedA, mode });
-    const puzzleB = generatePuzzle({ size, seed: seedB, mode });
-    if (!puzzleA || !puzzleB) continue;
-
-    const candidatesA = [...puzzleA.solution];
-    for (let i = candidatesA.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [candidatesA[i], candidatesA[j]] = [candidatesA[j], candidatesA[i]];
-    }
-
-    const evalA = candidatesA
-      .map(([r, c]) => {
-        const colorOnA = puzzleA.territoryMap[r][c];
-        if (territorySize(puzzleA.territoryMap, colorOnA) < 3) return null;
-        const ev = evaluateCell(puzzleA, puzzleB, r, c);
-        if (!ev) return null;
-        return { r, c, colorOnA: ev.colorOnA, colorOnB: ev.colorOnB, visualRisk: ev.visualRisk };
-      })
-      .filter((v): v is NonNullable<typeof v> => v !== null)
-      .sort((a, b) => a.visualRisk - b.visualRisk);
-
-    // Need two DISTINCT watcher-on-A candidates that both independently hold.
-    for (let i0 = 0; i0 < evalA.length; i0++) {
-      const t0 = evalA[i0];
-      if (!watcherTileHolds(puzzleA, puzzleB, t0.r, t0.c, t0.colorOnA, t0.colorOnB, t0.colorOnA)) continue;
-
-      for (let i1 = 0; i1 < evalA.length; i1++) {
-        if (i1 === i0) continue;
-        const t1 = evalA[i1];
-        // t1's own check must still hold with t0 already present (t0's
-        // cell untouched here since it's a different territory/cell).
-        if (!watcherTileHolds(puzzleA, puzzleB, t1.r, t1.c, t1.colorOnA, t1.colorOnB, t1.colorOnA)) continue;
-
-        const candidatesB = puzzleB.solution.filter(
-          ([r, c]) => cellKey(r, c) !== cellKey(t0.r, t0.c) && cellKey(r, c) !== cellKey(t1.r, t1.c),
-        );
-        for (let i = candidatesB.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [candidatesB[i], candidatesB[j]] = [candidatesB[j], candidatesB[i]];
-        }
-
-        const evalB = candidatesB
-          .map(([r, c]) => {
-            const colorOnB = puzzleB.territoryMap[r][c];
-            if (territorySize(puzzleB.territoryMap, colorOnB) < 3) return null;
-            const ev = evaluateCell(puzzleA, puzzleB, r, c);
-            if (!ev) return null;
-            return { r, c, colorOnA: ev.colorOnA, colorOnB: ev.colorOnB, visualRisk: ev.visualRisk };
-          })
-          .filter((v): v is NonNullable<typeof v> => v !== null)
-          .sort((a, b) => a.visualRisk - b.visualRisk);
-
-        for (const t2 of evalB) {
-          if (!watcherTileHolds(puzzleB, puzzleA, t2.r, t2.c, t2.colorOnB, t2.colorOnA, t2.colorOnB)) continue;
-
-          const tiles = [
-            { row: t0.r, col: t0.c, colorOnA: t0.colorOnA, colorOnB: t0.colorOnB },
-            { row: t1.r, col: t1.c, colorOnA: t1.colorOnA, colorOnB: t1.colorOnB },
-            { row: t2.r, col: t2.c, colorOnA: t2.colorOnA, colorOnB: t2.colorOnB },
-          ];
-
-          // Full 8-combo sweep: only the all-home combo may work for both faces.
-          let bothUniqueCount = 0, intendedWorks = false;
-          for (let mask = 0; mask < 8; mask++) {
-            const flips = [!!(mask & 1), !!(mask & 2), !!(mask & 4)];
-            const mapA = puzzleA.territoryMap.map(row => [...row]);
-            const mapB = puzzleB.territoryMap.map(row => [...row]);
-            tiles.forEach((t, i) => {
-              mapA[t.row][t.col] = flips[i] ? t.colorOnB : t.colorOnA;
-              mapB[t.row][t.col] = flips[i] ? t.colorOnA : t.colorOnB;
-            });
-            const bothUnique = hasUniqueSolution(toPuzzle(mapA)) && hasUniqueSolution(toPuzzle(mapB));
-            if (bothUnique) { bothUniqueCount++; if (mask === 0) intendedWorks = true; }
-          }
-          if (bothUniqueCount !== 1 || !intendedWorks) continue;
-
-          const solvableA = solveLogically(toPuzzle(puzzleA.territoryMap)) !== null;
-          const solvableB = solveLogically(toPuzzle(puzzleB.territoryMap)) !== null;
-          if (!solvableA || !solvableB) continue;
-
-          const { risk: visualRisk, fractured } = combinedRisk(puzzleA.territoryMap, puzzleB.territoryMap, tiles);
-          if (fractured) continue;
-
-          if (!best || visualRisk < best.visualRisk) {
-            best = {
-              size,
-              baseTerritoryMapA: puzzleA.territoryMap,
-              baseTerritoryMapB: puzzleB.territoryMap,
-              reversibleTiles: tiles,
-              solutionFlips: tiles.map(() => false),
-              solutionA: puzzleA.solution,
-              solutionB: puzzleB.solution,
-              visualRisk,
-            };
-          }
-          if (visualRisk === 0) return best;
-        }
-      }
-    }
-  }
-  return best;
-}
+// tryBuildAllWatcherThreeTilePuzzle moved to ../lib/allWatcherSearch.ts so it
+// can also run as a standalone script (scripts/search-allwatcher3.ts),
+// independent of the Next.js dev server — running it as a route handler was
+// found to fully block the server (a /progress poll hung for 2+ minutes).
 
 export const dynamic = 'force-dynamic';
 
@@ -1141,6 +969,33 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const generate = url.searchParams.get('generate');
   const full = url.searchParams.get('full');
+
+  // Live status for a long-running background generation search (see
+  // tryBuildAllWatcherThreeTilePuzzle) — lets /progress/page.tsx poll and
+  // show something other than a blackbox while the search runs.
+  if (url.searchParams.get('progress')) {
+    function readJsonFile(path: string): unknown {
+      try {
+        return JSON.parse(fs.readFileSync(path, 'utf-8'));
+      } catch {
+        return null;
+      }
+    }
+    return NextResponse.json({
+      progress: readJsonFile('/tmp/allwatcher3-6-progress.json'),
+      nearMiss: readJsonFile('/tmp/allwatcher3-6-nearmiss.json'),
+      twoClean: readJsonFile('/tmp/allwatcher3-6-twoclean.json'),
+      fullSuccess3: readJsonFile('/tmp/allwatcher3-6-fullsuccess.json'),
+      progress2: readJsonFile('/tmp/allwatcher2-6-progress.json'),
+      nearMiss2: readJsonFile('/tmp/allwatcher2-6-nearmiss.json'),
+      twoClean2: readJsonFile('/tmp/allwatcher2-6-twoclean.json'),
+      fullSuccess2: readJsonFile('/tmp/allwatcher2-6-fullsuccess.json'),
+      progress3x7: readJsonFile('/tmp/allwatcher3-7-progress.json'),
+      nearMiss3x7: readJsonFile('/tmp/allwatcher3-7-nearmiss.json'),
+      twoClean3x7: readJsonFile('/tmp/allwatcher3-7-twoclean.json'),
+      fullSuccess3x7: readJsonFile('/tmp/allwatcher3-7-fullsuccess.json'),
+    });
+  }
 
   if (url.searchParams.get('trace')) {
     const selected = LIVE_PUZZLES[url.searchParams.get('puzzle') ?? ''] ?? DUAL_REALMS_PUZZLE;
@@ -1197,7 +1052,7 @@ export async function GET(request: Request) {
     const size = Math.max(5, Math.min(8, Number(url.searchParams.get('size')) || 6));
     const results = [];
     for (let i = 0; i < count; i++) {
-      results.push(tryBuildAllWatcherThreeTilePuzzle(size, mode, strictContinuity));
+      results.push(await tryBuildAllWatcherThreeTilePuzzle(size, mode, strictContinuity));
     }
     const found = results.filter((r): r is NonNullable<typeof r> => r !== null);
     return NextResponse.json(

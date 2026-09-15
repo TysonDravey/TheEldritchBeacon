@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Board from '@/components/Board';
 import type { CellState, Puzzle, ContradictionResult } from '@/engine/boardTypes';
 import { canPlaceWatcher, watcherRejectionReason, isSolved } from '@/engine/rules';
@@ -12,19 +12,49 @@ import { DUAL_REALMS_PUZZLE_9 } from './lib/puzzle-variant-9-mixed';
 import { DUAL_REALMS_PUZZLE_10 } from './lib/puzzle-variant-10-mixed';
 import { DUAL_REALMS_PUZZLE_11 } from './lib/puzzle-variant-11-mixed';
 import { DUAL_REALMS_PUZZLE_12 } from './lib/puzzle-variant-12-mixed3-6x6';
-import { DUAL_REALMS_PUZZLE_13 } from './lib/puzzle-variant-13-allwatcher3-6x6';
+import { DUAL_REALMS_PUZZLE_19 } from './lib/puzzle-variant-19-shattered3-6x6';
+import { DUAL_REALMS_PUZZLE_20 } from './lib/puzzle-variant-20-shattered3-6x6';
+import { DUAL_REALMS_PUZZLE_21 } from './lib/puzzle-variant-21-shattered3-6x6';
+import { DUAL_REALMS_PUZZLE_22 } from './lib/puzzle-variant-22-allwatcher2-6x6';
+import { DUAL_REALMS_PUZZLE_24 } from './lib/puzzle-variant-24-allwatcher2-6x6';
+import { DUAL_REALMS_PUZZLE_25 } from './lib/puzzle-variant-25-allwatcher3-6x6';
+import { DUAL_REALMS_PUZZLE_26 } from './lib/puzzle-variant-26-allwatcher2-6x6';
 import { deriveTerritoryMap } from './lib/deriveTerritoryMap';
 import type { DualRealmsPuzzle, FaceId } from './lib/types';
 
-const PUZZLE_OPTIONS: { label: string; puzzle: DualRealmsPuzzle }[] = [
-  { label: 'Puzzle 1', puzzle: DUAL_REALMS_PUZZLE_SCATTERED },
-  { label: 'Puzzle 8 (2 Rifts, mixed types)', puzzle: DUAL_REALMS_PUZZLE_MIXED },
-  { label: 'Puzzle 9 (2 Rifts, mixed types)', puzzle: DUAL_REALMS_PUZZLE_9 },
-  { label: 'Puzzle 10 (2 Rifts, mixed types)', puzzle: DUAL_REALMS_PUZZLE_10 },
-  { label: 'Puzzle 11 (2 Rifts, mixed types)', puzzle: DUAL_REALMS_PUZZLE_11 },
-  { label: 'Puzzle 12 (3 Rifts, 6×6, mixed types)', puzzle: DUAL_REALMS_PUZZLE_12 },
-  { label: 'Puzzle 13 (3 Rifts, 6×6, all watcher-type)', puzzle: DUAL_REALMS_PUZZLE_13 },
+const PUZZLE_OPTIONS: { label: string; puzzle: DualRealmsPuzzle; group: string }[] = [
+  { label: 'Puzzle 1', puzzle: DUAL_REALMS_PUZZLE_SCATTERED, group: 'Legacy' },
+  { label: 'Puzzle 8', puzzle: DUAL_REALMS_PUZZLE_MIXED, group: '5×5 · 2 Rifts · mixed types' },
+  { label: 'Puzzle 9', puzzle: DUAL_REALMS_PUZZLE_9, group: '5×5 · 2 Rifts · mixed types' },
+  { label: 'Puzzle 10', puzzle: DUAL_REALMS_PUZZLE_10, group: '5×5 · 2 Rifts · mixed types' },
+  { label: 'Puzzle 11', puzzle: DUAL_REALMS_PUZZLE_11, group: '5×5 · 2 Rifts · mixed types' },
+  { label: 'Puzzle 12', puzzle: DUAL_REALMS_PUZZLE_12, group: '6×6 · 3 Rifts · mixed types' },
+  // Puzzles 13-18 removed from the picker: confirmed broken by the full
+  // flip-combo sweep (checks ALL 2^3-1 non-intended combos, not just
+  // single-Rift-alone flips) — every one fractures on most/all multi-Rift
+  // flip combinations, most severely 5-7 of 7. Data files kept on disk;
+  // not wired into LIVE_PUZZLES. Awaiting regenerated replacements.
+  { label: 'Puzzle 19', puzzle: DUAL_REALMS_PUZZLE_19, group: '6×6 · 3 Rifts · shattered' },
+  { label: 'Puzzle 20', puzzle: DUAL_REALMS_PUZZLE_20, group: '6×6 · 3 Rifts · shattered' },
+  { label: 'Puzzle 21', puzzle: DUAL_REALMS_PUZZLE_21, group: '6×6 · 3 Rifts · shattered' },
+  { label: 'Puzzle 22', puzzle: DUAL_REALMS_PUZZLE_22, group: '6×6 · 2 Rifts · all watcher-type (fully clean)' },
+  // Puzzle 23 removed from the picker: confirmed broken by the full
+  // flip-combo sweep — fractures when BOTH Rifts are flipped together,
+  // even though it looked perfect under the old single-tile-only check.
+  // Data file kept on disk for reference; not wired into LIVE_PUZZLES.
+  { label: 'Puzzle 24', puzzle: DUAL_REALMS_PUZZLE_24, group: '6×6 · 2 Rifts · all watcher-type (fully clean)' },
+  { label: 'Puzzle 25', puzzle: DUAL_REALMS_PUZZLE_25, group: '6×6 · 3 Rifts · all watcher-type (fully clean)' },
+  { label: 'Puzzle 26', puzzle: DUAL_REALMS_PUZZLE_26, group: '6×6 · 2 Rifts · all watcher-type (fully clean)' },
 ];
+
+// Group consecutive options sharing the same `group` label, keeping each
+// entry's original index (selectPuzzle takes an index into the flat array).
+const PUZZLE_GROUPS: { group: string; indices: number[] }[] = [];
+PUZZLE_OPTIONS.forEach((opt, i) => {
+  const last = PUZZLE_GROUPS[PUZZLE_GROUPS.length - 1];
+  if (last && last.group === opt.group) last.indices.push(i);
+  else PUZZLE_GROUPS.push({ group: opt.group, indices: [i] });
+});
 
 function emptyGrid(size: number): CellState[][] {
   return Array.from({ length: size }, () => Array.from({ length: size }, (): CellState => 'empty'));
@@ -64,12 +94,16 @@ interface FaceProps {
   cells: CellState[][];
   onWard: (row: number, col: number) => void;
   onWatcher: (row: number, col: number) => void;
+  onDrag: (row: number, col: number, action: 'place' | 'remove') => void;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onLongPress: (row: number, col: number) => void;
   contradiction: ContradictionResult;
   solved: boolean;
   reversibleOutlines: Map<string, string>;
 }
 
-function FaceBoard({ label, puzzle, cells, onWard, onWatcher, contradiction, solved, reversibleOutlines }: FaceProps) {
+function FaceBoard({ label, puzzle, cells, onWard, onWatcher, onDrag, onDragStart, onDragEnd, onLongPress, contradiction, solved, reversibleOutlines }: FaceProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
       <div style={{ fontWeight: 'bold', fontSize: 18, background: 'rgba(255,255,255,0.9)', borderRadius: 6, padding: '4px 14px' }}>
@@ -80,6 +114,10 @@ function FaceBoard({ label, puzzle, cells, onWard, onWatcher, contradiction, sol
         playerCells={cells}
         onCellWard={onWard}
         onCellWatcher={onWatcher}
+        onCellDrag={onDrag}
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        onCellLongPress={onLongPress}
         contradiction={contradiction}
         reversibleOutlines={reversibleOutlines}
       />
@@ -108,6 +146,16 @@ export default function DualRealmsClient() {
   const [activeFace, setActiveFace] = useState<FaceId>('A');
   const [sideBySide, setSideBySide] = useState(false);
   const [rejection, setRejection] = useState<string | null>(null);
+
+  // A drag gesture fires onCellDrag once per cell crossed, often faster than
+  // React can re-render between calls — reading `cells` from a plain
+  // closure would silently drop cells painted within the same batch (each
+  // call starts from the same stale array). Refs always see the latest
+  // write, matching the pattern already used for this in app/daily/page.tsx.
+  const cellsARef = useRef(cellsA);
+  const cellsBRef = useRef(cellsB);
+  useEffect(() => { cellsARef.current = cellsA; }, [cellsA]);
+  useEffect(() => { cellsBRef.current = cellsB; }, [cellsB]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { setFlips(randomStartFlips(solutionFlips)); }, []);
@@ -157,7 +205,35 @@ export default function DualRealmsClient() {
   const solvedB = useMemo(() => isSolved(puzzleB, cellsB), [puzzleB, cellsB]);
 
   const makeHandlers = useCallback(
-    (puzzle: Puzzle, cells: CellState[][], setCells: (c: CellState[][]) => void) => {
+    (
+      puzzle: Puzzle,
+      cells: CellState[][],
+      setCells: (c: CellState[][]) => void,
+      cellsRef: React.RefObject<CellState[][]>,
+    ) => {
+      const onDrag = (row: number, col: number, action: 'place' | 'remove') => {
+        const current = cellsRef.current;
+        const prev = current[row][col];
+        if (action === 'place'  && prev === 'empty') {
+          const next = current.map(r => [...r]);
+          next[row][col] = 'ward';
+          // Update the ref synchronously, not just via the effect below — a single
+          // drag gesture can call onDrag several times before React re-renders
+          // (coalesced pointermove events painting multiple cells in one batch), and
+          // the effect only syncs the ref after commit. Without this, each call in
+          // the same batch would rebuild `next` from the same stale snapshot and the
+          // final setCells would clobber all but the last cell painted, matching the
+          // playerStateRef.current = newState pattern in app/daily/page.tsx.
+          cellsRef.current = next;
+          setCells(next);
+        }
+        if (action === 'remove' && prev === 'ward') {
+          const next = current.map(r => [...r]);
+          next[row][col] = 'empty';
+          cellsRef.current = next;
+          setCells(next);
+        }
+      };
       const onWard = (row: number, col: number) => {
         const prev = cells[row][col];
         if (prev === 'watcher') return;
@@ -188,17 +264,33 @@ export default function DualRealmsClient() {
         next[row][col] = 'watcher';
         setCells(next);
       };
-      return { onWard, onWatcher };
+      return { onWard, onWatcher, onDrag };
     },
     [],
   );
 
-  const handlersA = makeHandlers(puzzleA, cellsA, setCellsA);
-  const handlersB = makeHandlers(puzzleB, cellsB, setCellsB);
+  const handlersA = makeHandlers(puzzleA, cellsA, setCellsA, cellsARef);
+  const handlersB = makeHandlers(puzzleB, cellsB, setCellsB, cellsBRef);
 
   function flipTile(index: number) {
     setFlips(prev => prev.map((f, i) => (i === index ? !f : f)));
   }
+
+  function flipAllTiles() {
+    setFlips(prev => prev.map(f => !f));
+  }
+
+  // Long-press directly on a Rift cell flips it — same tile list as the
+  // button row below, just reachable without scrolling down to it. Both
+  // faces share the same reversibleTiles positions, so one handler works
+  // for either Board.
+  const onRiftLongPress = useCallback((row: number, col: number) => {
+    const idx = reversibleTiles.findIndex(t => t.row === row && t.col === col);
+    if (idx !== -1) flipTile(idx);
+  }, [reversibleTiles]);
+
+  function noopDragStart() {}
+  function noopDragEnd() {}
 
   function resetAll() {
     setCellsA(emptyGrid(size));
@@ -215,24 +307,29 @@ export default function DualRealmsClient() {
         <p style={{ maxWidth: 560, textAlign: 'center', fontSize: 13, opacity: 0.75, margin: 0 }}>
           Two {size}×{size} Beacon boards share {reversibleTiles.length} Rifts. Each Rift shows a big
           core color (its current territory on THIS face) and a thin outline (its color
-          on the OTHER face). Click a Rift in the list below to flip it — both faces
-          update at once. Solve both faces to win.
+          on the OTHER face). Click a Rift in the list below to flip it, or press and hold
+          it directly on the board — both faces update at once. Solve both faces to win.
         </p>
 
         {bothSolved && (
           <div style={{ fontSize: 20, fontWeight: 'bold', color: '#2E7D32' }}>Both faces solved! 🎉</div>
         )}
 
-        <div style={{ display: 'flex', gap: 8 }}>
-          {PUZZLE_OPTIONS.map((opt, i) => (
-            <button
-              key={opt.label}
-              onClick={() => selectPuzzle(i)}
-              disabled={i === puzzleIndex}
-              style={i === puzzleIndex ? { fontWeight: 'bold' } : undefined}
-            >
-              {opt.label}
-            </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 760 }}>
+          {PUZZLE_GROUPS.map(({ group, indices }) => (
+            <div key={indices[0]} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+              <span style={{ fontSize: 11, opacity: 0.6, minWidth: 190, textAlign: 'right' }}>{group}:</span>
+              {indices.map(i => (
+                <button
+                  key={PUZZLE_OPTIONS[i].label}
+                  onClick={() => selectPuzzle(i)}
+                  disabled={i === puzzleIndex}
+                  style={i === puzzleIndex ? { fontWeight: 'bold' } : undefined}
+                >
+                  {PUZZLE_OPTIONS[i].label}
+                </button>
+              ))}
+            </div>
           ))}
         </div>
 
@@ -246,13 +343,17 @@ export default function DualRealmsClient() {
           <button onClick={() => setSideBySide(s => !s)}>
             {sideBySide ? 'Hide' : 'Show'} debug side-by-side
           </button>
+          <button onClick={flipAllTiles}>Flip All Rifts</button>
           <button onClick={resetAll}>Reset</button>
         </div>
       </div>
 
-      {rejection && (
-        <div style={{ color: '#8B1A1A', fontWeight: 'bold' }}>{rejection}</div>
-      )}
+      {/* Fixed-height slot, always rendered — letting this text mount/unmount
+          shifts the boards below it, which lands a double-click's second
+          tap on the wrong cell the instant a rejection pops up mid-gesture. */}
+      <div style={{ height: 20, color: '#8B1A1A', fontWeight: 'bold', visibility: rejection ? 'visible' : 'hidden' }}>
+        {rejection || ' '}
+      </div>
 
       <div style={{ display: 'flex', gap: 32 }}>
         {(sideBySide || activeFace === 'A') && (
@@ -262,6 +363,10 @@ export default function DualRealmsClient() {
             cells={cellsA}
             onWard={handlersA.onWard}
             onWatcher={handlersA.onWatcher}
+            onDrag={handlersA.onDrag}
+            onDragStart={noopDragStart}
+            onDragEnd={noopDragEnd}
+            onLongPress={onRiftLongPress}
             contradiction={contradictionA}
             solved={solvedA}
             reversibleOutlines={outlinesA}
@@ -274,6 +379,10 @@ export default function DualRealmsClient() {
             cells={cellsB}
             onWard={handlersB.onWard}
             onWatcher={handlersB.onWatcher}
+            onDrag={handlersB.onDrag}
+            onDragStart={noopDragStart}
+            onDragEnd={noopDragEnd}
+            onLongPress={onRiftLongPress}
             contradiction={contradictionB}
             solved={solvedB}
             reversibleOutlines={outlinesB}

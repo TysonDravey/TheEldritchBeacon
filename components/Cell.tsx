@@ -80,8 +80,8 @@ function Cell({
     >
       {reversibleOutline && (
         <div
-          className="absolute inset-0 pointer-events-none z-10"
-          style={{ boxShadow: `inset 0 0 0 4px ${reversibleOutline}` }}
+          className="absolute inset-0 pointer-events-none z-10 reversible-lightning"
+          style={{ '--rift-color': reversibleOutline } as React.CSSProperties}
         />
       )}
       {isDimmed && <div className="absolute inset-0 bg-ink opacity-40 pointer-events-none z-10" />}
