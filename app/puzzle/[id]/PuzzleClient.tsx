@@ -298,11 +298,11 @@ export default function PuzzleClient() {
         newUndoStack = [...current.undoStack, current.cells.map((r) => [...r])].slice(-UNDO_LIMIT);
       }
 
-      // Haptic — skip during drag (vibrate per cell would be excessive and adds up)
-      if (!isDraggingRef.current) {
-        if (next === 'watcher' || (next === 'empty' && current.cells[row][col] === 'watcher')) haptic('medium');
-        else haptic('light');
-      }
+      if (next === 'watcher' || (next === 'empty' && current.cells[row][col] === 'watcher')) haptic('medium');
+      // A drag never produces a watcher (see handleCellDrag), so this is always
+      // the ward/empty case for a dragged cell — use the selection-generator
+      // tick (see haptic()'s drag-tick case) instead of a fresh impact per cell.
+      else haptic(isDraggingRef.current ? 'drag-tick' : 'light');
 
       const dragging = isDraggingRef.current;
       if (!dragging) {
@@ -342,6 +342,10 @@ export default function PuzzleClient() {
         const STEP_MS    = 60;
         winTimersRef.current.forEach(clearTimeout);
         winTimersRef.current = [];
+        // watcher-rise-slam (globals.css): 200ms delay + 2200ms duration,
+        // "Fast slam" keyframe at 80% — one big hit right as they land,
+        // separate from and bigger than the per-ward ripple below.
+        winTimersRef.current.push(setTimeout(() => haptic('win-slam'), 1960));
         const watcherCells: [number, number][] = [];
         for (let r = 0; r < puzzle.size; r++)
           for (let c = 0; c < puzzle.size; c++)
@@ -395,6 +399,7 @@ export default function PuzzleClient() {
     isDraggingRef.current   = true;
     preDragCellsRef.current = playerState.cells.map((r) => [...r]);
     // Snapshot is pushed by the first applyChange call during this drag (avoids stale-closure race)
+    haptic('drag-start');
   }, [playerState]);
 
   const handleDragEnd = useCallback(() => {
@@ -402,6 +407,7 @@ export default function PuzzleClient() {
     preDragCellsRef.current = null;
     const current = playerStateRef.current;
     if (current) savePlayerState(current);
+    haptic('drag-end');
   }, []);
 
   // Drag ward — dedicated non-toggle callback: only places when action='place', only removes

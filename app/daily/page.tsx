@@ -590,7 +590,10 @@ export default function DailyPage() {
       }
 
       if (next === 'watcher' || (next === 'empty' && current.cells[row][col] === 'watcher')) haptic('medium');
-      else haptic('light');
+      // A drag never produces a watcher (see handleCellDrag), so this is always
+      // the ward/empty case for a dragged cell — use the selection-generator
+      // tick (see haptic()'s drag-tick case) instead of a fresh impact per cell.
+      else haptic(isDraggingRef.current ? 'drag-tick' : 'light');
 
       hintDepthRef.current = 0;
       setHintResult(null);
@@ -668,6 +671,10 @@ export default function DailyPage() {
 
         winTimersRef.current.forEach(clearTimeout);
         winTimersRef.current = [];
+        // watcher-rise-slam (globals.css): 200ms delay + 2200ms duration,
+        // "Fast slam" keyframe at 80% — one big hit right as they land,
+        // separate from and bigger than the per-ward ripple below.
+        winTimersRef.current.push(setTimeout(() => haptic('win-slam'), 1960));
         const watcherCells: [number, number][] = [];
         for (let r = 0; r < puzzle.size; r++)
           for (let c = 0; c < puzzle.size; c++)
@@ -703,11 +710,13 @@ export default function DailyPage() {
     if (!playerState) return;
     isDraggingRef.current   = true;
     preDragCellsRef.current = playerState.cells.map((r) => [...r]);
+    haptic('drag-start');
   }, [playerState]);
 
   const handleDragEnd = useCallback(() => {
     isDraggingRef.current   = false;
     preDragCellsRef.current = null;
+    haptic('drag-end');
   }, []);
 
   const handleCellDrag = useCallback(
