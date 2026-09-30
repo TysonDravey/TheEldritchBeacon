@@ -6,23 +6,43 @@
 // The route it contains (add-puzzle) is a local dev-only authoring tool
 // anyway; it already 403s outside development and the shipped game never
 // calls it.
+//
+// app/prototype gets the same treatment: it's dev-only experimentation
+// (currently the Dual Realms prototype), never linked from the shipped
+// app's UI, and its check/route.ts uses `export const dynamic =
+// 'force-dynamic'` for live progress polling — which `output: 'export'`
+// rejects outright, failing the whole build if left in place.
+//
+// tsconfig.json's `include` sweeps up every .ts file in the repo (not just
+// app/), so the standalone search-allwatcher{2,3}.ts scripts — which import
+// from app/prototype/dual-realms/lib — also need to move aside, or the
+// build's typecheck pass fails on the now-missing import even though these
+// scripts are never bundled into the app itself.
 import { existsSync, renameSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 
 const root = process.cwd();
-const apiDir = join(root, 'app', 'api');
-const apiTmp = join(root, '.api-tmp-mobile-build');
+const movePairs = [
+  [join(root, 'app', 'api'), join(root, '.api-tmp-mobile-build')],
+  [join(root, 'app', 'prototype'), join(root, '.prototype-tmp-mobile-build')],
+  [join(root, 'scripts', 'search-allwatcher2.ts'), join(root, 'scripts', '.search-allwatcher2.ts.mobile-build-bak')],
+  [join(root, 'scripts', 'search-allwatcher3.ts'), join(root, 'scripts', '.search-allwatcher3.ts.mobile-build-bak')],
+];
 
-let moved = false;
-if (existsSync(apiDir)) {
-  renameSync(apiDir, apiTmp);
-  moved = true;
+const moved = [];
+for (const [dir, tmp] of movePairs) {
+  if (existsSync(dir)) {
+    renameSync(dir, tmp);
+    moved.push([dir, tmp]);
+  }
 }
 
 function restore() {
-  if (moved && existsSync(apiTmp) && !existsSync(apiDir)) {
-    renameSync(apiTmp, apiDir);
+  for (const [dir, tmp] of moved) {
+    if (existsSync(tmp) && !existsSync(dir)) {
+      renameSync(tmp, dir);
+    }
   }
 }
 
