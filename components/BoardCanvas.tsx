@@ -127,24 +127,29 @@ export default function BoardCanvas({ puzzle }: { puzzle: Puzzle }) {
   drawRef.current = buildAndDraw;
 
   useEffect(() => {
+    let cancelled = false;
     const imgs: HTMLImageElement[] = new Array(TILE_COUNT);
-    let loaded = 0;
     for (let i = 0; i < TILE_COUNT; i++) {
       const img = new Image();
       img.src = `/tiles/processed/plain_tile_${String(i + 1).padStart(2, '0')}.png`;
       imgs[i] = img;
-      img.onload = () => {
-        loaded++;
-        if (loaded === TILE_COUNT) {
-          tilesRef.current = imgs;
-          drawRef.current();
-        }
-      };
     }
-    if (imgs.every(img => img.complete)) {
+
+    // decode() resolves only once the image is fully decoded and safe to
+    // paint via drawImage — unlike onload/.complete, which WebKit can
+    // satisfy for a freshly-cached image a moment before the actual pixel
+    // buffer is ready. That gap is the "hollow tile" bug: prebakeCell's
+    // drawImage call silently paints nothing for that one cell, leaving the
+    // backdrop showing through where its territory color should be. It's
+    // intermittent because it's a decode-timing race that a real device
+    // under memory pressure hits far more than a desktop Chrome dev session.
+    Promise.all(imgs.map(img => img.decode().catch(() => { /* fall through with whatever decoded */ }))).then(() => {
+      if (cancelled) return;
       tilesRef.current = imgs;
       drawRef.current();
-    }
+    });
+
+    return () => { cancelled = true; };
   }, []);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
