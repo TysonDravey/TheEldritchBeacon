@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import Board from '@/components/Board';
 import type { CellState, Puzzle } from '@/engine/boardTypes';
+import { updateSettings } from '@/lib/settings';
 
 // ---------------------------------------------------------------------------
 // Tutorial puzzle — 5×5 based on eb-5x5-001
@@ -198,6 +199,11 @@ export default function TutorialPage() {
   const [cellHistory, setCellHistory] = useState<CellState[][][]>(() => [EMPTY_BOARD()]);
   const [wrongMsg, setWrongMsg] = useState<string | null>(null);
   const placingRef = useRef(false); // lock during wave animation
+
+  // Actually visiting the tutorial counts as "seen" — dismisses the "New to
+  // the Beacon?" nudge on the home screen without the player needing to
+  // explicitly close it there too.
+  useEffect(() => { updateSettings({ tutorialDismissed: true }); }, []);
 
   const step = STEPS[stepIdx];
 

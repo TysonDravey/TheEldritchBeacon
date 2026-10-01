@@ -4,6 +4,7 @@ import './globals.css';
 import Backdrop from '@/components/Backdrop';
 import RegisterSW from '@/components/RegisterSW';
 import BuildBadge from '@/components/BuildBadge';
+import BackgroundMusic from '@/components/BackgroundMusic';
 
 const caveat = Caveat({ subsets: ['latin'], variable: '--font-caveat' });
 
@@ -50,6 +51,7 @@ export default function RootLayout({
         <RegisterSW />
         <BuildBadge />
         <Backdrop />
+        <BackgroundMusic />
         {children}
       </body>
     </html>

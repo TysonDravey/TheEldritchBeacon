@@ -7,6 +7,8 @@ import { rateDifficulty, scorePuzzle } from '@/engine/difficulty';
 import type { Puzzle, Difficulty } from '@/engine/boardTypes';
 import SplashScreen from '@/components/SplashScreen';
 import { REGIONS } from '@/data/regions';
+import { useSettings } from '@/lib/settings';
+import { playSound } from '@/lib/sound';
 
 const STORAGE_KEY_PREFIX = 'eldritch_beacon_state_';
 const UNLOCKED_KEY = 'eb_unlocked_regions';
@@ -154,54 +156,12 @@ function RegionSection({
   );
 }
 
-function ResetFooter({ onReset }: { onReset: () => void }) {
-  const [confirming, setConfirming] = useState(false);
-
-  function handleReset() {
-    for (let i = localStorage.length - 1; i >= 0; i--) {
-      const key = localStorage.key(i);
-      if (key?.startsWith(STORAGE_KEY_PREFIX)) localStorage.removeItem(key);
-    }
-    localStorage.removeItem(UNLOCKED_KEY);
-    setConfirming(false);
-    onReset();
-  }
-
-  return (
-    <div className="text-center">
-      {!confirming ? (
-        <button
-          onClick={() => setConfirming(true)}
-          className="font-serif text-xs text-ink-light opacity-40 hover:opacity-70 transition-opacity"
-          style={{ textShadow: OUTLINE }}
-        >
-          Reset progress
-        </button>
-      ) : (
-        <div className="inline-flex items-center gap-3 bg-parchment border border-ink border-opacity-30 px-4 py-2 rounded-sm">
-          <span className="font-serif text-xs text-ink-light">Erase all progress?</span>
-          <button
-            onClick={handleReset}
-            className="font-serif text-xs text-red-ink border border-red-ink px-2 py-0.5 rounded-sm hover:bg-red-ink hover:text-parchment transition-colors"
-          >
-            Yes, reset
-          </button>
-          <button
-            onClick={() => setConfirming(false)}
-            className="font-serif text-xs text-ink-light hover:text-ink transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function HomePage() {
   const [completedIds, setCompletedIds]     = useState<Set<string>>(new Set());
   const [newlyUnlocked, setNewlyUnlocked]   = useState<string | null>(null);
   const [showBanner, setShowBanner]         = useState(false);
+  const [settings, updateSettings]          = useSettings();
 
   useEffect(() => {
     // Load completed puzzle IDs
@@ -241,6 +201,7 @@ export default function HomePage() {
     if (firstNew && firstNew !== 'The Foundations') {
       setNewlyUnlocked(firstNew);
       setShowBanner(true);
+      playSound('region-reveal');
       localStorage.setItem(UNLOCKED_KEY, JSON.stringify([...nowKnown]));
     } else {
       localStorage.setItem(UNLOCKED_KEY, JSON.stringify([...nowKnown]));
@@ -313,6 +274,15 @@ export default function HomePage() {
 
       <main className="min-h-screen flex flex-col items-center px-6 py-12">
 
+        <Link
+          href="/settings"
+          aria-label="Settings"
+          className="fixed top-4 right-4 z-40 flex items-center justify-center w-9 h-9 rounded-full bg-parchment border border-ink border-opacity-30 text-ink opacity-70 hover:opacity-100 transition-opacity"
+          style={{ boxShadow: '0 2px 6px rgba(0,0,0,0.35)' }}
+        >
+          <span style={{ fontSize: 16 }}>&#9881;</span>
+        </Link>
+
         {/* Header scroll */}
         <div
           className="w-full max-w-lg mb-10 relative select-none"
@@ -375,19 +345,30 @@ export default function HomePage() {
             </Link>
           </section>
 
-          {/* Tutorial nudge */}
-          <section>
-            <Link
-              href="/tutorial"
-              className="flex items-center justify-between border border-brass bg-parchment hover:bg-parchment-dark transition-colors px-4 py-3 rounded-sm"
-            >
-              <div>
-                <p className="font-serif text-sm font-bold text-brass">New to the Beacon?</p>
-                <p className="font-serif text-xs text-ink-light mt-0.5">Learn the rules in a guided walkthrough</p>
-              </div>
-              <span className="font-serif text-sm text-brass opacity-60">&rarr;</span>
-            </Link>
-          </section>
+          {/* Tutorial nudge — dismissed automatically by visiting /tutorial
+              (see its mount effect), or manually via the × here. Either way
+              it won't come back unless re-enabled from Settings. */}
+          {!settings.tutorialDismissed && (
+            <section className="relative">
+              <Link
+                href="/tutorial"
+                className="flex items-center justify-between border border-brass bg-parchment hover:bg-parchment-dark transition-colors px-4 py-3 pr-9 rounded-sm"
+              >
+                <div>
+                  <p className="font-serif text-sm font-bold text-brass">New to the Beacon?</p>
+                  <p className="font-serif text-xs text-ink-light mt-0.5">Learn the rules in a guided walkthrough</p>
+                </div>
+                <span className="font-serif text-sm text-brass opacity-60">&rarr;</span>
+              </Link>
+              <button
+                onClick={() => updateSettings({ tutorialDismissed: true })}
+                aria-label="Dismiss"
+                className="absolute top-2 right-2 w-5 h-5 flex items-center justify-center font-serif text-xs text-ink-light opacity-50 hover:opacity-90 transition-opacity"
+              >
+                &#10005;
+              </button>
+            </section>
+          )}
 
           {/* Campaign regions */}
           <section className="flex flex-col gap-8">
@@ -415,92 +396,104 @@ export default function HomePage() {
             )}
           </section>
 
-          {/* Shattered Realms */}
-          {shatteredPuzzles.length > 0 && (() => {
-            const sorted = [...shatteredPuzzles].sort((a, b) => (PUZZLE_SCORE.get(a.id) ?? 0) - (PUZZLE_SCORE.get(b.id) ?? 0));
-            const completedCount = sorted.filter(p => completedIds.has(p.id)).length;
-            const current = sorted.find(p => !completedIds.has(p.id)) ?? null;
-            const currentIdx = sorted.findIndex(p => !completedIds.has(p.id));
-            const allDone = completedCount === sorted.length;
-            return (
-              <section>
-                <div className="flex items-start gap-4 mb-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <h2 className="font-lovecraftian text-xl text-ink" style={{ textShadow: OUTLINE }}>
-                        Shattered Realms
-                        {allDone && <span className="ml-2 text-brass text-base font-serif">✓</span>}
-                      </h2>
-                      <span className="font-serif text-xs text-ink-light shrink-0" style={{ textShadow: OUTLINE }}>
-                        {completedCount}/{sorted.length}
-                      </span>
-                    </div>
-                    <p className="font-serif text-xs text-ink-light italic mt-0.5" style={{ textShadow: OUTLINE }}>
-                      Territories may be scattered — one Watcher per color, wherever it falls
-                    </p>
-                  </div>
-                </div>
-                <div className="border-t border-ink opacity-30 mb-4" />
-                {current && (
-                  <div>
-                    <PuzzleCard puzzle={current} completed={false} />
-                    <p className="mt-2 font-serif text-xs text-center text-ink-light" style={{ textShadow: OUTLINE }}>
-                      Puzzle {currentIdx + 1} of {sorted.length}
-                    </p>
-                  </div>
-                )}
-              </section>
-            );
-          })()}
+          {/* Advanced Modes — demoted below the core campaign on purpose:
+              these are variants for players who already know the base game,
+              not a third "start here" competing with Campaign/Daily. */}
+          {(shatteredPuzzles.length > 0 || twinPuzzles.length > 0) && (
+            <section
+              className="flex flex-col gap-8 pt-6"
+              style={{ borderTop: '1px dashed rgba(26,18,9,0.25)' }}
+            >
+              <div className="text-center -mb-2">
+                <h2 className="font-lovecraftian text-base text-ink opacity-60" style={{ textShadow: OUTLINE }}>
+                  Advanced Modes
+                </h2>
+                <p className="font-serif text-xs text-ink-light opacity-50 italic mt-0.5" style={{ textShadow: OUTLINE }}>
+                  Variants for those who&rsquo;ve mastered the basics
+                </p>
+              </div>
 
-          {/* Twin Watchers */}
-          {twinPuzzles.length > 0 && (() => {
-            const sorted = [...twinPuzzles].sort((a, b) => (PUZZLE_SCORE.get(a.id) ?? 0) - (PUZZLE_SCORE.get(b.id) ?? 0));
-            const completedCount = sorted.filter(p => completedIds.has(p.id)).length;
-            const current = sorted.find(p => !completedIds.has(p.id)) ?? null;
-            const currentIdx = sorted.findIndex(p => !completedIds.has(p.id));
-            const allDone = completedCount === sorted.length;
-            return (
-              <section>
-                <div className="flex items-start gap-4 mb-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <h2 className="font-lovecraftian text-xl text-ink" style={{ textShadow: OUTLINE }}>
-                        Twin Watchers
-                        {allDone && <span className="ml-2 text-brass text-base font-serif">✓</span>}
-                      </h2>
-                      <span className="font-serif text-xs text-ink-light shrink-0" style={{ textShadow: OUTLINE }}>
-                        {completedCount}/{sorted.length}
-                      </span>
+              {/* Shattered Realms */}
+              {shatteredPuzzles.length > 0 && (() => {
+                const sorted = [...shatteredPuzzles].sort((a, b) => (PUZZLE_SCORE.get(a.id) ?? 0) - (PUZZLE_SCORE.get(b.id) ?? 0));
+                const completedCount = sorted.filter(p => completedIds.has(p.id)).length;
+                const current = sorted.find(p => !completedIds.has(p.id)) ?? null;
+                const currentIdx = sorted.findIndex(p => !completedIds.has(p.id));
+                const allDone = completedCount === sorted.length;
+                return (
+                  <section>
+                    <div className="flex items-start gap-4 mb-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <h3 className="font-lovecraftian text-lg text-ink opacity-85" style={{ textShadow: OUTLINE }}>
+                            Shattered Realms
+                            {allDone && <span className="ml-2 text-brass text-base font-serif">✓</span>}
+                          </h3>
+                          <span className="font-serif text-xs text-ink-light shrink-0" style={{ textShadow: OUTLINE }}>
+                            {completedCount}/{sorted.length}
+                          </span>
+                        </div>
+                        <p className="font-serif text-xs text-ink-light italic mt-0.5" style={{ textShadow: OUTLINE }}>
+                          Territories may be scattered — one Watcher per color, wherever it falls
+                        </p>
+                      </div>
                     </div>
-                    <p className="font-serif text-xs text-ink-light italic mt-0.5" style={{ textShadow: OUTLINE }}>
-                      Two Watchers per row, column, and territory now — neither may touch the other
-                    </p>
-                  </div>
-                </div>
-                <div className="border-t border-ink opacity-30 mb-4" />
-                {current && (
-                  <div>
-                    <PuzzleCard puzzle={current} completed={false} />
-                    <p className="mt-2 font-serif text-xs text-center text-ink-light" style={{ textShadow: OUTLINE }}>
-                      Puzzle {currentIdx + 1} of {sorted.length}
-                    </p>
-                  </div>
-                )}
-              </section>
-            );
-          })()}
+                    <div className="border-t border-ink opacity-30 mb-4" />
+                    {current && (
+                      <div>
+                        <PuzzleCard puzzle={current} completed={false} />
+                        <p className="mt-2 font-serif text-xs text-center text-ink-light" style={{ textShadow: OUTLINE }}>
+                          Puzzle {currentIdx + 1} of {sorted.length}
+                        </p>
+                      </div>
+                    )}
+                  </section>
+                );
+              })()}
+
+              {/* Twin Watchers */}
+              {twinPuzzles.length > 0 && (() => {
+                const sorted = [...twinPuzzles].sort((a, b) => (PUZZLE_SCORE.get(a.id) ?? 0) - (PUZZLE_SCORE.get(b.id) ?? 0));
+                const completedCount = sorted.filter(p => completedIds.has(p.id)).length;
+                const current = sorted.find(p => !completedIds.has(p.id)) ?? null;
+                const currentIdx = sorted.findIndex(p => !completedIds.has(p.id));
+                const allDone = completedCount === sorted.length;
+                return (
+                  <section>
+                    <div className="flex items-start gap-4 mb-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <h3 className="font-lovecraftian text-lg text-ink opacity-85" style={{ textShadow: OUTLINE }}>
+                            Twin Watchers
+                            {allDone && <span className="ml-2 text-brass text-base font-serif">✓</span>}
+                          </h3>
+                          <span className="font-serif text-xs text-ink-light shrink-0" style={{ textShadow: OUTLINE }}>
+                            {completedCount}/{sorted.length}
+                          </span>
+                        </div>
+                        <p className="font-serif text-xs text-ink-light italic mt-0.5" style={{ textShadow: OUTLINE }}>
+                          Two Watchers per row, column, and territory now — neither may touch the other
+                        </p>
+                      </div>
+                    </div>
+                    <div className="border-t border-ink opacity-30 mb-4" />
+                    {current && (
+                      <div>
+                        <PuzzleCard puzzle={current} completed={false} />
+                        <p className="mt-2 font-serif text-xs text-center text-ink-light" style={{ textShadow: OUTLINE }}>
+                          Puzzle {currentIdx + 1} of {sorted.length}
+                        </p>
+                      </div>
+                    )}
+                  </section>
+                );
+              })()}
+            </section>
+          )}
 
         </div>
 
-        {/* Footer */}
-        <footer className="w-full max-w-2xl mt-16 pb-8">
-          <ResetFooter onReset={() => {
-            setCompletedIds(new Set());
-            setNewlyUnlocked(null);
-            setShowBanner(false);
-          }} />
-        </footer>
+        <div className="w-full max-w-2xl mt-16 pb-8" />
 
       </main>
 

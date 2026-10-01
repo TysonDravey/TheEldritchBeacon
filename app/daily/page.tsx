@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import posthog from 'posthog-js';
 import { haptic } from '@/lib/haptic';
+import { playSound } from '@/lib/sound';
 import NextImage from 'next/image';
 import { getPuzzleById } from '@/data/samplePuzzles';
 import { DAILY_CALENDAR } from '@/data/dailyCalendar';
@@ -589,11 +590,24 @@ export default function DailyPage() {
         newUndoStack = [...current.undoStack, current.cells.map((r) => [...r])].slice(-UNDO_LIMIT);
       }
 
-      if (next === 'watcher' || (next === 'empty' && current.cells[row][col] === 'watcher')) haptic('medium');
-      // A drag never produces a watcher (see handleCellDrag), so this is always
-      // the ward/empty case for a dragged cell — use the selection-generator
-      // tick (see haptic()'s drag-tick case) instead of a fresh impact per cell.
-      else haptic(isDraggingRef.current ? 'drag-tick' : 'light');
+      const becameWatcher = next === 'watcher';
+      const removedWatcher = next === 'empty' && current.cells[row][col] === 'watcher';
+      if (becameWatcher || removedWatcher) {
+        haptic('medium');
+        // Skip during drag — a drag never produces a watcher anyway (see
+        // handleCellDrag), so this branch is tap-only already.
+        playSound(becameWatcher ? 'watcher' : 'watcher-remove');
+      } else {
+        // A drag never produces a watcher (see handleCellDrag), so this is always
+        // the ward/empty case for a dragged cell — use the selection-generator
+        // tick (see haptic()'s drag-tick case) instead of a fresh impact per cell.
+        haptic(isDraggingRef.current ? 'drag-tick' : 'light');
+        // No per-cell sound during a drag — see playSound()'s win-ward comment
+        // for why a sound fired per cell/ward reads as noise, not a rhythm;
+        // unlike the haptic tick, there's no good "sound equivalent" of
+        // selectionChanged() to fall back on, so drag stays silent for now.
+        if (!isDraggingRef.current) playSound(next === 'ward' ? 'ward' : 'ward-remove');
+      }
 
       hintDepthRef.current = 0;
       setHintResult(null);
@@ -674,7 +688,7 @@ export default function DailyPage() {
         // watcher-rise-slam (globals.css): 200ms delay + 2200ms duration,
         // "Fast slam" keyframe at 80% — one big hit right as they land,
         // separate from and bigger than the per-ward ripple below.
-        winTimersRef.current.push(setTimeout(() => haptic('win-slam'), 1960));
+        winTimersRef.current.push(setTimeout(() => { haptic('win-slam'); playSound('win-slam'); }, 1960));
         const watcherCells: [number, number][] = [];
         for (let r = 0; r < puzzle.size; r++)
           for (let c = 0; c < puzzle.size; c++)
@@ -689,6 +703,7 @@ export default function DailyPage() {
               if (delay > maxDelay) maxDelay = delay;
               const t = setTimeout(() => {
                 haptic('win-ward');
+                playSound('win-ward');
                 const el = document.querySelector(`[data-cell="true"][data-row="${r}"][data-col="${c}"]`);
                 if (el) { el.classList.remove('tile-wiggle'); void (el as HTMLElement).offsetWidth; el.classList.add('tile-wiggle'); }
               }, delay);
@@ -697,6 +712,7 @@ export default function DailyPage() {
           }
         }
         const completionT = setTimeout(() => {
+          playSound('complete');
           if (monthJustFinished) setShowMonthComplete(true);
           else setShowCompletion(true);
         }, maxDelay + 500);
@@ -761,6 +777,7 @@ export default function DailyPage() {
       if (!canPlaceWatcher(puzzle, testCells, row, col)) {
         const reason = watcherRejectionReason(puzzle, testCells, row, col);
         haptic('error');
+        playSound('error');
         if (prev !== 'ward') applyChange(row, col, 'ward');
         setRejectionMessage(reason);
         setFlashCells([[row, col]]);
@@ -789,6 +806,7 @@ export default function DailyPage() {
     setPlayerState(newState);
     savePlayerState({ ...newState, puzzleId: storageKey });
     setHintResult(hint);
+    playSound('hint');
     if (hint.techniqueName && isTechniqueNew(hint.techniqueName)) {
       markTechniqueDiscovered(hint.techniqueName);
       setPendingDiscovery(hint.techniqueName);

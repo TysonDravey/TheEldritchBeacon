@@ -19,6 +19,7 @@ import TechniqueDiscovery from '@/components/TechniqueDiscovery';
 import { WATCHER_SVGS, WARD_PNG } from '@/theme/colors';
 import { REGION_BY_DIFFICULTY } from '@/data/regions';
 import { haptic } from '@/lib/haptic';
+import { playSound } from '@/lib/sound';
 import { isTechniqueNew, markTechniqueDiscovered } from '@/lib/techniques';
 
 // Chapter completion data — keyed by difficulty tier
@@ -298,11 +299,21 @@ export default function PuzzleClient() {
         newUndoStack = [...current.undoStack, current.cells.map((r) => [...r])].slice(-UNDO_LIMIT);
       }
 
-      if (next === 'watcher' || (next === 'empty' && current.cells[row][col] === 'watcher')) haptic('medium');
-      // A drag never produces a watcher (see handleCellDrag), so this is always
-      // the ward/empty case for a dragged cell — use the selection-generator
-      // tick (see haptic()'s drag-tick case) instead of a fresh impact per cell.
-      else haptic(isDraggingRef.current ? 'drag-tick' : 'light');
+      const becameWatcher = next === 'watcher';
+      const removedWatcher = next === 'empty' && current.cells[row][col] === 'watcher';
+      if (becameWatcher || removedWatcher) {
+        haptic('medium');
+        playSound(becameWatcher ? 'watcher' : 'watcher-remove');
+      } else {
+        // A drag never produces a watcher (see handleCellDrag), so this is always
+        // the ward/empty case for a dragged cell — use the selection-generator
+        // tick (see haptic()'s drag-tick case) instead of a fresh impact per cell.
+        haptic(isDraggingRef.current ? 'drag-tick' : 'light');
+        // No per-cell sound during a drag — see lib/sound.ts's win-ward
+        // comment for why a sound fired per cell reads as noise, not a
+        // rhythm; drag stays silent for now.
+        if (!isDraggingRef.current) playSound(next === 'ward' ? 'ward' : 'ward-remove');
+      }
 
       const dragging = isDraggingRef.current;
       if (!dragging) {
@@ -345,7 +356,7 @@ export default function PuzzleClient() {
         // watcher-rise-slam (globals.css): 200ms delay + 2200ms duration,
         // "Fast slam" keyframe at 80% — one big hit right as they land,
         // separate from and bigger than the per-ward ripple below.
-        winTimersRef.current.push(setTimeout(() => haptic('win-slam'), 1960));
+        winTimersRef.current.push(setTimeout(() => { haptic('win-slam'); playSound('win-slam'); }, 1960));
         const watcherCells: [number, number][] = [];
         for (let r = 0; r < puzzle.size; r++)
           for (let c = 0; c < puzzle.size; c++)
@@ -360,6 +371,7 @@ export default function PuzzleClient() {
               if (delay > maxDelay) maxDelay = delay;
               const t = setTimeout(() => {
                 haptic('win-ward');
+                playSound('win-ward');
                 const el = document.querySelector(`[data-cell="true"][data-row="${r}"][data-col="${c}"]`);
                 if (el) {
                   el.classList.remove('tile-wiggle');
@@ -382,6 +394,7 @@ export default function PuzzleClient() {
         // watcher-rise-slam: 200ms delay + 2200ms duration — always wait for it to finish
         const WATCHER_ANIM_END = 2600;
         const completionT = setTimeout(() => {
+          playSound('complete');
           if (chapterJustFinished) {
             setShowChapterComplete(true);
           } else {
@@ -459,6 +472,7 @@ export default function PuzzleClient() {
       if (!canPlaceWatcher(puzzle, testCells, row, col)) {
         const reason = watcherRejectionReason(puzzle, testCells, row, col);
         haptic('error');
+        playSound('error');
         if (prev !== 'ward') applyChange(row, col, 'ward');
         setRejectionMessage(reason);
         setFlashCells([[row, col]]);
@@ -489,6 +503,7 @@ export default function PuzzleClient() {
     setPlayerState(newState);
     savePlayerState(newState);
     setHintResult(hint);
+    playSound('hint');
     setActiveChainStep(0);
     if (hint.techniqueName && isTechniqueNew(hint.techniqueName)) {
       markTechniqueDiscovered(hint.techniqueName);
