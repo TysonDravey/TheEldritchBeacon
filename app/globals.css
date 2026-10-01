@@ -42,6 +42,11 @@ body {
   padding-right: env(safe-area-inset-right);
   /* Disable tap highlight on mobile */
   -webkit-tap-highlight-color: transparent;
+  /* iOS ignores the viewport's user-scalable=no for its native
+     double-tap-to-zoom gesture (an accessibility override since iOS 10) —
+     touch-action is the only thing that actually suppresses it, so it has
+     to be set here globally, not just on buttons/links. */
+  touch-action: manipulation;
 }
 
 /* Prevent double-tap zoom on interactive elements */

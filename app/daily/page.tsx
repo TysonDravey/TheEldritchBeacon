@@ -602,11 +602,9 @@ export default function DailyPage() {
         // the ward/empty case for a dragged cell — use the selection-generator
         // tick (see haptic()'s drag-tick case) instead of a fresh impact per cell.
         haptic(isDraggingRef.current ? 'drag-tick' : 'light');
-        // No per-cell sound during a drag — see playSound()'s win-ward comment
-        // for why a sound fired per cell/ward reads as noise, not a rhythm;
-        // unlike the haptic tick, there's no good "sound equivalent" of
-        // selectionChanged() to fall back on, so drag stays silent for now.
-        if (!isDraggingRef.current) playSound(next === 'ward' ? 'ward' : 'ward-remove');
+        // Drag gets its own quieter, throttled sound type (see lib/sound.ts)
+        // rather than firing a fresh ward/ward-remove per cell crossed.
+        playSound(isDraggingRef.current ? 'drag-tick' : (next === 'ward' ? 'ward' : 'ward-remove'));
       }
 
       hintDepthRef.current = 0;
