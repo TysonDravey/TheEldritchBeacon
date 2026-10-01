@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SAMPLE_PUZZLES } from '@/data/samplePuzzles';
 import { REGIONS } from '@/data/regions';
-import { scorePuzzle } from '@/engine/difficulty';
 
 const STORAGE_KEY_PREFIX = 'eldritch_beacon_state_';
 const NOTE_SEEN_KEY      = 'eldritch_beacon_keeper_note_seen';
@@ -19,17 +18,6 @@ function loadCompletedIds(): Set<string> {
     }
   } catch { /* ignore */ }
   return ids;
-}
-
-function findNextPuzzle(completedIds: Set<string>): string {
-  for (const region of REGIONS) {
-    const puzzles = SAMPLE_PUZZLES
-      .filter(p => p.difficulty === region.difficulty && p.mode === 'initiate')
-      .sort((a, b) => scorePuzzle(a) - scorePuzzle(b));
-    const next = puzzles.find(p => !completedIds.has(p.id));
-    if (next) return next.id;
-  }
-  return SAMPLE_PUZZLES[SAMPLE_PUZZLES.length - 1].id;
 }
 
 function getCurrentChapter(completedIds: Set<string>): {
@@ -67,7 +55,6 @@ export default function CampaignPage() {
   const router = useRouter();
   const [view,    setView]    = useState<View>('intro');
   const [started, setStarted] = useState(false);
-  const [nextId,  setNextId]  = useState<string | null>(null);
   const [ready,   setReady]   = useState(false);
   const [chapter, setChapter] = useState({ roman: 'I', regionName: 'The Foundations', image: '/titleCards/campaign_01/intro_01.png', completedCount: 0 });
 
@@ -75,7 +62,6 @@ export default function CampaignPage() {
     const completed = loadCompletedIds();
     const noteSeen  = !!localStorage.getItem(NOTE_SEEN_KEY);
     setStarted(completed.size > 0 || noteSeen);
-    setNextId(findNextPuzzle(completed));
     setChapter(getCurrentChapter(completed));
     setReady(true);
   }, []);
@@ -83,7 +69,7 @@ export default function CampaignPage() {
   function handleBeginClick() {
     const noteSeen = !!localStorage.getItem(NOTE_SEEN_KEY);
     if (noteSeen) {
-      if (nextId) router.push(`/puzzle/${nextId}`);
+      router.push('/campaign/map');
     } else {
       setView('note');
     }
@@ -91,7 +77,7 @@ export default function CampaignPage() {
 
   function handleUnderstood() {
     try { localStorage.setItem(NOTE_SEEN_KEY, '1'); } catch { /* ignore */ }
-    if (nextId) router.push(`/puzzle/${nextId}`);
+    router.push('/campaign/map');
   }
 
   // ── Keeper's note ──────────────────────────────────────────────────────────

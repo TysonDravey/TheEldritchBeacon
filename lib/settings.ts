@@ -7,13 +7,19 @@ const CHANGE_EVENT = 'eb-settings-changed';
 
 export interface Settings {
   musicEnabled: boolean;
+  musicVolume: number; // 0–1
   sfxEnabled: boolean;
+  sfxVolume: number; // 0–1
+  hapticsEnabled: boolean;
   tutorialDismissed: boolean;
 }
 
 const DEFAULT_SETTINGS: Settings = {
   musicEnabled: true,
+  musicVolume: 0.4,
   sfxEnabled: true,
+  sfxVolume: 1,
+  hapticsEnabled: true,
   tutorialDismissed: false,
 };
 

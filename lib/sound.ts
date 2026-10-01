@@ -50,7 +50,8 @@ let lastRipplePlayAt = 0;
 const RIPPLE_MIN_INTERVAL_MS = 70;
 
 export function playSound(type: SoundType): void {
-  if (!loadSettings().sfxEnabled) return;
+  const settings = loadSettings();
+  if (!settings.sfxEnabled) return;
   if (type === 'win-ward') {
     const now = Date.now();
     if (now - lastRipplePlayAt < RIPPLE_MIN_INTERVAL_MS) return;
@@ -58,6 +59,7 @@ export function playSound(type: SoundType): void {
   }
   try {
     const audio = new Audio(randomVariantPath(type));
+    audio.volume = settings.sfxVolume;
     audio.play().catch(() => { /* no file yet, or autoplay blocked — silent */ });
   } catch { /* ignore */ }
 }

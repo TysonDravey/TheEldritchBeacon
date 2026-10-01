@@ -3,165 +3,25 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { SAMPLE_PUZZLES } from '@/data/samplePuzzles';
-import { rateDifficulty, scorePuzzle } from '@/engine/difficulty';
+import { scorePuzzle } from '@/engine/difficulty';
 import type { Puzzle, Difficulty } from '@/engine/boardTypes';
 import SplashScreen from '@/components/SplashScreen';
 import { REGIONS } from '@/data/regions';
 import { useSettings } from '@/lib/settings';
 import { playSound } from '@/lib/sound';
+import PuzzleCard from '@/components/PuzzleCard';
 
 const STORAGE_KEY_PREFIX = 'eldritch_beacon_state_';
 const UNLOCKED_KEY = 'eb_unlocked_regions';
 
-const OUTLINE = '-1px -1px 0 rgba(242,233,216,0.95), 1px -1px 0 rgba(242,233,216,0.95), -1px 1px 0 rgba(242,233,216,0.95), 1px 1px 0 rgba(242,233,216,0.95)';
-
 // Pre-compute scores once at module load — avoids re-running the solver on every render/sort
 const PUZZLE_SCORE = new Map<string, number>(SAMPLE_PUZZLES.map(p => [p.id, scorePuzzle(p)]));
 
-function difficultyColor(difficulty: Difficulty): string {
-  switch (difficulty) {
-    case 'Initiate':    return 'text-ink border-ink';
-    case 'Scholar':     return 'text-brass border-brass';
-    case 'Occultist':   return 'text-red-ink border-red-ink';
-    case 'High Priest': return 'text-red-ink border-red-ink opacity-80';
-    case 'Eldritch':    return 'text-red-ink border-red-ink font-bold';
-    case 'Harbinger':   return 'text-red-ink border-red-ink font-bold italic';
-    case 'Archon':      return 'text-red-ink border-red-ink font-bold opacity-90';
-    case 'Unbound':     return 'text-red-ink border-red-ink font-bold italic opacity-90';
-    default:            return 'text-ink border-ink';
-  }
-}
-
-function PuzzleCard({ puzzle, completed }: { puzzle: Puzzle; completed: boolean }) {
-  return (
-    <Link
-      href={`/puzzle/${puzzle.id}`}
-      className="block border border-ink bg-parchment hover:bg-parchment-dark transition-colors duration-150 p-4 rounded-sm"
-    >
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="font-serif text-base font-bold text-ink leading-snug">
-          {puzzle.title}
-        </h3>
-        {completed && (
-          <span className="text-brass text-lg flex-shrink-0" title="Completed">✓</span>
-        )}
-      </div>
-      <p className="mt-1 text-ink-light text-sm font-serif">
-        {puzzle.size}&times;{puzzle.size}
-      </p>
-      <div className="mt-2 flex items-center gap-2 flex-wrap">
-        <span className={`inline-block text-xs border px-1.5 py-0.5 rounded-sm font-serif ${difficultyColor(puzzle.difficulty)}`}>
-          {puzzle.difficulty}
-        </span>
-        <span className="text-xs font-serif text-ink-light opacity-50" title="Obscurity score">
-          &#9670;&thinsp;{scorePuzzle(puzzle)}
-        </span>
-      </div>
-    </Link>
-  );
-}
-
-function RegionSection({
-  region,
-  puzzles,
-  completedIds,
-  locked,
-  newlyUnlocked,
-}: {
-  region: typeof REGIONS[number];
-  puzzles: Puzzle[];
-  completedIds: Set<string>;
-  locked: boolean;
-  newlyUnlocked: boolean;
-}) {
-  const sorted = [...puzzles].sort((a, b) => (PUZZLE_SCORE.get(a.id) ?? 0) - (PUZZLE_SCORE.get(b.id) ?? 0));
-  const completedCount = sorted.filter(p => completedIds.has(p.id)).length;
-  const allDone = completedCount === sorted.length;
-  const currentPuzzle = sorted.find(p => !completedIds.has(p.id)) ?? null;
-  const currentIdx = sorted.findIndex(p => !completedIds.has(p.id));
-
-  if (locked) return null;
-
-  // ── Complete ─────────────────────────────────────────────────────────────
-  if (allDone) {
-    return (
-      <div>
-        <div className="flex items-center gap-4">
-          <img
-            src={region.ward}
-            alt=""
-            className="w-12 h-12 object-contain"
-            style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}
-          />
-          <div className="flex-1">
-            <h2 className="font-lovecraftian text-xl text-ink" style={{ textShadow: OUTLINE }}>
-              {region.name}
-              <span className="ml-2 text-brass text-base font-serif">✓</span>
-            </h2>
-            <p className="font-serif text-xs text-ink-light italic mt-0.5" style={{ textShadow: OUTLINE }}>
-              {completedCount}/{sorted.length} completed
-            </p>
-          </div>
-        </div>
-        <div className="border-t border-ink opacity-30 mt-4" />
-      </div>
-    );
-  }
-
-  // ── Active ────────────────────────────────────────────────────────────────
-  return (
-    <div
-      style={newlyUnlocked ? {
-        animation: 'region-reveal 1.2s ease-out both',
-      } : undefined}
-    >
-      {/* Region header */}
-      <div className="flex items-start gap-4 mb-3">
-        <img
-          src={region.ward}
-          alt=""
-          className="w-16 h-16 object-contain shrink-0"
-          style={{ filter: 'drop-shadow(0 3px 6px rgba(0,0,0,0.65))' }}
-        />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline justify-between gap-2">
-            <h2 className="font-lovecraftian text-xl text-ink" style={{ textShadow: OUTLINE }}>
-              {region.name}
-            </h2>
-            <span className="font-serif text-xs text-ink-light shrink-0" style={{ textShadow: OUTLINE }}>
-              {completedCount}/{sorted.length}
-            </span>
-          </div>
-          <p className="font-serif text-xs text-ink-light italic mt-0.5" style={{ textShadow: OUTLINE }}>
-            {region.description}
-          </p>
-          <p className="font-serif text-xs text-ink-light opacity-60 mt-1" style={{ textShadow: OUTLINE }}>
-            {region.techniques.join(' · ')}
-          </p>
-        </div>
-      </div>
-
-      <div className="border-t border-ink opacity-30 mb-4" />
-
-      {/* Current puzzle */}
-      {currentPuzzle && (
-        <div>
-          <PuzzleCard puzzle={currentPuzzle} completed={false} />
-          <p className="mt-2 font-serif text-xs text-center text-ink-light" style={{ textShadow: OUTLINE }}>
-            Puzzle {currentIdx + 1} of {sorted.length}
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-
 export default function HomePage() {
-  const [completedIds, setCompletedIds]     = useState<Set<string>>(new Set());
-  const [newlyUnlocked, setNewlyUnlocked]   = useState<string | null>(null);
-  const [showBanner, setShowBanner]         = useState(false);
-  const [settings, updateSettings]          = useSettings();
+  const [completedIds, setCompletedIds]   = useState<Set<string>>(new Set());
+  const [newlyUnlocked, setNewlyUnlocked] = useState<string | null>(null);
+  const [showBanner, setShowBanner]       = useState(false);
+  const [settings, updateSettings]        = useSettings();
 
   useEffect(() => {
     // Load completed puzzle IDs
@@ -208,7 +68,9 @@ export default function HomePage() {
     }
   }, []);
 
-  // Group campaign puzzles by difficulty
+  // Group campaign puzzles by difficulty — only needed here to compute the
+  // "Chapter N — Region Name" banner text, not to render per-region detail
+  // (that detail now lives entirely on /campaign/map).
   const campaignPuzzles = SAMPLE_PUZZLES.filter(
     p => p.mode === 'initiate' || p.mode === 'cult-master'
   );
@@ -216,16 +78,6 @@ export default function HomePage() {
   for (const p of campaignPuzzles) {
     if (!byDifficulty.has(p.difficulty)) byDifficulty.set(p.difficulty, []);
     byDifficulty.get(p.difficulty)!.push(p);
-  }
-
-  // Compute which regions are locked (previous must be fully complete)
-  const lockedRegions = new Set<string>();
-  let prevComplete = true;
-  for (const region of REGIONS) {
-    const puzzles = byDifficulty.get(region.difficulty) ?? [];
-    if (puzzles.length === 0) continue;
-    if (!prevComplete) lockedRegions.add(region.name);
-    prevComplete = prevComplete && puzzles.every(p => completedIds.has(p.id));
   }
 
   // Compute current chapter for the campaign banner
@@ -297,6 +149,9 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* Three clear choices — Campaign, Daily, Advanced. Everything else
+            (region-by-region progress, which puzzle you're on) lives on
+            /campaign/map now, not crammed onto this page. */}
         <div className="w-full max-w-2xl flex flex-col gap-8">
 
           {/* Campaign entry */}
@@ -370,45 +225,16 @@ export default function HomePage() {
             </section>
           )}
 
-          {/* Campaign regions */}
-          <section className="flex flex-col gap-8">
-            {REGIONS.map(region => {
-              const puzzles = byDifficulty.get(region.difficulty) ?? [];
-              if (puzzles.length === 0) return null;
-              return (
-                <RegionSection
-                  key={region.difficulty}
-                  region={region}
-                  puzzles={puzzles}
-                  completedIds={completedIds}
-                  locked={lockedRegions.has(region.name)}
-                  newlyUnlocked={region.name === newlyUnlocked}
-                />
-              );
-            })}
-            {lockedRegions.size > 0 && (
-              <p
-                className="font-serif text-xs text-center italic"
-                style={{ color: 'rgba(26,18,9,0.35)', textShadow: OUTLINE }}
-              >
-                {lockedRegions.size} {lockedRegions.size === 1 ? 'region' : 'regions'} sealed beyond
-              </p>
-            )}
-          </section>
-
           {/* Advanced Modes — demoted below the core campaign on purpose:
               these are variants for players who already know the base game,
-              not a third "start here" competing with Campaign/Daily. */}
+              not a third "start here" competing with Campaign/Daily. Wrapped
+              in one solid card (rather than floating text on the backdrop)
+              so it stays readable against the busy background art. */}
           {(shatteredPuzzles.length > 0 || twinPuzzles.length > 0) && (
-            <section
-              className="flex flex-col gap-8 pt-6"
-              style={{ borderTop: '1px dashed rgba(26,18,9,0.25)' }}
-            >
-              <div className="text-center -mb-2">
-                <h2 className="font-lovecraftian text-base text-ink opacity-60" style={{ textShadow: OUTLINE }}>
-                  Advanced Modes
-                </h2>
-                <p className="font-serif text-xs text-ink-light opacity-50 italic mt-0.5" style={{ textShadow: OUTLINE }}>
+            <section className="bg-parchment border border-ink border-opacity-30 rounded-sm p-4 flex flex-col gap-6">
+              <div className="text-center">
+                <h2 className="font-lovecraftian text-base text-ink opacity-70">Advanced Modes</h2>
+                <p className="font-serif text-xs text-ink-light opacity-70 italic mt-0.5">
                   Variants for those who&rsquo;ve mastered the basics
                 </p>
               </div>
@@ -421,35 +247,34 @@ export default function HomePage() {
                 const currentIdx = sorted.findIndex(p => !completedIds.has(p.id));
                 const allDone = completedCount === sorted.length;
                 return (
-                  <section>
-                    <div className="flex items-start gap-4 mb-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <h3 className="font-lovecraftian text-lg text-ink opacity-85" style={{ textShadow: OUTLINE }}>
-                            Shattered Realms
-                            {allDone && <span className="ml-2 text-brass text-base font-serif">✓</span>}
-                          </h3>
-                          <span className="font-serif text-xs text-ink-light shrink-0" style={{ textShadow: OUTLINE }}>
-                            {completedCount}/{sorted.length}
-                          </span>
-                        </div>
-                        <p className="font-serif text-xs text-ink-light italic mt-0.5" style={{ textShadow: OUTLINE }}>
-                          Territories may be scattered — one Watcher per color, wherever it falls
-                        </p>
-                      </div>
+                  <div>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <h3 className="font-lovecraftian text-base text-ink">
+                        Shattered Realms
+                        {allDone && <span className="ml-2 text-brass text-sm font-serif">✓</span>}
+                      </h3>
+                      <span className="font-serif text-xs text-ink-light shrink-0">
+                        {completedCount}/{sorted.length}
+                      </span>
                     </div>
-                    <div className="border-t border-ink opacity-30 mb-4" />
+                    <p className="font-serif text-xs text-ink-light italic mt-0.5">
+                      Territories may be scattered — one Watcher per color, wherever it falls
+                    </p>
                     {current && (
-                      <div>
+                      <div className="mt-3">
                         <PuzzleCard puzzle={current} completed={false} />
-                        <p className="mt-2 font-serif text-xs text-center text-ink-light" style={{ textShadow: OUTLINE }}>
+                        <p className="mt-2 font-serif text-xs text-center text-ink-light">
                           Puzzle {currentIdx + 1} of {sorted.length}
                         </p>
                       </div>
                     )}
-                  </section>
+                  </div>
                 );
               })()}
+
+              {(shatteredPuzzles.length > 0 && twinPuzzles.length > 0) && (
+                <div className="border-t border-ink opacity-10" />
+              )}
 
               {/* Twin Watchers */}
               {twinPuzzles.length > 0 && (() => {
@@ -459,33 +284,28 @@ export default function HomePage() {
                 const currentIdx = sorted.findIndex(p => !completedIds.has(p.id));
                 const allDone = completedCount === sorted.length;
                 return (
-                  <section>
-                    <div className="flex items-start gap-4 mb-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <h3 className="font-lovecraftian text-lg text-ink opacity-85" style={{ textShadow: OUTLINE }}>
-                            Twin Watchers
-                            {allDone && <span className="ml-2 text-brass text-base font-serif">✓</span>}
-                          </h3>
-                          <span className="font-serif text-xs text-ink-light shrink-0" style={{ textShadow: OUTLINE }}>
-                            {completedCount}/{sorted.length}
-                          </span>
-                        </div>
-                        <p className="font-serif text-xs text-ink-light italic mt-0.5" style={{ textShadow: OUTLINE }}>
-                          Two Watchers per row, column, and territory now — neither may touch the other
-                        </p>
-                      </div>
+                  <div>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <h3 className="font-lovecraftian text-base text-ink">
+                        Twin Watchers
+                        {allDone && <span className="ml-2 text-brass text-sm font-serif">✓</span>}
+                      </h3>
+                      <span className="font-serif text-xs text-ink-light shrink-0">
+                        {completedCount}/{sorted.length}
+                      </span>
                     </div>
-                    <div className="border-t border-ink opacity-30 mb-4" />
+                    <p className="font-serif text-xs text-ink-light italic mt-0.5">
+                      Two Watchers per row, column, and territory now — neither may touch the other
+                    </p>
                     {current && (
-                      <div>
+                      <div className="mt-3">
                         <PuzzleCard puzzle={current} completed={false} />
-                        <p className="mt-2 font-serif text-xs text-center text-ink-light" style={{ textShadow: OUTLINE }}>
+                        <p className="mt-2 font-serif text-xs text-center text-ink-light">
                           Puzzle {currentIdx + 1} of {sorted.length}
                         </p>
                       </div>
                     )}
-                  </section>
+                  </div>
                 );
               })()}
             </section>
@@ -498,11 +318,6 @@ export default function HomePage() {
       </main>
 
       <style>{`
-        @keyframes region-reveal {
-          0%   { opacity: 0; transform: translateY(12px); filter: brightness(1.4); }
-          40%  { opacity: 1; transform: translateY(0);    filter: brightness(1.4); }
-          100% { opacity: 1; transform: translateY(0);    filter: brightness(1); }
-        }
         @keyframes banner-drop {
           0%   { opacity: 0; transform: translateY(-100%); }
           100% { opacity: 1; transform: translateY(0); }

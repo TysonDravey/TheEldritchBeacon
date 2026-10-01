@@ -7,6 +7,34 @@ import { useSettings } from '@/lib/settings';
 const STORAGE_KEY_PREFIX = 'eldritch_beacon_state_';
 const UNLOCKED_KEY = 'eb_unlocked_regions';
 
+function VolumeSlider({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+  disabled: boolean;
+}) {
+  return (
+    <input
+      type="range"
+      min={0}
+      max={100}
+      step={1}
+      value={Math.round(value * 100)}
+      disabled={disabled}
+      onChange={e => onChange(Number(e.target.value) / 100)}
+      className="w-full"
+      style={{
+        accentColor: 'var(--brass, #b5860d)',
+        opacity: disabled ? 0.35 : 1,
+      }}
+      aria-label="Volume"
+    />
+  );
+}
+
 function Toggle({
   label,
   description,
@@ -74,18 +102,39 @@ export default function SettingsPage() {
         </div>
 
         <section className="flex flex-col gap-5 border border-ink border-opacity-30 rounded-sm p-4 bg-parchment">
-          <Toggle
-            label="Music"
-            description="Background ambience while you play"
-            checked={settings.musicEnabled}
-            onChange={v => updateSettings({ musicEnabled: v })}
-          />
+          <div className="flex flex-col gap-2">
+            <Toggle
+              label="Music"
+              description="Background ambience while you play"
+              checked={settings.musicEnabled}
+              onChange={v => updateSettings({ musicEnabled: v })}
+            />
+            <VolumeSlider
+              value={settings.musicVolume}
+              onChange={v => updateSettings({ musicVolume: v })}
+              disabled={!settings.musicEnabled}
+            />
+          </div>
+          <div className="border-t border-ink opacity-10" />
+          <div className="flex flex-col gap-2">
+            <Toggle
+              label="Sound Effects"
+              description="Wards, Watchers, and other feedback"
+              checked={settings.sfxEnabled}
+              onChange={v => updateSettings({ sfxEnabled: v })}
+            />
+            <VolumeSlider
+              value={settings.sfxVolume}
+              onChange={v => updateSettings({ sfxVolume: v })}
+              disabled={!settings.sfxEnabled}
+            />
+          </div>
           <div className="border-t border-ink opacity-10" />
           <Toggle
-            label="Sound Effects"
-            description="Wards, Watchers, and other feedback"
-            checked={settings.sfxEnabled}
-            onChange={v => updateSettings({ sfxEnabled: v })}
+            label="Haptics"
+            description="Vibration feedback on supported devices"
+            checked={settings.hapticsEnabled}
+            onChange={v => updateSettings({ hapticsEnabled: v })}
           />
         </section>
 

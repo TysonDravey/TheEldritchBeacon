@@ -15,10 +15,15 @@ export default function BackgroundMusic() {
   useEffect(() => {
     const audio = new Audio(TRACKS[0]);
     audio.loop = true;
-    audio.volume = 0.4;
     audioRef.current = audio;
     return () => { audio.pause(); };
   }, []);
+
+  // Separate from the enable/disable effect below so dragging the volume
+  // slider doesn't re-trigger the autoplay-retry dance on every tick.
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = settings.musicVolume;
+  }, [settings.musicVolume]);
 
   useEffect(() => {
     const audio = audioRef.current;

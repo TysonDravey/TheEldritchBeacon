@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
+import { loadSettings } from './settings';
 
 export type HapticType =
   | 'light' | 'medium' | 'error' | 'win-ward' | 'win-slam'
@@ -24,6 +25,7 @@ let lastRapidHapticAt = 0;
 const RAPID_HAPTIC_MIN_INTERVAL_MS = 50;
 
 export function haptic(type: HapticType): void {
+  if (!loadSettings().hapticsEnabled) return;
   if (type === 'drag-tick' || type === 'win-ward') {
     const now = Date.now();
     if (now - lastRapidHapticAt < RAPID_HAPTIC_MIN_INTERVAL_MS) return;
