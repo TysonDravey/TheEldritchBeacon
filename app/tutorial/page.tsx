@@ -318,11 +318,13 @@ export default function TutorialPage() {
 
       {/* Nav */}
       <div className="w-full max-w-2xl mb-8 flex items-center gap-2">
-        <Link
-          href="/"
-          className="font-serif text-sm text-ink-light hover:text-ink border-b border-transparent hover:border-ink transition-colors"
-        >
-          &larr; All Puzzles
+        <Link href="/" className="transition-all duration-100 hover:brightness-110 active:scale-95 shrink-0">
+          <img
+            src="/buttons/left_button_01.png"
+            alt="Back"
+            draggable={false}
+            style={{ height: 40, display: 'block', filter: 'drop-shadow(2px 4px 2px rgba(0,0,0,0.6))' }}
+          />
         </Link>
         <span className="font-serif text-xs text-ink opacity-30 mx-1">|</span>
         <span className="font-serif text-sm text-ink-light">Tutorial</span>

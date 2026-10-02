@@ -37,13 +37,15 @@ export default function RootLayout({
             timing investigation in StartupProbe. */}
         <script dangerouslySetInnerHTML={{ __html: `window.__startupT0 = performance.now();console.log('[startup] html-parse-start @ ' + window.__startupT0.toFixed(0) + 'ms');` }} />
       </head>
-      <body className={`${caveat.variable} text-ink font-serif min-h-screen`}>
+      <body className={`${caveat.variable} text-ink font-serif`}>
         <StartupProbe />
         <RegisterSW />
         <BuildBadge />
         <Backdrop />
         <BackgroundMusic />
-        {children}
+        <div className="scroll-root">
+          {children}
+        </div>
       </body>
     </html>
   );

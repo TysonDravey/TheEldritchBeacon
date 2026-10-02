@@ -124,7 +124,7 @@ export default function Board({
   const pointerTypeRef  = useRef<string>('mouse');
   const visitedDragCellsRef = useRef<Set<string>>(new Set());
   const clickTimerRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastTapRef         = useRef<{ x: number; y: number; time: number; row: number; col: number } | null>(null);
+  const lastTapRef         = useRef<{ time: number; row: number; col: number } | null>(null);
   const doubletapFiredRef  = useRef(false);
   const longPressTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressFiredRef  = useRef(false);
@@ -259,26 +259,21 @@ export default function Board({
     const cell = getCellAtPoint(e.clientX, e.clientY);
     if (!cell) return;
 
-    // Detect double-tap either by proximity (raw pixels — finger position varies on
-    // mobile) or by both taps resolving to the same cell. Same-cell is the more
-    // reliable signal on the board's smaller, perspective-shrunk back rows: a fixed
-    // pixel radius tuned against a ~42px front-row cell is proportionally huge there,
-    // but still lets a tap drift onto a neighboring back-row cell; comparing resolved
-    // cells (via the same nearest-center hit-test real taps use) catches that
-    // correctly regardless of row size. Always target the cell tap A actually landed
-    // on, not tap B's.
+    // Detect double-tap by both taps resolving to the same cell (via the same
+    // nearest-center hit-test real taps use) — reliable regardless of row size,
+    // unlike a fixed pixel radius: tuned against a ~42px front-row cell, that
+    // radius is proportionally huge on the board's smaller, perspective-shrunk
+    // back rows, so a tap on a genuinely different (but adjacent) back-row cell
+    // still fell inside it and got misread as a double-tap on the first cell
+    // instead of a new tap on its neighbor. Always target the cell tap A
+    // actually landed on, not tap B's.
     const now  = Date.now();
     const last = lastTapRef.current;
-    if (last && now - last.time < 900) {
-      const dx = e.clientX - last.x, dy = e.clientY - last.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const sameCell = last.row === cell.row && last.col === cell.col;
-      if (dist < 50 || sameCell) {
-        doubletapFiredRef.current = true;
-        lastTapRef.current = null;
-        onCellWatcherRef.current(last.row, last.col);
-        return;
-      }
+    if (last && now - last.time < 900 && last.row === cell.row && last.col === cell.col) {
+      doubletapFiredRef.current = true;
+      lastTapRef.current = null;
+      onCellWatcherRef.current(last.row, last.col);
+      return;
     }
 
     const state = playerCellsRef.current[cell.row]?.[cell.col];
@@ -390,9 +385,8 @@ export default function Board({
 
     wiggleCell(cell.row, cell.col);
 
-    // Record screen position + the cell it resolved to for double-tap detection
-    // (position tolerates finger drift; the cell itself stays anchored to this tap).
-    lastTapRef.current = { x: e.clientX, y: e.clientY, time: Date.now(), row: cell.row, col: cell.col };
+    // Record the cell this tap resolved to, for double-tap detection.
+    lastTapRef.current = { time: Date.now(), row: cell.row, col: cell.col };
 
     // Place/remove ward immediately — no delay. If a double-tap follows within 900ms,
     // handleCellWatcher reads the updated state and handles ward→watcher correctly.

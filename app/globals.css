@@ -35,15 +35,15 @@ img {
 html {
   scrollbar-gutter: stable both-edges;
   height: 100%;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 body {
   color: var(--ink);
   font-family: Georgia, serif;
-  min-height: 100vh;
-  min-height: 100dvh;
-  overflow-x: hidden;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
   /* iPhone safe areas */
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
@@ -62,6 +62,20 @@ body {
      drag — nothing on this page is meant to be selected by dragging over it. */
   user-select: none;
   -webkit-user-select: none;
+}
+
+/* The actual scroll container for every page's content — body/html are fixed
+   (see above) specifically so this is the only thing that ever scrolls.
+   WKWebView's native rubber-band bounce on the document itself was shifting
+   position: fixed elements (Backdrop's background) and letting the system's
+   own (white) view background show through behind the status bar during the
+   bounce, both fixed by making sure that native scroll/bounce never happens
+   on body/html at all — it's contained to this element instead. */
+.scroll-root {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Prevent double-tap zoom on interactive elements */
