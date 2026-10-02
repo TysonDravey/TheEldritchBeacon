@@ -22,6 +22,18 @@ import { haptic } from '@/lib/haptic';
 import { playSound } from '@/lib/sound';
 import { isTechniqueNew, markTechniqueDiscovered } from '@/lib/techniques';
 
+// scorePuzzle runs a full solver simulation — real work, not a cheap lookup
+// (see its own comment in engine/difficulty.ts). Computed once per puzzle at
+// module load and reused by every page, same pattern as
+// app/campaign/map/page.tsx's PUZZLE_SCORE. regionPuzzles below sorts by this
+// for every puzzle's own page; without memoizing, Shattered Realms and Twin
+// Watchers — flat pools of 200+ puzzles each with no per-tier split — would
+// each re-score their *entire* pool on every single one of their own pages'
+// static build, which is what caused the mobile build's puzzle pages to start
+// timing out after the next-puzzle fix below started actually populating
+// regionPuzzles for those two modes (previously always empty, so free).
+const PUZZLE_SCORE = new Map<string, number>(SAMPLE_PUZZLES.map(p => [p.id, scorePuzzle(p)]));
+
 // Chapter completion data — keyed by difficulty tier
 const CHAPTER_COMPLETIONS: Partial<Record<Difficulty, {
   image: string;
@@ -299,11 +311,18 @@ export default function PuzzleClient() {
         newUndoStack = [...current.undoStack, current.cells.map((r) => [...r])].slice(-UNDO_LIMIT);
       }
 
+      const dragging = isDraggingRef.current;
+      const solved = dragging ? false : isSolved(puzzle, newCells);
+
       const becameWatcher = next === 'watcher';
       const removedWatcher = next === 'empty' && current.cells[row][col] === 'watcher';
       if (becameWatcher || removedWatcher) {
         haptic('medium');
-        playSound(becameWatcher ? 'watcher' : 'watcher-remove');
+        // Skip the ordinary placement blip when this tap also completes the puzzle —
+        // win-lift fires 200ms later (synced to the watchers' rise animation) and a
+        // ~0.6s watcher-placement sound starting right on top of it would still be
+        // sounding when win-lift starts, masking the start of the rise.
+        if (!solved) playSound(becameWatcher ? 'watcher' : 'watcher-remove');
       } else {
         // A drag never produces a watcher (see handleCellDrag), so this is always
         // the ward/empty case for a dragged cell — use the selection-generator
@@ -314,14 +333,12 @@ export default function PuzzleClient() {
         playSound(isDraggingRef.current ? 'drag-tick' : (next === 'ward' ? 'ward' : 'ward-remove'));
       }
 
-      const dragging = isDraggingRef.current;
       if (!dragging) {
         hintDepthRef.current = 0;
         setHintResult(null);
       }
       const isWatcherChange = next === 'watcher' || (next === 'empty' && current.cells[row][col] === 'watcher');
       const contra = dragging ? { found: false } : isWatcherChange ? findContradictions(puzzle, newCells) : null;
-      const solved = dragging ? false : isSolved(puzzle, newCells);
 
       const newState: PlayerState = {
         ...current,
@@ -348,13 +365,17 @@ export default function PuzzleClient() {
           mode:        puzzle.mode ?? 'initiate',
         });
         setIsFreshWin(true);
-        const SLAM_DELAY = 2000;
+        // 190ms after win-slam (1960ms) rather than right on top of it (was 2000,
+        // only 40ms later) — close enough together to read as "simultaneous," not
+        // "slam, then the wards settle."
+        const SLAM_DELAY = 2150;
         const STEP_MS    = 60;
         winTimersRef.current.forEach(clearTimeout);
         winTimersRef.current = [];
-        // watcher-rise-slam (globals.css): 200ms delay + 2200ms duration,
-        // "Fast slam" keyframe at 80% — one big hit right as they land,
-        // separate from and bigger than the per-ward ripple below.
+        // watcher-rise-slam (globals.css): 200ms animation-delay before the rise
+        // starts, then 2200ms total duration with the "fast slam" keyframe at
+        // 80% — win-lift covers the rise itself, win-slam the impact.
+        winTimersRef.current.push(setTimeout(() => { playSound('win-lift'); }, 200));
         winTimersRef.current.push(setTimeout(() => { haptic('win-slam'); playSound('win-slam'); }, 1960));
         const watcherCells: [number, number][] = [];
         for (let r = 0; r < puzzle.size; r++)
@@ -520,6 +541,7 @@ export default function PuzzleClient() {
       undoStack: stack,
       completed: false,
     };
+    playerStateRef.current = newState;
     setPlayerState(newState);
     savePlayerState(newState);
     setContradiction(findContradictions(puzzle!, prevCells));
@@ -532,6 +554,13 @@ export default function PuzzleClient() {
   const handleRestart = useCallback(() => {
     if (!puzzle) return;
     const fresh = createFreshPlayerState(puzzle.id, puzzle.size);
+    // Set the ref directly rather than relying on the playerState-sync effect — that
+    // effect skips its update while isDraggingRef.current is true (see its comment),
+    // and if a drag's pointerup ever lands outside the board without being captured,
+    // that flag can stay stuck true. Restart would then clear the visible board but
+    // leave the ref pointing at the old one, and the very next tap's applyChange
+    // (which always reads from the ref) would rebuild the old board right on top of it.
+    playerStateRef.current = fresh;
     setPlayerState(fresh);
     savePlayerState(fresh);
     setContradiction({ found: false });
@@ -551,9 +580,15 @@ export default function PuzzleClient() {
   // Must be called before any early return below (hooks can't be conditional).
   const regionPuzzles = useMemo(() => {
     if (!puzzle) return [];
+    // Initiate mode is grouped into difficulty-tier "regions" (chapters), so next-puzzle
+    // must stay within the same tier. Shattered Realms and Twin Watchers aren't split into
+    // tiers at all (see app/page.tsx's flat shatteredPuzzles/twinPuzzles lists) — matching
+    // mode alone is both correct and necessary, since this was hardcoded to 'initiate' and
+    // silently left those two modes with an always-empty list, so completing one never
+    // found a "next puzzle" and fell back to the menu.
     return SAMPLE_PUZZLES
-      .filter(p => p.difficulty === puzzle.difficulty && p.mode === 'initiate')
-      .sort((a, b) => scorePuzzle(a) - scorePuzzle(b));
+      .filter(p => p.mode === puzzle.mode && (puzzle.mode !== 'initiate' || p.difficulty === puzzle.difficulty))
+      .sort((a, b) => (PUZZLE_SCORE.get(a.id) ?? 0) - (PUZZLE_SCORE.get(b.id) ?? 0));
   }, [puzzle]);
 
   if (!puzzle) {
@@ -612,7 +647,7 @@ export default function PuzzleClient() {
             <h1 className="font-lovecraftian text-base text-ink leading-tight truncate">{puzzle.title}</h1>
             <p className="font-serif text-ink-light leading-none" style={{ fontSize: 11 }}>
               {puzzle.size}&times;{puzzle.size} &mdash; {puzzle.difficulty}
-              <span className="ml-1 opacity-50">&#9670; {scorePuzzle(puzzle)}</span>
+              <span className="ml-1 opacity-50">&#9670; {PUZZLE_SCORE.get(puzzle.id) ?? scorePuzzle(puzzle)}</span>
               {playerState.hintsUsed > 0 && (
                 <span className="ml-2 text-red-ink">
                   {playerState.hintsUsed} hint{playerState.hintsUsed !== 1 ? 's' : ''}

@@ -95,8 +95,13 @@ export default function SettingsPage() {
     <main className="min-h-screen flex flex-col items-center px-6 py-12">
       <div className="w-full max-w-lg flex flex-col gap-8">
         <div className="flex items-center gap-3 bg-parchment border border-ink border-opacity-30 rounded-sm px-4 py-3">
-          <Link href="/" className="font-serif text-sm text-ink-light opacity-60 hover:opacity-100 transition-opacity">
-            &larr; Back
+          <Link href="/" className="transition-all duration-100 hover:brightness-110 active:scale-95 shrink-0">
+            <img
+              src="/buttons/left_button_01.png"
+              alt="Back"
+              draggable={false}
+              style={{ height: 40, display: 'block', filter: 'drop-shadow(2px 4px 2px rgba(0,0,0,0.6))' }}
+            />
           </Link>
           <h1 className="font-lovecraftian text-2xl text-ink">Settings</h1>
         </div>

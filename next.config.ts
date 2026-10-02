@@ -65,6 +65,13 @@ const nextConfig: NextConfig = {
         },
       }),
   skipTrailingSlashRedirect: true,
+  // Default is 60s per page. The mobile build statically generates 380+
+  // puzzle pages, and under load from other processes on a dev machine
+  // (editor, browser, this very build tool) a handful can occasionally spike
+  // past that and fail the entire export — seen directly during this
+  // session. A generous ceiling costs nothing on a fast CI machine (Vercel)
+  // and makes the mobile build resilient to local machine contention.
+  staticPageGenerationTimeout: 180,
 };
 
 export default nextConfig;

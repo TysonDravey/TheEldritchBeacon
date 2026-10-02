@@ -179,15 +179,29 @@ export default function Board({
   }, [size]);
 
   function getCellAtPoint(x: number, y: number): { row: number; col: number } | null {
-    for (const c of cellRectsRef.current) {
-      if (x >= c.left && x < c.right && y >= c.top && y < c.bottom) return { row: c.row, col: c.col };
-    }
-    // Fall back to the nearest cell within a small tolerance. Adjacent cells' rects come from
-    // getBoundingClientRect() under a rotateX() transform, which can leave sub-pixel rounding
-    // gaps between them — on a ~36px cell a tap landing in that gap would otherwise resolve to
-    // nothing at all (dropped silently, no ward, no wiggle).
-    const NEAR_PX = 4;
+    // Check every cell rather than returning the first match — the rotateX() tilt's
+    // horizontal keystoning (cells lean outward from center under perspective) makes
+    // neighboring cells' bounding boxes overlap by a couple px, worse toward the board's
+    // edges. In that overlap zone, first-DOM-order-wins can resolve a tap to the wrong
+    // neighbor; nearest-center disambiguates correctly instead.
     let best: { row: number; col: number } | null = null;
+    let bestCenterDist = Infinity;
+    for (const c of cellRectsRef.current) {
+      if (x >= c.left && x < c.right && y >= c.top && y < c.bottom) {
+        const cx = (c.left + c.right) / 2;
+        const cy = (c.top + c.bottom) / 2;
+        const d = (x - cx) ** 2 + (y - cy) ** 2;
+        if (d < bestCenterDist) { bestCenterDist = d; best = { row: c.row, col: c.col }; }
+      }
+    }
+    if (best) return best;
+
+    // Fall back to the nearest cell within a tolerance for a tap landing just outside
+    // every cell's box. The perspective tilt also shrinks far (low-row) cells noticeably
+    // relative to near ones — e.g. ~30x36px vs ~40x42px on a 10x10 board — so a fixed
+    // tolerance needs enough slack for the smallest cells on the board, not just to cover
+    // sub-pixel rounding gaps.
+    const NEAR_PX = 10;
     let bestDist = NEAR_PX;
     for (const c of cellRectsRef.current) {
       const dx = x < c.left ? c.left - x : x > c.right  ? x - c.right  : 0;
@@ -245,16 +259,21 @@ export default function Board({
     const cell = getCellAtPoint(e.clientX, e.clientY);
     if (!cell) return;
 
-    // Detect double-tap by proximity (not exact cell) — finger position varies on mobile.
-    // Target the cell tap A actually landed on, not wherever tap B's own (drifted) position
-    // resolves to — on small cells a few px of natural drift can land tap B on a neighboring
-    // cell, which is very often already a Ward, causing a spurious rejection.
+    // Detect double-tap either by proximity (raw pixels — finger position varies on
+    // mobile) or by both taps resolving to the same cell. Same-cell is the more
+    // reliable signal on the board's smaller, perspective-shrunk back rows: a fixed
+    // pixel radius tuned against a ~42px front-row cell is proportionally huge there,
+    // but still lets a tap drift onto a neighboring back-row cell; comparing resolved
+    // cells (via the same nearest-center hit-test real taps use) catches that
+    // correctly regardless of row size. Always target the cell tap A actually landed
+    // on, not tap B's.
     const now  = Date.now();
     const last = lastTapRef.current;
-    if (last) {
+    if (last && now - last.time < 900) {
       const dx = e.clientX - last.x, dy = e.clientY - last.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < 40 && now - last.time < 900) {
+      const sameCell = last.row === cell.row && last.col === cell.col;
+      if (dist < 50 || sameCell) {
         doubletapFiredRef.current = true;
         lastTapRef.current = null;
         onCellWatcherRef.current(last.row, last.col);
@@ -395,6 +414,15 @@ export default function Board({
   }, []);
 
   // Safety net: reset drag state whenever the pointer is released anywhere on the page.
+  // Must cover pointercancel as well as pointerup — mobile browsers (iOS especially)
+  // fire cancel instead of up when a gesture gets interrupted (the system taking over
+  // for an edge-swipe, a multi-touch conflict, Safari's own scroll-vs-drag
+  // resolution). Without this, isDraggingRef.current can get stuck true forever: every
+  // later applyChange hard-codes `solved = dragging ? false : isSolved(...)`, so a
+  // stuck flag silently blocks win detection from then on, and Restart/Undo's
+  // ref-sync effect also skips its update while dragging, so a stuck flag there made
+  // Restart visually clear the board while the stale ref quietly resurrected it on the
+  // next tap.
   useEffect(() => {
     const onGlobalUp = () => {
       if (!pointerDownRef.current) return;
@@ -408,7 +436,11 @@ export default function Board({
       boardHandledUpRef.current = false;
     };
     window.addEventListener('pointerup', onGlobalUp);
-    return () => window.removeEventListener('pointerup', onGlobalUp);
+    window.addEventListener('pointercancel', onGlobalUp);
+    return () => {
+      window.removeEventListener('pointerup', onGlobalUp);
+      window.removeEventListener('pointercancel', onGlobalUp);
+    };
   }, []);
 
   return (

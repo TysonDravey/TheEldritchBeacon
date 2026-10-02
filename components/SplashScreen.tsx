@@ -30,7 +30,7 @@ const PRELOAD_ASSETS = [
 const CARD_COUNT = 3;
 const SESSION_KEY = 'eb_splash_shown';
 
-const MIN_MS = 5000;
+const MIN_MS = 1200;
 
 // Ease-in-out curve: slow start, fast middle, slow end.
 function easeInOut(t: number): number {

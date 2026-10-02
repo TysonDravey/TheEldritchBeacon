@@ -590,13 +590,17 @@ export default function DailyPage() {
         newUndoStack = [...current.undoStack, current.cells.map((r) => [...r])].slice(-UNDO_LIMIT);
       }
 
+      const solved = isSolved(puzzle, newCells);
+
       const becameWatcher = next === 'watcher';
       const removedWatcher = next === 'empty' && current.cells[row][col] === 'watcher';
       if (becameWatcher || removedWatcher) {
         haptic('medium');
-        // Skip during drag — a drag never produces a watcher anyway (see
-        // handleCellDrag), so this branch is tap-only already.
-        playSound(becameWatcher ? 'watcher' : 'watcher-remove');
+        // Skip the ordinary placement blip when this tap also completes the puzzle —
+        // win-lift fires 200ms later (synced to the watchers' rise animation) and a
+        // ~0.6s watcher-placement sound starting right on top of it would still be
+        // sounding when win-lift starts, masking the start of the rise.
+        if (!solved) playSound(becameWatcher ? 'watcher' : 'watcher-remove');
       } else {
         // A drag never produces a watcher (see handleCellDrag), so this is always
         // the ward/empty case for a dragged cell — use the selection-generator
@@ -610,7 +614,6 @@ export default function DailyPage() {
       hintDepthRef.current = 0;
       setHintResult(null);
       const contra = findContradictions(puzzle, newCells);
-      const solved = isSolved(puzzle, newCells);
       const storageKey = `daily_${selectedDate}_${puzzle.id}`;
       const newState: PlayerState = { ...current, cells: newCells, undoStack: newUndoStack, completed: solved };
 
@@ -683,9 +686,10 @@ export default function DailyPage() {
 
         winTimersRef.current.forEach(clearTimeout);
         winTimersRef.current = [];
-        // watcher-rise-slam (globals.css): 200ms delay + 2200ms duration,
-        // "Fast slam" keyframe at 80% — one big hit right as they land,
-        // separate from and bigger than the per-ward ripple below.
+        // watcher-rise-slam (globals.css): 200ms animation-delay before the rise
+        // starts, then 2200ms total duration with the "fast slam" keyframe at
+        // 80% — win-lift covers the rise itself, win-slam the impact.
+        winTimersRef.current.push(setTimeout(() => { playSound('win-lift'); }, 200));
         winTimersRef.current.push(setTimeout(() => { haptic('win-slam'); playSound('win-slam'); }, 1960));
         const watcherCells: [number, number][] = [];
         for (let r = 0; r < puzzle.size; r++)
@@ -697,7 +701,9 @@ export default function DailyPage() {
           for (let c = 0; c < puzzle.size; c++) {
             if (newCells[r][c] === 'ward') {
               const dist = Math.min(...watcherCells.map(([wr, wc]) => Math.abs(wr - r) + Math.abs(wc - c)));
-              const delay = 2000 + dist * 60;
+              // 190ms after win-slam (1960ms), not right on top of it — see the
+              // matching comment in PuzzleClient.tsx.
+              const delay = 2150 + dist * 60;
               if (delay > maxDelay) maxDelay = delay;
               const t = setTimeout(() => {
                 haptic('win-ward');
@@ -817,6 +823,7 @@ export default function DailyPage() {
     const prevCells = stack.pop()!;
     const storageKey = `daily_${selectedDate}_${puzzle!.id}`;
     const newState: PlayerState = { ...playerState, cells: prevCells, undoStack: stack, completed: false };
+    playerStateRef.current = newState;
     setPlayerState(newState);
     savePlayerState({ ...newState, puzzleId: storageKey });
     if (contradictionTimerRef.current) { clearTimeout(contradictionTimerRef.current); contradictionTimerRef.current = null; }
@@ -832,6 +839,10 @@ export default function DailyPage() {
     if (!puzzle) return;
     const storageKey = `daily_${selectedDate}_${puzzle.id}`;
     const fresh = createFreshPlayerState(storageKey, puzzle.size);
+    // See the matching comment in PuzzleClient.tsx's handleRestart — setting the ref
+    // directly (not just via setPlayerState) closes the window where a fast next tap's
+    // applyChange could read a stale ref and rebuild the old board on top of the reset.
+    playerStateRef.current = fresh;
     setPlayerState(fresh);
     savePlayerState(fresh);
     if (contradictionTimerRef.current) { clearTimeout(contradictionTimerRef.current); contradictionTimerRef.current = null; }

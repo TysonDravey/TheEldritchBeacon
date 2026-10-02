@@ -24,6 +24,9 @@ needed once they land.
 7. **Win slam — watchers crash down** (`win-slam.mp3`) — the big one. A
    weighty impact plus a magical flourish. Your single most dramatic
    sound.
+7b. **Win lift — watchers rising, just before the slam** (`win-lift.mp3`)
+   — plays the moment the Watchers start rising, ~1.75s before
+   win-slam's impact. Filled.
 8. **Puzzle/chapter complete** (`complete.mp3`) — a short fanfare,
    distinct from #7 — this is the "you actually finished" payoff, a
    little longer and more musical than the slam.
@@ -37,9 +40,9 @@ Also wired, same family as the above:
 9. UI navigation click — a subtle click for menu/settings interactions.
 10. Region/chapter unlock banner reveal — a short sting for the "___ has
     been revealed" banner on the home screen.
-11. A second (or third) background-music track, so a long session
-    doesn't loop the same song forever. Drop extra tracks in `music/`,
-    not here.
+11. ~~A second (or third) background-music track~~ — Filled: two
+    "Beacon in the Fog" variations now cycle in randomly alongside the
+    original track instead of looping one song forever.
 
 ## One important note on #6 (win ripple)
 

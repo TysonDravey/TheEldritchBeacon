@@ -23,6 +23,15 @@
 
 * { box-sizing: border-box; }
 
+/* Browsers make <img> natively draggable by default — click-holding a Ward/Watcher
+   tile and moving the cursor off it starts a native ghost-image drag instead of (or
+   alongside) the board's own pointer-drag gesture. Nothing here is meant to be
+   dragged out as a file/image. */
+img {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
 html {
   scrollbar-gutter: stable both-edges;
   height: 100%;
@@ -47,6 +56,12 @@ body {
      touch-action is the only thing that actually suppresses it, so it has
      to be set here globally, not just on buttons/links. */
   touch-action: manipulation;
+  /* A mouse/touch drag that starts on the board and strays past its edge
+     (easy on the smaller perspective-shrunk back rows) would otherwise hit
+     ordinary page content and kick off the browser's native text-selection
+     drag — nothing on this page is meant to be selected by dragging over it. */
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* Prevent double-tap zoom on interactive elements */
