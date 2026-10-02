@@ -30,43 +30,43 @@ const CHAPTER_COMPLETIONS: Partial<Record<Difficulty, {
   lore: string;
 }>> = {
   Initiate: {
-    image: '/titleCards/campaign_01/chapter_01.png',
+    image: '/journal/page-01.jpg',
     chapterLabel: 'Chapter I Complete',
     title: 'The Approach Confirmed',
     lore: 'We made shore before dusk, as planned. The light appeared operational throughout — no movement observed from the water. Not then.\n\nVale’s silence remains unexplained. The charts here are restored; that is one thing settled before we go up the stair.\n\nThe tower is sound. I have no reason yet to write otherwise.',
   },
   Scholar: {
-    image: '/titleCards/campaign_01/chapter_02.png',
+    image: '/journal/page-02.jpg',
     chapterLabel: 'Chapter II Complete',
     title: 'Marks Without Meaning',
     lore: 'Vale’s journal turned up among his effects. Little in it but measurements, repeated past any reasonable need.\n\n‘Bigger within,’ he wrote, more than once. I called it nonsense and moved to verify the simple arithmetic myself.\n\nThe marks above the entrance are mason’s work. I am certain of this. I have copied them regardless.',
   },
   Occultist: {
-    image: '/titleCards/campaign_01/chapter_03.png',
+    image: '/journal/page-03.jpg',
     chapterLabel: 'Chapter III Complete',
     title: 'A Measurement That Will Not Close',
     lore: 'Twenty-one feet, eight inches. I have checked it from three walls and the tower does not care that the number is wrong.\n\nA weighted line hangs clear of the stone at the bottom and draws toward it higher up, though the line itself is straight.\n\nI have stopped assuming the fault is mine.',
   },
   'High Priest': {
-    image: '/titleCards/campaign_01/chapter_04.png',
+    image: '/journal/page-04.jpg',
     chapterLabel: 'Chapter IV Complete',
     title: 'The Interval Is Wrong',
     lore: 'The mechanism is sound. I have examined the gears myself — one revolution, thirty-six seconds, exactly as built.\n\nThe light takes forty-one. I counted it from the gallery, then the stair, then again, and the discrepancy held every time.\n\nI cut my hand on the retaining bracket. The blood found the lens before I could stop it, and settled into the grooves as though it belonged there. I have begun drawing what it shows me.',
   },
   Eldritch: {
-    image: '/titleCards/campaign_01/chapter_05.png',
+    image: '/journal/page-05.jpg',
     chapterLabel: 'Chapter V Complete',
     title: 'The Third Window',
     lore: 'The exterior records two windows on the western face. I have counted from the stair and found three.\n\nThe centre opening has no corresponding stone outside it. I struck the wall myself to be sure. From within, the sound came through glass.\n\nThrough it, the horizon sits lower than it should — as though I am standing somewhere higher than I am.',
   },
   Harbinger: {
-    image: '/titleCards/campaign_01/chapter_06.png',
+    image: '/journal/page-06.jpg',
     chapterLabel: 'Chapter VI Complete',
     title: 'They Should Not Match',
     lore: 'I have laid the drawings over one another by lamplight — the shoreline, the lower floor, the lantern rings, the window.\n\nThe centres do not agree, and should not agree, and yet the same shape persists through every one of them.\n\nVale wrote the same thing I am now writing: it is missing again. I begin to understand what he meant by it.',
   },
   Archon: {
-    image: '/titleCards/campaign_01/chapter_07.png',
+    image: '/journal/page-07.jpg',
     chapterLabel: 'Chapter VII Complete',
     title: 'I Know',
     lore: 'There is a page in my own hand that I do not remember filling.\n\nThe drawing on it is patient, and calm, and correct in every particular — more correct than my own work has been in days.\n\nI wrote beneath it that I did not draw this. The reply was already waiting for me, in a hand that was not mine.',
@@ -853,6 +853,7 @@ export default function PuzzleClient() {
               src={completion.image}
               alt=""
               draggable={false}
+              className="journal-pan"
               style={{
                 position: 'absolute', inset: 0,
                 width: '100%', height: '100%',

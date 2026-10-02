@@ -1,16 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 // Full-screen viewer for a page of Captain Mercer's journal. These scans are
 // dense with small handwriting and technical detail that's illegible at
 // thumbnail size, so this isn't a simple image popup — it needs a real way
-// to zoom in and read it. Deliberately not a custom pinch-gesture
-// implementation: explicit zoom buttons plus the browser's own native
-// scroll for panning avoids the gesture-conflict bugs a hand-rolled pinch
-// handler would risk (this session already found several of those in the
-// board's own gesture code), and this is a lore viewer, not gameplay — it
-// doesn't need to feel like a native photo app.
+// to zoom in and read it. Zoom toggles via an explicit button or a
+// double-tap on the image; panning is the browser's own native scroll.
+// Deliberately not a custom pinch-gesture implementation — a hand-rolled
+// pinch handler risks the same class of gesture-conflict bugs this session
+// already found in the board's own gesture code, and this is a lore viewer,
+// not gameplay, so it doesn't need to feel like a native photo app.
 export default function JournalViewer({
   src,
   onClose,
@@ -19,6 +19,21 @@ export default function JournalViewer({
   onClose: () => void;
 }) {
   const [zoomed, setZoomed] = useState(false);
+  // Plain click-timestamp double-tap, not a custom pinch/gesture handler —
+  // there's only one tappable target here (the whole image), so there's none
+  // of the "which cell did this land on" ambiguity that caused real bugs in
+  // the board's own double-tap detection (see components/Board.tsx).
+  const lastTapRef = useRef(0);
+
+  function handleImageTap() {
+    const now = Date.now();
+    if (now - lastTapRef.current < 350) {
+      setZoomed(z => !z);
+      lastTapRef.current = 0;
+    } else {
+      lastTapRef.current = now;
+    }
+  }
 
   return (
     <div
@@ -62,6 +77,7 @@ export default function JournalViewer({
           src={src}
           alt="A page from Captain Mercer's journal"
           draggable={false}
+          onClick={handleImageTap}
           // maxWidth: 'none' overrides Tailwind's global `img { max-width:
           // 100% }` reset, which otherwise silently clamps this straight
           // back down regardless of the width set here.
