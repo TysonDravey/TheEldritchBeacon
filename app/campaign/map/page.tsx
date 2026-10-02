@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { SAMPLE_PUZZLES } from '@/data/samplePuzzles';
-import { REGIONS } from '@/data/regions';
+import { REGIONS, campaignRegionDifficulty } from '@/data/regions';
 import type { Puzzle, Difficulty } from '@/engine/boardTypes';
 import PuzzleCard from '@/components/PuzzleCard';
 
@@ -119,8 +119,9 @@ export default function CampaignMapPage() {
   const campaignPuzzles = SAMPLE_PUZZLES.filter(p => p.mode === 'initiate' || p.mode === 'cult-master');
   const byDifficulty = new Map<Difficulty, Puzzle[]>();
   for (const p of campaignPuzzles) {
-    if (!byDifficulty.has(p.difficulty)) byDifficulty.set(p.difficulty, []);
-    byDifficulty.get(p.difficulty)!.push(p);
+    const region = campaignRegionDifficulty(p);
+    if (!byDifficulty.has(region)) byDifficulty.set(region, []);
+    byDifficulty.get(region)!.push(p);
   }
 
   const regionsWithPuzzles = REGIONS.filter(r => (byDifficulty.get(r.difficulty) ?? []).length > 0);

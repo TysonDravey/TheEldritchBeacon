@@ -1,4 +1,4 @@
-import type { Difficulty } from '@/engine/boardTypes';
+import type { Difficulty, Puzzle } from '@/engine/boardTypes';
 
 export const REGIONS: {
   name: string;
@@ -61,3 +61,29 @@ export const REGIONS: {
 export const REGION_BY_DIFFICULTY: Record<string, typeof REGIONS[number]> = Object.fromEntries(
   REGIONS.map(r => [r.difficulty, r])
 );
+
+const DIFFICULTY_ORDER = REGIONS.map(r => r.difficulty);
+
+// Board size alone can make a puzzle read as far easier than its
+// solver-computed difficulty suggests — a 5x5 board scoring Occultist (or
+// later) is still only 25 cells, and surfacing it deep into the campaign
+// undercuts the sense of escalating scale regardless of how demanding its
+// logic actually is. Caps which region a puzzle can be grouped into by
+// board size, independent of (and without altering) its real difficulty.
+const MAX_REGION_BY_SIZE: Partial<Record<number, Difficulty>> = {
+  5: 'Scholar',
+};
+
+/** Which region's puzzle pool this puzzle should be grouped into for campaign
+ *  progression — puzzle.difficulty itself (and its displayed badge) is left
+ *  untouched; this only affects placement. */
+export function campaignRegionDifficulty(puzzle: Puzzle): Difficulty {
+  const cap = MAX_REGION_BY_SIZE[puzzle.size];
+  if (!cap) return puzzle.difficulty;
+  const capRank = DIFFICULTY_ORDER.indexOf(cap);
+  const ownRank = DIFFICULTY_ORDER.indexOf(puzzle.difficulty);
+  // -1 means the difficulty (e.g. Unbound) isn't one of the campaign's own
+  // sequential regions at all — leave those alone rather than guess.
+  if (ownRank === -1 || capRank === -1 || ownRank <= capRank) return puzzle.difficulty;
+  return cap;
+}

@@ -16,7 +16,7 @@ import GameControls from '@/components/GameControls';
 import HintOverlay from '@/components/HintOverlay';
 import TechniqueDiscovery from '@/components/TechniqueDiscovery';
 import { WATCHER_SVGS, WARD_PNG } from '@/theme/colors';
-import { REGION_BY_DIFFICULTY } from '@/data/regions';
+import { REGION_BY_DIFFICULTY, campaignRegionDifficulty } from '@/data/regions';
 import { haptic } from '@/lib/haptic';
 import { playSound } from '@/lib/sound';
 import { isTechniqueNew, markTechniqueDiscovered } from '@/lib/techniques';
@@ -390,11 +390,11 @@ export default function PuzzleClient() {
           }
         }
         // Check if this completes the whole chapter (initiate-mode puzzles only)
-        const tierPuzzles = SAMPLE_PUZZLES.filter(p => p.difficulty === puzzle.difficulty && p.mode === 'initiate');
+        const tierPuzzles = SAMPLE_PUZZLES.filter(p => campaignRegionDifficulty(p) === campaignRegionDifficulty(puzzle) && p.mode === 'initiate');
         const allCompleted = loadAllCompleted();
         allCompleted.add(puzzle.id);
         const chapterJustFinished = puzzle.mode === 'initiate'
-          && CHAPTER_COMPLETIONS[puzzle.difficulty] != null
+          && CHAPTER_COMPLETIONS[campaignRegionDifficulty(puzzle)] != null
           && tierPuzzles.length > 0
           && tierPuzzles.every(p => allCompleted.has(p.id));
 
@@ -574,7 +574,7 @@ export default function PuzzleClient() {
     // silently left those two modes with an always-empty list, so completing one never
     // found a "next puzzle" and fell back to the menu.
     return SAMPLE_PUZZLES
-      .filter(p => p.mode === puzzle.mode && (puzzle.mode !== 'initiate' || p.difficulty === puzzle.difficulty))
+      .filter(p => p.mode === puzzle.mode && (puzzle.mode !== 'initiate' || campaignRegionDifficulty(p) === campaignRegionDifficulty(puzzle)))
       .sort((a, b) => a.score - b.score);
   }, [puzzle]);
 
@@ -600,7 +600,7 @@ export default function PuzzleClient() {
     );
   }
 
-  const region = REGION_BY_DIFFICULTY[puzzle.difficulty] ?? null;
+  const region = REGION_BY_DIFFICULTY[campaignRegionDifficulty(puzzle)] ?? null;
   const currentIdx = regionPuzzles.findIndex(p => p.id === puzzle.id);
   const nextPuzzle = currentIdx >= 0 && currentIdx < regionPuzzles.length - 1
     ? regionPuzzles[currentIdx + 1]
@@ -825,7 +825,7 @@ export default function PuzzleClient() {
 
       {/* Chapter completion overlay */}
       {showChapterComplete && (() => {
-        const completion = CHAPTER_COMPLETIONS[puzzle.difficulty];
+        const completion = CHAPTER_COMPLETIONS[campaignRegionDifficulty(puzzle)];
         if (!completion) return null;
         return (
           <div

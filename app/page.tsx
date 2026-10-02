@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { SAMPLE_PUZZLES } from '@/data/samplePuzzles';
 import type { Puzzle, Difficulty } from '@/engine/boardTypes';
 import SplashScreen from '@/components/SplashScreen';
-import { REGIONS } from '@/data/regions';
+import { REGIONS, campaignRegionDifficulty } from '@/data/regions';
 import { useSettings } from '@/lib/settings';
 import { playSound } from '@/lib/sound';
 import PuzzleCard from '@/components/PuzzleCard';
@@ -34,8 +34,9 @@ export default function HomePage() {
     const known = new Set<string>(JSON.parse(localStorage.getItem(UNLOCKED_KEY) ?? '[]'));
     const byDiff = new Map<Difficulty, Puzzle[]>();
     for (const p of SAMPLE_PUZZLES.filter(p => p.mode === 'initiate' || p.mode === 'cult-master')) {
-      if (!byDiff.has(p.difficulty)) byDiff.set(p.difficulty, []);
-      byDiff.get(p.difficulty)!.push(p);
+      const region = campaignRegionDifficulty(p);
+      if (!byDiff.has(region)) byDiff.set(region, []);
+      byDiff.get(region)!.push(p);
     }
 
     // Walk the region chain to find what's newly unlocked
@@ -72,8 +73,9 @@ export default function HomePage() {
   );
   const byDifficulty = new Map<Difficulty, Puzzle[]>();
   for (const p of campaignPuzzles) {
-    if (!byDifficulty.has(p.difficulty)) byDifficulty.set(p.difficulty, []);
-    byDifficulty.get(p.difficulty)!.push(p);
+    const region = campaignRegionDifficulty(p);
+    if (!byDifficulty.has(region)) byDifficulty.set(region, []);
+    byDifficulty.get(region)!.push(p);
   }
 
   // Compute current chapter for the campaign banner
