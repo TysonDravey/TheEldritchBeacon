@@ -116,7 +116,7 @@ export default function CampaignMapPage() {
     setReady(true);
   }, []);
 
-  const campaignPuzzles = SAMPLE_PUZZLES.filter(p => p.mode === 'initiate' || p.mode === 'cult-master');
+  const campaignPuzzles = SAMPLE_PUZZLES.filter(p => p.mode === 'initiate');
   const byDifficulty = new Map<Difficulty, Puzzle[]>();
   for (const p of campaignPuzzles) {
     const region = campaignRegionDifficulty(p);
@@ -139,6 +139,8 @@ export default function CampaignMapPage() {
   });
 
   if (!ready) return null;
+
+  const campaignComplete = statuses.length > 0 && statuses[statuses.length - 1] === 'completed';
 
   return (
     <main className="min-h-screen flex flex-col items-center px-6 py-12">
@@ -167,6 +169,29 @@ export default function CampaignMapPage() {
             />
           ))}
         </div>
+
+        {campaignComplete && (
+          <div className="bg-parchment border border-brass rounded-sm p-4 text-center flex flex-col gap-3">
+            <p className="font-lovecraftian text-lg text-ink">The Beacon holds steady</p>
+            <p className="font-serif text-sm text-ink-light italic">
+              Your charts of these waters are complete. Stranger puzzles await.
+            </p>
+            <div className="flex flex-col gap-2 mt-1">
+              <Link
+                href="/"
+                className="font-serif text-sm border border-ink px-4 py-2 rounded-sm bg-parchment hover:bg-parchment-dark transition-colors"
+              >
+                Try Shattered Realms &rarr;
+              </Link>
+              <Link
+                href="/"
+                className="font-serif text-sm border border-ink px-4 py-2 rounded-sm bg-parchment hover:bg-parchment-dark transition-colors"
+              >
+                Try Twin Watchers &rarr;
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );

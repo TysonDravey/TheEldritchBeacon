@@ -564,6 +564,63 @@ function buildWatcherHint(d: DeductionResult, puzzle: Puzzle): HintResult {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Mistake detection — compares the player's own markings against the
+// puzzle's stored solution directly, rather than waiting for pure rule-logic
+// (findContradictions) to eventually surface an unrelated impossibility
+// somewhere else on the board. Checked first in getHint, below, so a wrong
+// placement gets flagged specifically instead of a confusing deduction
+// elsewhere that doesn't address what's actually wrong.
+// ---------------------------------------------------------------------------
+
+function findSolutionMismatches(puzzle: Puzzle, playerCells: CellState[][]): [number, number][] {
+  const solutionSet = new Set(puzzle.solution.map(([r, c]) => `${r},${c}`));
+  const mismatches: [number, number][] = [];
+  for (let r = 0; r < puzzle.size; r++) {
+    for (let c = 0; c < puzzle.size; c++) {
+      const state = playerCells[r]?.[c];
+      const inSolution = solutionSet.has(`${r},${c}`);
+      if (state === 'watcher' && !inSolution) mismatches.push([r, c]);
+      else if (state === 'ward' && inSolution) mismatches.push([r, c]);
+    }
+  }
+  return mismatches;
+}
+
+function buildMistakeHint(
+  puzzle: Puzzle,
+  playerCells: CellState[][],
+  mismatches: [number, number][],
+  depth: number,
+): HintResult {
+  if (depth === 0) {
+    return {
+      level: 1,
+      message: mismatches.length > 1
+        ? `Something isn't right. ${mismatches.length} of your markings don't match the true chart.`
+        : `Something isn't right here. One of your markings doesn't match the true chart.`,
+      highlightCells: mismatches,
+    };
+  }
+
+  const [r, c] = mismatches[0];
+  const isWatcher = playerCells[r][c] === 'watcher';
+  const territory = puzzle.territoryMap[r][c];
+  const detail = isWatcher
+    ? `The Watcher at row ${r + 1}, column ${c + 1} — the ${tname(territory)} territory — doesn't belong there. Reconsider this placement.`
+    : `Row ${r + 1}, column ${c + 1} — the ${tname(territory)} territory — should hold a Watcher. The Ward there is blocking it.`;
+  const extra = mismatches.length > 1
+    ? ` There ${mismatches.length - 1 === 1 ? 'is one more mismatch' : `are ${mismatches.length - 1} more mismatches`} elsewhere on the board too.`
+    : '';
+
+  return {
+    level: 3,
+    message: detail + extra,
+    primaryCell: [r, c],
+    highlightCells: mismatches,
+  };
+}
+
 function buildContradictionHint(
   message: string,
   affectedCells?: [number, number][],
@@ -624,6 +681,16 @@ export function getHint(
   playerCells: CellState[][],
   depth: number = 0,
 ): HintResult {
+  // A wrong placement takes priority over everything else — pure rule-logic
+  // (findContradictions, below) only catches a mistake once its ripple
+  // effects eventually make something else impossible, which can surface far
+  // from the actual wrong cell. Checking directly against the solution finds
+  // it immediately instead.
+  const mismatches = findSolutionMismatches(puzzle, playerCells);
+  if (mismatches.length > 0) {
+    return buildMistakeHint(puzzle, playerCells, mismatches, depth);
+  }
+
   // Contradiction takes priority at any depth
   const contradiction = findContradictions(puzzle, playerCells);
   if (contradiction.found) {

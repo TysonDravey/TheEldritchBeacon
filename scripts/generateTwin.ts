@@ -123,8 +123,14 @@ async function main() {
       process.exit(1);
     }
 
+    // The entry immediately before insertPoint may or may not already end in
+    // its own trailing comma (every entry in the file has one, including the
+    // last — but an entry this same script just inserted earlier in this run
+    // doesn't yet). Strip any trailing comma first so inserting ours never
+    // produces a double comma (a silent array hole: `},,\n{` is valid JS but
+    // leaves `undefined` in RAW_PUZZLES where the hole falls).
     const newContent =
-      content.slice(0, insertPoint) +
+      content.slice(0, insertPoint).replace(/,(\s*)$/, '$1') +
       ',\n' + JSON.stringify(entry) +
       content.slice(insertPoint);
 

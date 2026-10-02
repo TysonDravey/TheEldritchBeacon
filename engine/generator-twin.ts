@@ -123,6 +123,13 @@ function generateTwinTerritoryMap(
   const map: number[][] = Array.from({ length: n }, () => Array(n).fill(-1));
   const pending: Array<{ row: number; col: number; territory: number }> = [];
 
+  // Each territory grows biased toward a primary axis (row-stripe or
+  // col-stripe), same as the base generator (engine/generator.ts) — this
+  // used to be hardcoded to always prefer horizontal growth for every
+  // territory, which made every territory on the board the same "wide and
+  // flat" shape instead of a natural mix of wide, tall, and blocky ones.
+  const axes: ('row' | 'col')[] = pairs.map(() => rng() < 0.5 ? 'row' : 'col');
+
   // Seed each territory from both watcher positions
   for (let t = 0; t < pairs.length; t++) {
     for (const [r, c] of pairs[t]) {
@@ -137,13 +144,18 @@ function generateTwinTerritoryMap(
     [pending[i], pending[j]] = [pending[j], pending[i]];
   }
 
-  // BFS flood-fill with mild bias toward horizontal expansion (keeps territories legible)
+  // BFS flood-fill, biased toward each territory's own axis
   while (pending.length > 0) {
     const idx = Math.floor(rng() * Math.min(pending.length, 4));
     const { row, col, territory } = pending.splice(idx, 1)[0];
 
-    const preferred: [number, number][] = [[row, col - 1], [row, col + 1]];
-    const secondary: [number, number][] = [[row - 1, col], [row + 1, col]];
+    const axis = axes[territory];
+    const preferred: [number, number][] = axis === 'row'
+      ? [[row, col - 1], [row, col + 1]]
+      : [[row - 1, col], [row + 1, col]];
+    const secondary: [number, number][] = axis === 'row'
+      ? [[row - 1, col], [row + 1, col]]
+      : [[row, col - 1], [row, col + 1]];
 
     for (const [nr, nc] of preferred) {
       if (nr < 0 || nr >= n || nc < 0 || nc >= n) continue;

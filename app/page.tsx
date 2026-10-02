@@ -33,7 +33,7 @@ export default function HomePage() {
     // Detect newly unlocked regions for the celebration banner
     const known = new Set<string>(JSON.parse(localStorage.getItem(UNLOCKED_KEY) ?? '[]'));
     const byDiff = new Map<Difficulty, Puzzle[]>();
-    for (const p of SAMPLE_PUZZLES.filter(p => p.mode === 'initiate' || p.mode === 'cult-master')) {
+    for (const p of SAMPLE_PUZZLES.filter(p => p.mode === 'initiate')) {
       const region = campaignRegionDifficulty(p);
       if (!byDiff.has(region)) byDiff.set(region, []);
       byDiff.get(region)!.push(p);
@@ -68,9 +68,7 @@ export default function HomePage() {
   // Group campaign puzzles by difficulty — only needed here to compute the
   // "Chapter N — Region Name" banner text, not to render per-region detail
   // (that detail now lives entirely on /campaign/map).
-  const campaignPuzzles = SAMPLE_PUZZLES.filter(
-    p => p.mode === 'initiate' || p.mode === 'cult-master'
-  );
+  const campaignPuzzles = SAMPLE_PUZZLES.filter(p => p.mode === 'initiate');
   const byDifficulty = new Map<Difficulty, Puzzle[]>();
   for (const p of campaignPuzzles) {
     const region = campaignRegionDifficulty(p);
@@ -179,7 +177,9 @@ export default function HomePage() {
               >
                 <p className="font-serif text-xs" style={{ color: 'rgba(242,233,216,0.55)', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 2 }}>Chapter {chapterRoman}</p>
                 <p className="font-lovecraftian text-xl" style={{ color: 'rgba(242,233,216,0.95)', textShadow: '0 1px 8px rgba(0,0,0,0.9)' }}>{currentRegion?.name ?? 'The Foundations'}</p>
-                <p className="font-serif text-xs italic" style={{ color: 'rgba(242,233,216,0.6)', marginTop: 2 }}>{campaignStarted ? 'Continue the campaign' : 'Begin the campaign'}</p>
+                <p className="font-serif text-xs italic" style={{ color: 'rgba(242,233,216,0.6)', marginTop: 2 }}>
+                  {allChaptersComplete ? 'Revisit the campaign' : campaignStarted ? 'Continue the campaign' : 'Begin the campaign'}
+                </p>
               </div>
             </Link>
           </section>

@@ -464,7 +464,10 @@ async function main() {
 
     const insertPoint = fileContent.lastIndexOf('\n];');
     if (insertPoint === -1) { process.stderr.write('ERROR: insertion point not found\n'); process.exit(1); }
-    fileContent = fileContent.slice(0, insertPoint) + ',\n' + JSON.stringify(entry) + fileContent.slice(insertPoint);
+    // Strip any trailing comma already on the preceding entry first — every
+    // entry in the file ends with one, including the last — so this never
+    // produces a double comma (a silent array hole: valid JS, undefined value).
+    fileContent = fileContent.slice(0, insertPoint).replace(/,(\s*)$/, '$1') + ',\n' + JSON.stringify(entry) + fileContent.slice(insertPoint);
     writeFileSync(filePath, fileContent, 'utf-8');
     usedSeeds.add(seed);
 

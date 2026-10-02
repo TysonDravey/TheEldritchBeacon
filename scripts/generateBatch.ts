@@ -150,8 +150,11 @@ async function main() {
         process.exit(1);
       }
 
+      // Strip any trailing comma already on the preceding entry first — every
+      // entry in the file ends with one, including the last — so this never
+      // produces a double comma (a silent array hole: valid JS, undefined value).
       const newContent =
-        content.slice(0, insertPoint) +
+        content.slice(0, insertPoint).replace(/,(\s*)$/, '$1') +
         ',\n' + JSON.stringify(entry) +
         content.slice(insertPoint);
 

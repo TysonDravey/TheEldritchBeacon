@@ -13,7 +13,7 @@ export interface Board {
   territories: number;     // how many territories
 }
 
-export type PuzzleMode = 'initiate' | 'cult-master' | 'twin-watchers' | 'shattered-realms';
+export type PuzzleMode = 'initiate' | 'twin-watchers' | 'shattered-realms';
 
 export type Difficulty = 'Initiate' | 'Scholar' | 'Occultist' | 'High Priest' | 'Eldritch' | 'Harbinger' | 'Archon' | 'Unbound';
 
