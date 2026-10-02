@@ -115,10 +115,57 @@ function pairIntoTerritories(
 // Territory map — grow organic regions from 2 seeds per territory
 // ---------------------------------------------------------------------------
 
+// Finds a territory whose two watchers sit exactly 2 apart in a straight
+// line (same row or column), with nothing already between them — a
+// territory shaped as exactly those 3 cells forces its watchers to the two
+// ends (the middle cell is adjacent to both), since that's the only
+// non-adjacent pair the territory has room for. That gives the player (and
+// the hints) one guaranteed, contradiction-free deduction to start from —
+// twin-watcher puzzles otherwise tend to need hypothesis/contradiction
+// testing everywhere, with no easier on-ramp at all.
+//
+// Also tries to extend it to a 4-cell "T": one extra cell attached
+// perpendicular to the *middle* of the line. That still leaves only one
+// valid non-adjacent pair (every pair touching the extra cell is adjacent
+// to a line cell), so the deduction stays exactly as forced — the extra
+// cell is just a guaranteed Ward, as a bonus. Attaching it to an *end*
+// instead (a plain corner "L") does NOT work: that leaves two valid pairs,
+// not one, so it isn't tried.
+function findLineTerritory(
+  n: number,
+  pairs: [number, number][][],
+  rng: () => number,
+): { territory: number; middle: [number, number]; extra: [number, number] | null } | null {
+  const occupied = new Set(pairs.flat().map(([r, c]) => `${r},${c}`));
+  const candidates: number[] = [];
+  for (let t = 0; t < pairs.length; t++) {
+    const [[r1, c1], [r2, c2]] = pairs[t];
+    if ((r1 === r2 && Math.abs(c1 - c2) === 2) || (c1 === c2 && Math.abs(r1 - r2) === 2)) {
+      candidates.push(t);
+    }
+  }
+  if (candidates.length === 0) return null;
+  const territory = candidates[0];
+  const [[r1, c1], [r2, c2]] = pairs[territory];
+  const horizontal = r1 === r2;
+  const middle: [number, number] = [(r1 + r2) / 2, (c1 + c2) / 2];
+
+  const perpendicular: [number, number][] = horizontal
+    ? [[middle[0] - 1, middle[1]], [middle[0] + 1, middle[1]]]
+    : [[middle[0], middle[1] - 1], [middle[0], middle[1] + 1]];
+  const order = rng() < 0.5 ? perpendicular : [perpendicular[1], perpendicular[0]];
+  const extra = order.find(
+    ([r, c]) => r >= 0 && r < n && c >= 0 && c < n && !occupied.has(`${r},${c}`)
+  ) ?? null;
+
+  return { territory, middle, extra };
+}
+
 function generateTwinTerritoryMap(
   n: number,
   pairs: [number, number][][],
   rng: () => number,
+  lineTerritory: { territory: number; middle: [number, number]; extra: [number, number] | null } | null,
 ): number[][] {
   const map: number[][] = Array.from({ length: n }, () => Array(n).fill(-1));
   const pending: Array<{ row: number; col: number; territory: number }> = [];
@@ -130,11 +177,26 @@ function generateTwinTerritoryMap(
   // flat" shape instead of a natural mix of wide, tall, and blocky ones.
   const axes: ('row' | 'col')[] = pairs.map(() => rng() < 0.5 ? 'row' : 'col');
 
-  // Seed each territory from both watcher positions
+  // Seed each territory from both watcher positions. The line territory
+  // (if any) is seeded but deliberately never enqueued for growth below, so
+  // it stays exactly its 3 forced cells.
   for (let t = 0; t < pairs.length; t++) {
     for (const [r, c] of pairs[t]) {
       map[r][c] = t;
-      pending.push({ row: r, col: c, territory: t });
+      if (lineTerritory?.territory !== t) {
+        pending.push({ row: r, col: c, territory: t });
+      }
+    }
+  }
+  if (lineTerritory) {
+    const [mr, mc] = lineTerritory.middle;
+    map[mr][mc] = lineTerritory.territory;
+    // The T-shape's 4th cell (if any) is assigned directly too, never
+    // enqueued — like the middle cell, it must never become a growth seed,
+    // or the territory would grow past its forced shape.
+    if (lineTerritory.extra) {
+      const [er, ec] = lineTerritory.extra;
+      map[er][ec] = lineTerritory.territory;
     }
   }
 
@@ -301,7 +363,8 @@ export function generateTwinPuzzle(opts: TwinPuzzleOptions): Puzzle | null {
     const pairs = pairIntoTerritories(positions, n, rng);
     if (pairs.length !== n) continue;
 
-    const territoryMap = generateTwinTerritoryMap(n, pairs, rng);
+    const lineTerritory = findLineTerritory(n, pairs, rng);
+    const territoryMap = generateTwinTerritoryMap(n, pairs, rng, lineTerritory);
 
     // Reject if any territory is non-contiguous (looks like Shattered Realms)
     if (!isContiguous(territoryMap, n)) continue;
