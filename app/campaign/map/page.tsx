@@ -6,10 +6,48 @@ import { SAMPLE_PUZZLES } from '@/data/samplePuzzles';
 import { REGIONS, campaignRegionDifficulty } from '@/data/regions';
 import type { Puzzle, Difficulty } from '@/engine/boardTypes';
 import PuzzleCard from '@/components/PuzzleCard';
+import JournalViewer from '@/components/JournalViewer';
 
 const STORAGE_KEY_PREFIX = 'eldritch_beacon_state_';
 
 type RegionStatus = 'completed' | 'current' | 'locked';
+
+// A locked-looking preview of Captain Mercer's journal page for this region —
+// cropped rather than letterboxed at this size (these are dense, landscape
+// scans; a small, legible letterboxed preview isn't really possible), tap to
+// open the full page in JournalViewer. Hidden for locked regions to avoid
+// spoiling what's ahead.
+function JournalPreview({ src, onOpen }: { src: string; onOpen: () => void }) {
+  return (
+    <button
+      onClick={onOpen}
+      className="mt-3 w-full rounded-sm overflow-hidden border border-ink border-opacity-20 relative block"
+      style={{ height: 64 }}
+    >
+      <img
+        src={src}
+        alt=""
+        draggable={false}
+        style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 30%' }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(to right, rgba(8,5,2,0.1) 40%, rgba(8,5,2,0.6) 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          padding: '0 12px',
+        }}
+      >
+        <span className="font-serif text-xs italic" style={{ color: 'rgba(242,233,216,0.95)' }}>
+          Mercer&rsquo;s Journal &rarr;
+        </span>
+      </div>
+    </button>
+  );
+}
 
 function RegionNode({
   region,
@@ -17,12 +55,14 @@ function RegionNode({
   completedIds,
   status,
   isLast,
+  onOpenJournal,
 }: {
   region: typeof REGIONS[number];
   puzzles: Puzzle[];
   completedIds: Set<string>;
   status: RegionStatus;
   isLast: boolean;
+  onOpenJournal: (src: string) => void;
 }) {
   const sorted = [...puzzles].sort((a, b) => a.score - b.score);
   const completedCount = sorted.filter(p => completedIds.has(p.id)).length;
@@ -76,6 +116,7 @@ function RegionNode({
               </h3>
               <span className="font-serif text-xs text-ink-light">{completedCount}/{sorted.length}</span>
             </div>
+            <JournalPreview src={region.journalPage} onOpen={() => onOpenJournal(region.journalPage)} />
           </div>
         ) : (
           <div className="bg-parchment border border-ink border-opacity-30 rounded-sm p-4">
@@ -85,6 +126,7 @@ function RegionNode({
             </div>
             <p className="font-serif text-xs text-ink-light italic mt-0.5">{region.description}</p>
             <p className="font-serif text-xs text-ink-light opacity-60 mt-1">{region.techniques.join(' · ')}</p>
+            <JournalPreview src={region.journalPage} onOpen={() => onOpenJournal(region.journalPage)} />
             {currentPuzzle && (
               <div className="mt-3">
                 <PuzzleCard puzzle={currentPuzzle} completed={false} />
@@ -103,6 +145,7 @@ function RegionNode({
 export default function CampaignMapPage() {
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [ready, setReady] = useState(false);
+  const [openJournalSrc, setOpenJournalSrc] = useState<string | null>(null);
 
   useEffect(() => {
     const ids = new Set<string>();
@@ -166,6 +209,7 @@ export default function CampaignMapPage() {
               completedIds={completedIds}
               status={statuses[i]}
               isLast={i === regionsWithPuzzles.length - 1}
+              onOpenJournal={setOpenJournalSrc}
             />
           ))}
         </div>
@@ -193,6 +237,10 @@ export default function CampaignMapPage() {
           </div>
         )}
       </div>
+
+      {openJournalSrc && (
+        <JournalViewer src={openJournalSrc} onClose={() => setOpenJournalSrc(null)} />
+      )}
     </main>
   );
 }

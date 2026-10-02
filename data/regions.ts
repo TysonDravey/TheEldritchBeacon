@@ -6,6 +6,12 @@ export const REGIONS: {
   ward: string;
   description: string;
   techniques: string[];
+  // Captain Mercer's journal page unlocked on reaching this region — see
+  // images/beaconjournalpages/ for the original high-res scans these were
+  // resized/compressed from. Mapped to follow the journal's own escalation:
+  // arrival, survey, the geometry stops making sense, blood enters, the
+  // impossible window, the full realization, the quiet aftermath.
+  journalPage: string;
 }[] = [
   {
     name: 'The Foundations',
@@ -13,6 +19,7 @@ export const REGIONS: {
     ward: '/tiles/wards/genericward_01.png',
     description: 'The base of the Beacon. Light still reaches here.',
     techniques: ['Last Refuge', 'Full Row', 'Full Column', 'Touching Shadows'],
+    journalPage: '/journal/page-01.jpg',
   },
   {
     name: 'The Shore',
@@ -20,6 +27,7 @@ export const REGIONS: {
     ward: '/tiles/wards/ward_seagreen_01.png',
     description: 'Salt and stone. The tide carries strange things.',
     techniques: ['Territory Lock', 'Column Lock'],
+    journalPage: '/journal/page-02.jpg',
   },
   {
     name: 'The Fog',
@@ -27,6 +35,7 @@ export const REGIONS: {
     ward: '/tiles/wards/ward_indigo_01.png',
     description: 'Visibility narrows. Shapes move in the grey.',
     techniques: ['Narrow Channel', 'Shared Horizon'],
+    journalPage: '/journal/page-03.jpg',
   },
   {
     name: 'The Reefs',
@@ -34,6 +43,7 @@ export const REGIONS: {
     ward: '/tiles/wards/ward_emerald_01.png',
     description: 'Hidden dangers below the surface. Proceed carefully.',
     techniques: ['Beacon Pair', 'Territory Dead-End', 'Dual Confinement'],
+    journalPage: '/journal/page-04.jpg',
   },
   {
     name: 'Deep Water',
@@ -41,6 +51,7 @@ export const REGIONS: {
     ward: '/tiles/wards/ward_storm_01.png',
     description: 'No light reaches here. Something watches from below.',
     techniques: ['Mutual Exclusion', 'Forbidden Tide', 'Territory Network'],
+    journalPage: '/journal/page-05.jpg',
   },
   {
     name: 'The Black Tide',
@@ -48,6 +59,7 @@ export const REGIONS: {
     ward: '/tiles/wards/ward_crimson_03.png',
     description: 'The water has turned. The rules have not.',
     techniques: ['Forced Territory Chain', 'Chain of Madness'],
+    journalPage: '/journal/page-06.jpg',
   },
   {
     name: 'The Lantern Room',
@@ -55,6 +67,7 @@ export const REGIONS: {
     ward: '/tiles/wards/ward_ochre_01.png',
     description: 'The top of the Beacon. Whatever keeps the light burning lives here.',
     techniques: ['Deep Current', 'Watcher Network'],
+    journalPage: '/journal/page-07.jpg',
   },
 ];
 
