@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.tysondravey.eldritchbeacon',
-  appName: 'The Eldritch Beacon',
+  appName: 'Eldritch Beacon',
   webDir: 'out',
   // Capacitor dismisses the native LaunchScreen as soon as the WKWebView is
   // inserted into the view hierarchy — not once it's actually painted
