@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { getPuzzleById, SAMPLE_PUZZLES } from '@/data/samplePuzzles';
 import { loadPlayerState, savePlayerState, createFreshPlayerState } from '@/lib/storage';
 import { getHint } from '@/engine/hints';
+import { hasForcedOpening } from '@/engine/difficulty';
 import { isSolved, canPlaceWatcher, watcherRejectionReason } from '@/engine/rules';
 import { findContradictions } from '@/engine/solver';
 import type { PlayerState, CellState, HintResult, ContradictionResult, Difficulty } from '@/engine/boardTypes';
@@ -573,9 +574,16 @@ export default function PuzzleClient() {
     // mode alone is both correct and necessary, since this was hardcoded to 'initiate' and
     // silently left those two modes with an always-empty list, so completing one never
     // found a "next puzzle" and fell back to the menu.
+    // Twin Watchers also sorts puzzles with a guaranteed easy opening move
+    // first (see app/page.tsx's matching comment) — keep this in sync with
+    // that list's order, or "next puzzle" here would lead somewhere
+    // different from what the home page itself would have suggested next.
     return SAMPLE_PUZZLES
       .filter(p => p.mode === puzzle.mode && (puzzle.mode !== 'initiate' || campaignRegionDifficulty(p) === campaignRegionDifficulty(puzzle)))
-      .sort((a, b) => a.score - b.score);
+      .sort((a, b) => puzzle.mode === 'twin-watchers'
+        ? Number(hasForcedOpening(b)) - Number(hasForcedOpening(a)) || a.score - b.score
+        : a.score - b.score
+      );
   }, [puzzle]);
 
   if (!puzzle) {

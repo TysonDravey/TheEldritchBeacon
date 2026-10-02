@@ -152,3 +152,43 @@ function scoreTodifficulty(score: number): Difficulty {
   if (score <= 85) return 'High Priest';
   return 'Eldritch';
 }
+
+/**
+ * Twin-watcher mode only: true if any territory has exactly one valid
+ * non-adjacent pair of cells within it — meaning that territory's 2 watchers
+ * are fully forced the instant you look at its shape, no row/column
+ * reasoning or contradiction-testing required. engine/generator-twin.ts's
+ * findLineTerritory deliberately engineers this (a straight 3-cell line, or
+ * that plus one forced-Ward cell off the middle), but this checks the shape
+ * directly rather than assuming every puzzle was built that way, so it also
+ * credits any older puzzle that happens to have the same property by chance.
+ *
+ * A 9x9 twin board still needs contradiction-testing somewhere else almost
+ * always, so this doesn't change a puzzle's overall difficulty label — it
+ * only flags whether the puzzle has a guaranteed easy opening move, which is
+ * what actually determines whether the first hint a player sees feels fair.
+ */
+export function hasForcedOpening(puzzle: Puzzle): boolean {
+  const n = puzzle.size;
+  const cellsByTerritory = new Map<number, [number, number][]>();
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      const t = puzzle.territoryMap[r][c];
+      let cells = cellsByTerritory.get(t);
+      if (!cells) { cells = []; cellsByTerritory.set(t, cells); }
+      cells.push([r, c]);
+    }
+  }
+  for (const cells of cellsByTerritory.values()) {
+    let validPairs = 0;
+    for (let i = 0; i < cells.length && validPairs <= 1; i++) {
+      for (let j = i + 1; j < cells.length; j++) {
+        const [r1, c1] = cells[i];
+        const [r2, c2] = cells[j];
+        if (Math.abs(r1 - r2) > 1 || Math.abs(c1 - c2) > 1) validPairs++;
+      }
+    }
+    if (validPairs === 1) return true;
+  }
+  return false;
+}

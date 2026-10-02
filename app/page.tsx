@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { SAMPLE_PUZZLES } from '@/data/samplePuzzles';
 import type { Puzzle, Difficulty } from '@/engine/boardTypes';
+import { hasForcedOpening } from '@/engine/difficulty';
 import SplashScreen from '@/components/SplashScreen';
 import { REGIONS, campaignRegionDifficulty } from '@/data/regions';
 import { useSettings } from '@/lib/settings';
@@ -276,7 +277,17 @@ export default function HomePage() {
 
               {/* Twin Watchers */}
               {twinPuzzles.length > 0 && (() => {
-                const sorted = [...twinPuzzles].sort((a, b) => a.score - b.score);
+                // Puzzles with a guaranteed easy opening move (see
+                // engine/difficulty.ts's hasForcedOpening) come first,
+                // regardless of raw score — score alone doesn't know
+                // whether the first move is a fair one, and nearly every
+                // twin puzzle ends up Archon-or-harder overall anyway, so
+                // sorting by score alone buried easier-opening puzzles
+                // behind harder-opening ones with a coincidentally lower
+                // total score.
+                const sorted = [...twinPuzzles].sort((a, b) =>
+                  Number(hasForcedOpening(b)) - Number(hasForcedOpening(a)) || a.score - b.score
+                );
                 const completedCount = sorted.filter(p => completedIds.has(p.id)).length;
                 const current = sorted.find(p => !completedIds.has(p.id)) ?? null;
                 const currentIdx = sorted.findIndex(p => !completedIds.has(p.id));
