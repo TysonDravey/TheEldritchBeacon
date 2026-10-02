@@ -1,8 +1,10 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { Puzzle, Difficulty } from '@/engine/boardTypes';
-import { scorePuzzle } from '@/engine/difficulty';
+import { splashAssetsDecoded } from '@/lib/appReady';
 
 export function difficultyColor(difficulty: Difficulty): string {
   switch (difficulty) {
@@ -18,10 +20,53 @@ export function difficultyColor(difficulty: Difficulty): string {
   }
 }
 
-export default function PuzzleCard({ puzzle, completed }: { puzzle: Puzzle; completed: boolean }) {
+export default function PuzzleCard({
+  puzzle,
+  completed,
+  score,
+}: {
+  puzzle: Puzzle;
+  completed: boolean;
+  // Always pass a pre-computed score from the caller's own cache (see
+  // lib/puzzleScoreCache.ts) — this never falls back to computing one itself.
+  // It used to, "for safety," which defeated the entire point: a parent's
+  // score cache is always empty on its very first render (the effect that
+  // populates it hasn't run yet), so that fallback fired on every single
+  // mount regardless of caching — scorePuzzle() runs a full solver, and a
+  // few puzzles are pathologically slow (one measured on-device taking
+  // several seconds on its own), so this alone was hanging the whole home
+  // page on first paint. Showing nothing until a real score arrives is
+  // strictly better than silently reintroducing that hang.
+  score?: number;
+}) {
+  const router = useRouter();
+  const href = `/puzzle/${puzzle.id}`;
+
+  // next/link's automatic prefetch buys nothing before the player has even
+  // seen the home page, but on-device tracing found resolving a route's RSC
+  // payload through Capacitor's capacitor://localhost scheme against the
+  // ~370-puzzle static export directory cost several real seconds the first
+  // time anything reaches into it — which just moved that cost to the first
+  // real tap into a puzzle instead of eliminating it. Prefetching manually
+  // once the splash's own asset decode is done (rather than waiting for the
+  // whole splash sequence, including its deliberate minimum display time and
+  // fade, to finish) spends that still-captive waiting time on this instead
+  // of leaving it idle. Deliberately not any earlier than that: starting
+  // this at splash-card-painted instead — the instant before the decode
+  // begins — made the two contend over Capacitor's resource-serving layer
+  // and stretched both out to several seconds apiece.
+  useEffect(() => {
+    let cancelled = false;
+    splashAssetsDecoded.then(() => {
+      if (!cancelled) router.prefetch(href);
+    });
+    return () => { cancelled = true; };
+  }, [href, router]);
+
   return (
     <Link
-      href={`/puzzle/${puzzle.id}`}
+      href={href}
+      prefetch={false}
       className="block border border-ink bg-parchment hover:bg-parchment-dark transition-colors duration-150 p-4 rounded-sm"
     >
       <div className="flex items-start justify-between gap-2">
@@ -39,9 +84,11 @@ export default function PuzzleCard({ puzzle, completed }: { puzzle: Puzzle; comp
         <span className={`inline-block text-xs border px-1.5 py-0.5 rounded-sm font-serif ${difficultyColor(puzzle.difficulty)}`}>
           {puzzle.difficulty}
         </span>
-        <span className="text-xs font-serif text-ink-light opacity-50" title="Obscurity score">
-          &#9670;&thinsp;{scorePuzzle(puzzle)}
-        </span>
+        {score != null && (
+          <span className="text-xs font-serif text-ink-light opacity-50" title="Obscurity score">
+            &#9670;&thinsp;{score}
+          </span>
+        )}
       </div>
     </Link>
   );

@@ -4,30 +4,30 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { SAMPLE_PUZZLES } from '@/data/samplePuzzles';
 import { REGIONS } from '@/data/regions';
-import { scorePuzzle } from '@/engine/difficulty';
 import type { Puzzle, Difficulty } from '@/engine/boardTypes';
 import PuzzleCard from '@/components/PuzzleCard';
+import { computeScoresChunked } from '@/lib/puzzleScoreCache';
 
 const STORAGE_KEY_PREFIX = 'eldritch_beacon_state_';
-
-const PUZZLE_SCORE = new Map<string, number>(SAMPLE_PUZZLES.map(p => [p.id, scorePuzzle(p)]));
 
 type RegionStatus = 'completed' | 'current' | 'locked';
 
 function RegionNode({
   region,
   puzzles,
+  puzzleScores,
   completedIds,
   status,
   isLast,
 }: {
   region: typeof REGIONS[number];
   puzzles: Puzzle[];
+  puzzleScores: Map<string, number>;
   completedIds: Set<string>;
   status: RegionStatus;
   isLast: boolean;
 }) {
-  const sorted = [...puzzles].sort((a, b) => (PUZZLE_SCORE.get(a.id) ?? 0) - (PUZZLE_SCORE.get(b.id) ?? 0));
+  const sorted = [...puzzles].sort((a, b) => (puzzleScores.get(a.id) ?? 0) - (puzzleScores.get(b.id) ?? 0));
   const completedCount = sorted.filter(p => completedIds.has(p.id)).length;
   const currentPuzzle = sorted.find(p => !completedIds.has(p.id)) ?? null;
   const currentIdx = sorted.findIndex(p => !completedIds.has(p.id));
@@ -90,7 +90,7 @@ function RegionNode({
             <p className="font-serif text-xs text-ink-light opacity-60 mt-1">{region.techniques.join(' · ')}</p>
             {currentPuzzle && (
               <div className="mt-3">
-                <PuzzleCard puzzle={currentPuzzle} completed={false} />
+                <PuzzleCard puzzle={currentPuzzle} completed={false} score={puzzleScores.get(currentPuzzle.id)} />
                 <p className="mt-2 font-serif text-xs text-center text-ink-light">
                   Puzzle {currentIdx + 1} of {sorted.length}
                 </p>
@@ -105,6 +105,7 @@ function RegionNode({
 
 export default function CampaignMapPage() {
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
+  const [puzzleScores, setPuzzleScores] = useState<Map<string, number>>(new Map());
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -117,6 +118,13 @@ export default function CampaignMapPage() {
     }
     setCompletedIds(ids);
     setReady(true);
+  }, []);
+
+  // Only the initiate/cult-master puzzles shown on this page need scores —
+  // see lib/puzzleScoreCache.ts for why this can't score everything eagerly.
+  useEffect(() => {
+    const relevant = SAMPLE_PUZZLES.filter(p => p.mode === 'initiate' || p.mode === 'cult-master');
+    return computeScoresChunked(relevant, setPuzzleScores);
   }, []);
 
   const campaignPuzzles = SAMPLE_PUZZLES.filter(p => p.mode === 'initiate' || p.mode === 'cult-master');
@@ -158,6 +166,7 @@ export default function CampaignMapPage() {
               key={region.difficulty}
               region={region}
               puzzles={byDifficulty.get(region.difficulty) ?? []}
+              puzzleScores={puzzleScores}
               completedIds={completedIds}
               status={statuses[i]}
               isLast={i === regionsWithPuzzles.length - 1}

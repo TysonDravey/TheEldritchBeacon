@@ -506,6 +506,14 @@ export default function DailyPage() {
     setAlreadyCompleted(false);
     setHintResult(null);
     setContradiction({ found: false });
+    // Without this, isFreshWin and any still-pending win timers from a just-won
+    // puzzle carry straight into whichever daily gets picked next — every
+    // Watcher placed there replays the win rise-slam animation, since Watcher
+    // just reads this one boolean with no idea it belongs to a different game
+    // now. PuzzleClient.tsx's equivalent per-puzzle reset already does this.
+    setIsFreshWin(false);
+    winTimersRef.current.forEach(clearTimeout);
+    winTimersRef.current = [];
     if (saved) {
       setPlayerState(saved);
       if (saved.completed) {

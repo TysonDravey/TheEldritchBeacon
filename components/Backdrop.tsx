@@ -3,11 +3,11 @@
 import { usePathname } from 'next/navigation';
 
 const BACKDROPS = [
-  '/boards/sampleBoard_06.png',
-  '/boards/sampleBoard_07.png',
-  '/boards/sampleBoard_08.png',
-  '/boards/sampleBoard_09.png',
-  '/boards/sampleBoard_10.png',
+  '/boards/sampleBoard_06.jpg',
+  '/boards/sampleBoard_07.jpg',
+  '/boards/sampleBoard_08.jpg',
+  '/boards/sampleBoard_09.jpg',
+  '/boards/sampleBoard_10.jpg',
 ];
 
 function hash(s: string): number {

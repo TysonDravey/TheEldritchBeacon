@@ -5,6 +5,7 @@ import Backdrop from '@/components/Backdrop';
 import RegisterSW from '@/components/RegisterSW';
 import BuildBadge from '@/components/BuildBadge';
 import BackgroundMusic from '@/components/BackgroundMusic';
+import StartupProbe from '@/components/StartupProbe';
 
 const caveat = Caveat({ subsets: ['latin'], variable: '--font-caveat' });
 
@@ -19,8 +20,6 @@ export const metadata: Metadata = {
   },
 };
 
-const TILE_COUNT = 10;
-
 export default function RootLayout({
   children,
 }: {
@@ -32,22 +31,14 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, maximum-scale=1" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <meta name="mobile-web-app-capable" content="yes" />
-        {Array.from({ length: TILE_COUNT }, (_, i) => (
-          <link
-            key={i}
-            rel="preload"
-            as="image"
-            href={`/tiles/processed/plain_tile_${String(i + 1).padStart(2, '0')}.png`}
-          />
-        ))}
-        {[1, 2, 3].map(i => (
-          <link key={`scroll-${i}`} rel="preload" as="image" href={`/scrolls/scroll_0${i}.png`} />
-        ))}
-        {[6, 7, 8, 9, 10].map(i => (
-          <link key={`bg-${i}`} rel="preload" as="image" href={`/boards/sampleBoard_${String(i).padStart(2, '0')}.png`} />
-        ))}
+        {/* Temporary, left in on purpose: an inline script runs the instant the
+            HTML parser reaches it — before the JS bundle even loads, let alone
+            hydrates — to mark true document-parse-start for the cold-launch
+            timing investigation in StartupProbe. */}
+        <script dangerouslySetInnerHTML={{ __html: `window.__startupT0 = performance.now();console.log('[startup] html-parse-start @ ' + window.__startupT0.toFixed(0) + 'ms');` }} />
       </head>
       <body className={`${caveat.variable} text-ink font-serif min-h-screen`}>
+        <StartupProbe />
         <RegisterSW />
         <BuildBadge />
         <Backdrop />

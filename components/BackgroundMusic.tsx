@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useSettings } from '@/lib/settings';
 import { getAudioContext } from '@/lib/sound';
+import { appReady } from '@/lib/appReady';
 
 // Picked at random each time a track ends (never the one that just played,
 // once there's more than one) rather than looping a single track forever —
@@ -76,14 +77,34 @@ export default function BackgroundMusic() {
   // actually control volume on iOS, so music uses it too despite the memory
   // cost of decoding a full track, rather than a second unverified approach.
   useEffect(() => {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-    const gain = ctx.createGain();
-    gain.gain.value = settingsRef.current.musicVolume;
-    gain.connect(ctx.destination);
-    gainRef.current = gain;
+    let cancelled = false;
+    // Experimentally deferred behind appReady (resolves once SplashScreen is
+    // actually done): on-device testing couldn't find any JS-level cause for
+    // a remarkably consistent ~5s startup stall that survived fixing every
+    // other candidate, which raised the question of whether creating a Web
+    // Audio AudioContext triggers native iOS audio-session setup that runs
+    // outside JS's visibility entirely and competes with WKWebView's own
+    // rendering at the OS level — similar in kind to the multi-second native
+    // process-launch overhead already visible elsewhere in these traces (GPU
+    // process, WebContent process, etc.). Worth keeping even if it isn't the
+    // answer: none of this needs to happen before the player can see anything.
+    appReady.then(() => {
+      if (cancelled) return;
+      // Temporary, left in on purpose: see components/StartupProbe.tsx for why.
+      // eslint-disable-next-line no-console
+      console.log(`[startup] bgmusic-effect-start @ ${performance.now().toFixed(0)}ms`);
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      const gain = ctx.createGain();
+      gain.gain.value = settingsRef.current.musicVolume;
+      gain.connect(ctx.destination);
+      gainRef.current = gain;
+      // eslint-disable-next-line no-console
+      console.log(`[startup] bgmusic-effect-done @ ${performance.now().toFixed(0)}ms`);
+    });
 
     return () => {
+      cancelled = true;
       wantPlayingRef.current = false;
       sourceRef.current?.stop();
       sourceRef.current = null;
@@ -95,50 +116,77 @@ export default function BackgroundMusic() {
   }, [settings.musicVolume]);
 
   useEffect(() => {
-    const ctxOrNull = getAudioContext();
-    const gainOrNull = gainRef.current;
-    if (!ctxOrNull || !gainOrNull) return;
-    const ctx: AudioContext = ctxOrNull;
-    const gain: GainNode = gainOrNull;
+    let cancelled = false;
+    let cleanup: (() => void) | null = null;
 
-    function stop() {
-      wantPlayingRef.current = false;
-      sourceRef.current?.stop();
-      sourceRef.current = null;
-    }
+    // Also deferred behind appReady — see the first effect's comment. This
+    // one additionally depends on gainRef.current, which that first effect
+    // only populates once appReady resolves; without waiting here too, this
+    // could run first (same mount, before that one's async callback lands),
+    // find no gain node yet, and bail out permanently since its dependency
+    // (settings.musicEnabled) wouldn't change again on its own to retry.
+    appReady.then(() => {
+      if (cancelled) return;
+      const ctxOrNull = getAudioContext();
+      const gainOrNull = gainRef.current;
+      if (!ctxOrNull || !gainOrNull) return;
+      const ctx: AudioContext = ctxOrNull;
+      const gain: GainNode = gainOrNull;
 
-    function syncToVisibility() {
-      // Capacitor's WKWebView fires the standard Page Visibility API on
-      // app background/foreground — no native plugin needed. This is a
-      // game, not a music player: nothing should keep playing once the
-      // player has left the app, and without this, Web Audio playback
-      // (unlike a plain <audio> element, which WKWebView suspends on its
-      // own) just keeps running in the background indefinitely.
-      if (document.hidden || !settings.musicEnabled) {
-        stop();
-        return;
+      function stop() {
+        wantPlayingRef.current = false;
+        sourceRef.current?.stop();
+        sourceRef.current = null;
       }
-      wantPlayingRef.current = true;
-      if (!sourceRef.current && !startingRef.current) playNextTrack(ctx, gain);
-    }
 
-    syncToVisibility();
-    document.addEventListener('visibilitychange', syncToVisibility);
+      function syncToVisibility() {
+        // Capacitor's WKWebView fires the standard Page Visibility API on
+        // app background/foreground — no native plugin needed. This is a
+        // game, not a music player: nothing should keep playing once the
+        // player has left the app, and without this, Web Audio playback
+        // (unlike a plain <audio> element, which WKWebView suspends on its
+        // own) just keeps running in the background indefinitely.
+        if (document.hidden || !settings.musicEnabled) {
+          stop();
+          return;
+        }
+        wantPlayingRef.current = true;
+        if (!sourceRef.current && !startingRef.current) playNextTrack(ctx, gain);
+      }
 
-    // decodeAudioData doesn't need a user gesture, but ctx.resume() (inside
-    // getAudioContext()) does on iOS — so the first attempt above can decode
-    // fine yet still play silently into a suspended context. Retry once on
-    // the first tap/click anywhere, same pattern as the old <audio>-element
-    // version used for its own autoplay-block retry.
-    const onFirstInteraction = () => {
-      syncToVisibility();
-      window.removeEventListener('pointerdown', onFirstInteraction);
-    };
-    window.addEventListener('pointerdown', onFirstInteraction);
+      // Deliberately NOT calling syncToVisibility() immediately here. It used
+      // to fire on mount unconditionally — decodeAudioData doesn't need a
+      // user gesture, so it decoded a full ~3-4 minute track right away
+      // regardless. iOS can't actually play it before a gesture anyway
+      // (ctx.resume() inside getAudioContext() will no-op until one
+      // happens), so that decode was pure cost. Waiting for the same
+      // first-tap signal that unlocks playback to also be what starts the
+      // decode costs nothing (the player couldn't have heard it any sooner
+      // regardless).
+      document.addEventListener('visibilitychange', syncToVisibility);
+
+      const onFirstInteraction = () => {
+        // The splash screen (components/SplashScreen.tsx) doesn't stop
+        // clicks from bubbling to window, so an impatient tap during its
+        // loading bar would otherwise count as "first interaction." It
+        // calls markAppReady() once it's actually done, which is what
+        // appReady above is already waiting on, so by the time this code
+        // runs at all the splash is guaranteed finished — no extra guard
+        // needed here anymore.
+        syncToVisibility();
+        window.removeEventListener('pointerdown', onFirstInteraction);
+      };
+      window.addEventListener('pointerdown', onFirstInteraction);
+
+      cleanup = () => {
+        document.removeEventListener('visibilitychange', syncToVisibility);
+        window.removeEventListener('pointerdown', onFirstInteraction);
+      };
+    });
 
     return () => {
-      document.removeEventListener('visibilitychange', syncToVisibility);
-      window.removeEventListener('pointerdown', onFirstInteraction);
+      cancelled = true;
+      cleanup?.();
     };
   }, [settings.musicEnabled]);
 

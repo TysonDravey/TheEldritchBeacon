@@ -3,25 +3,31 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { SAMPLE_PUZZLES } from '@/data/samplePuzzles';
-import { scorePuzzle } from '@/engine/difficulty';
 import type { Puzzle, Difficulty } from '@/engine/boardTypes';
 import SplashScreen from '@/components/SplashScreen';
 import { REGIONS } from '@/data/regions';
 import { useSettings } from '@/lib/settings';
 import { playSound } from '@/lib/sound';
 import PuzzleCard from '@/components/PuzzleCard';
+import { computeScoresChunked } from '@/lib/puzzleScoreCache';
 
 const STORAGE_KEY_PREFIX = 'eldritch_beacon_state_';
 const UNLOCKED_KEY = 'eb_unlocked_regions';
-
-// Pre-compute scores once at module load — avoids re-running the solver on every render/sort
-const PUZZLE_SCORE = new Map<string, number>(SAMPLE_PUZZLES.map(p => [p.id, scorePuzzle(p)]));
 
 export default function HomePage() {
   const [completedIds, setCompletedIds]   = useState<Set<string>>(new Set());
   const [newlyUnlocked, setNewlyUnlocked] = useState<string | null>(null);
   const [showBanner, setShowBanner]       = useState(false);
   const [settings, updateSettings]        = useSettings();
+  const [puzzleScores, setPuzzleScores]   = useState<Map<string, number>>(new Map());
+
+  // Only Shattered Realms / Twin Watchers need scores here (for sorting
+  // "next puzzle" by difficulty) — see lib/puzzleScoreCache.ts for why this
+  // can't just score everything eagerly.
+  useEffect(() => {
+    const relevant = SAMPLE_PUZZLES.filter(p => p.mode === 'shattered-realms' || p.mode === 'twin-watchers');
+    return computeScoresChunked(relevant, setPuzzleScores);
+  }, []);
 
   useEffect(() => {
     // Load completed puzzle IDs
@@ -241,7 +247,7 @@ export default function HomePage() {
 
               {/* Shattered Realms */}
               {shatteredPuzzles.length > 0 && (() => {
-                const sorted = [...shatteredPuzzles].sort((a, b) => (PUZZLE_SCORE.get(a.id) ?? 0) - (PUZZLE_SCORE.get(b.id) ?? 0));
+                const sorted = [...shatteredPuzzles].sort((a, b) => (puzzleScores.get(a.id) ?? 0) - (puzzleScores.get(b.id) ?? 0));
                 const completedCount = sorted.filter(p => completedIds.has(p.id)).length;
                 const current = sorted.find(p => !completedIds.has(p.id)) ?? null;
                 const currentIdx = sorted.findIndex(p => !completedIds.has(p.id));
@@ -262,7 +268,7 @@ export default function HomePage() {
                     </p>
                     {current && (
                       <div className="mt-3">
-                        <PuzzleCard puzzle={current} completed={false} />
+                        <PuzzleCard puzzle={current} completed={false} score={puzzleScores.get(current.id)} />
                         <p className="mt-2 font-serif text-xs text-center text-ink-light">
                           Puzzle {currentIdx + 1} of {sorted.length}
                         </p>
@@ -278,7 +284,7 @@ export default function HomePage() {
 
               {/* Twin Watchers */}
               {twinPuzzles.length > 0 && (() => {
-                const sorted = [...twinPuzzles].sort((a, b) => (PUZZLE_SCORE.get(a.id) ?? 0) - (PUZZLE_SCORE.get(b.id) ?? 0));
+                const sorted = [...twinPuzzles].sort((a, b) => (puzzleScores.get(a.id) ?? 0) - (puzzleScores.get(b.id) ?? 0));
                 const completedCount = sorted.filter(p => completedIds.has(p.id)).length;
                 const current = sorted.find(p => !completedIds.has(p.id)) ?? null;
                 const currentIdx = sorted.findIndex(p => !completedIds.has(p.id));
@@ -299,7 +305,7 @@ export default function HomePage() {
                     </p>
                     {current && (
                       <div className="mt-3">
-                        <PuzzleCard puzzle={current} completed={false} />
+                        <PuzzleCard puzzle={current} completed={false} score={puzzleScores.get(current.id)} />
                         <p className="mt-2 font-serif text-xs text-center text-ink-light">
                           Puzzle {currentIdx + 1} of {sorted.length}
                         </p>
