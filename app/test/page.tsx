@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { SAMPLE_PUZZLES } from '@/data/samplePuzzles';
-import { scorePuzzle } from '@/engine/difficulty';
 import type { Difficulty } from '@/engine/boardTypes';
 
 type Rating = 1 | 2 | 3;
@@ -183,7 +182,7 @@ export default function TestPage() {
                       {p.difficulty}
                     </span>
                     <span style={{ marginLeft: 6, fontSize: '0.72rem', opacity: 0.5 }}>
-                      ◆{scorePuzzle(p)}
+                      ◆{p.score}
                     </span>
                   </td>
                   <td style={{ padding: '7px 12px', textAlign: 'center' }}>

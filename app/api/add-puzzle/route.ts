@@ -32,10 +32,10 @@ export async function POST(req: NextRequest) {
   const nextNum = nums.length > 0 ? Math.max(...nums) + 1 : 1;
   const id = `eb-${sizeStr}-${String(nextNum).padStart(3, '0')}`;
 
-  // Strip difficulty (it's computed at load time, not stored)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { difficulty: _d, ...rest } = puzzle;
-  const entry = { ...rest, id, title: title ?? puzzle.title };
+  // difficulty/score are baked into data/samplePuzzles.ts at write time, not
+  // computed at load time — the caller (app/generate/page.tsx) already sends
+  // real computed values, so this just passes them through.
+  const entry = { ...puzzle, id, title: title ?? puzzle.title };
 
   // Insert before the closing ]; of RAW_PUZZLES
   const insertPoint = content.lastIndexOf('\n];');

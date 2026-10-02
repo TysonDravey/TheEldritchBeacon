@@ -10,7 +10,6 @@ import { getPuzzleById } from '@/data/samplePuzzles';
 import { DAILY_CALENDAR } from '@/data/dailyCalendar';
 import { loadPlayerState, savePlayerState, createFreshPlayerState } from '@/lib/storage';
 import { getHint } from '@/engine/hints';
-import { scorePuzzle } from '@/engine/difficulty';
 import { isSolved, canPlaceWatcher, watcherRejectionReason } from '@/engine/rules';
 import { findContradictions } from '@/engine/solver';
 import type { PlayerState, CellState, HintResult, ContradictionResult } from '@/engine/boardTypes';
@@ -663,7 +662,7 @@ export default function DailyPage() {
           is_today:    isToday,
           puzzle_id:   puzzle.id,
           size:        puzzle.size,
-          score:       scorePuzzle(puzzle),
+          score:       puzzle.score,
           hints_used:  newState.hintsUsed,
           streak:      streakCount,
         });

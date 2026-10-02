@@ -250,7 +250,7 @@ function randomSearchTerritoryMap(
   maxTries = 40000,
 ): number[][] | null {
   function toPuzzle(territoryMap: number[][]): Puzzle {
-    return { id: 'gen', title: 'gen', mode: 'initiate', size, territoryMap, solution: [], difficulty: 'Initiate', seed: 'gen', createdAt: '' };
+    return { id: 'gen', title: 'gen', mode: 'initiate', size, territoryMap, solution: [], difficulty: 'Initiate', score: 0, seed: 'gen', createdAt: '' };
   }
   const { reversibleTiles } = DUAL_REALMS_PUZZLE;
   const homeColors = reversibleTiles.map(t => (face === 'A' ? t.colorOnA : t.colorOnB));
@@ -326,7 +326,7 @@ function tryBuildPuzzle(
   strictContinuity = false,
 ) {
   function toPuzzle(territoryMap: number[][]): Puzzle {
-    return { id: 'gen', title: 'gen', mode: 'initiate', size, territoryMap, solution: [], difficulty: 'Initiate', seed: 'gen', createdAt: '' };
+    return { id: 'gen', title: 'gen', mode: 'initiate', size, territoryMap, solution: [], difficulty: 'Initiate', score: 0, seed: 'gen', createdAt: '' };
   }
   function cellKey(r: number, c: number) { return `${r},${c}`; }
 
@@ -459,7 +459,7 @@ function tryBuildTileIsWatcherPuzzle(
   strictContinuity = false,
 ) {
   function toPuzzle(territoryMap: number[][]): Puzzle {
-    return { id: 'gen', title: 'gen', mode: 'initiate', size, territoryMap, solution: [], difficulty: 'Initiate', seed: 'gen', createdAt: '' };
+    return { id: 'gen', title: 'gen', mode: 'initiate', size, territoryMap, solution: [], difficulty: 'Initiate', score: 0, seed: 'gen', createdAt: '' };
   }
   for (let seedAttempt = 0; seedAttempt < 80; seedAttempt++) {
     const seedA = `dr-tw-A-${Date.now()}-${seedAttempt}-${Math.random()}`;
@@ -548,7 +548,7 @@ function tryBuildMixedTwoTilePuzzle(
   strictContinuity = false,
 ) {
   function toPuzzle(territoryMap: number[][]): Puzzle {
-    return { id: 'gen', title: 'gen', mode: 'initiate', size, territoryMap, solution: [], difficulty: 'Initiate', seed: 'gen', createdAt: '' };
+    return { id: 'gen', title: 'gen', mode: 'initiate', size, territoryMap, solution: [], difficulty: 'Initiate', score: 0, seed: 'gen', createdAt: '' };
   }
   function cellKey(r: number, c: number) { return `${r},${c}`; }
   function watchersOf(cells: [number, number][]): CellState[][] {
@@ -754,7 +754,7 @@ function tryBuildMixedThreeTilePuzzle(
   strictContinuity = false,
 ) {
   function toPuzzle(territoryMap: number[][]): Puzzle {
-    return { id: 'gen', title: 'gen', mode: 'initiate', size, territoryMap, solution: [], difficulty: 'Initiate', seed: 'gen', createdAt: '' };
+    return { id: 'gen', title: 'gen', mode: 'initiate', size, territoryMap, solution: [], difficulty: 'Initiate', score: 0, seed: 'gen', createdAt: '' };
   }
   function cellKey(r: number, c: number) { return `${r},${c}`; }
   function watchersOf(cells: [number, number][]): CellState[][] {
@@ -1003,7 +1003,7 @@ export async function GET(request: Request) {
     const mapA = deriveTerritoryMap('A', baseTerritoryMapA, reversibleTiles, solutionFlips);
     const mapB = deriveTerritoryMap('B', baseTerritoryMapB, reversibleTiles, solutionFlips);
     function toP(tm: number[][]): Puzzle {
-      return { id: 'trace', title: 'trace', mode: 'initiate', size, territoryMap: tm, solution: [], difficulty: 'Initiate', seed: 'trace', createdAt: '' };
+      return { id: 'trace', title: 'trace', mode: 'initiate', size, territoryMap: tm, solution: [], difficulty: 'Initiate', score: 0, seed: 'trace', createdAt: '' };
     }
     const traceA = solveWithTrace(toP(mapA));
     const traceB = solveWithTrace(toP(mapB));
@@ -1115,6 +1115,7 @@ export async function GET(request: Request) {
       territoryMap,
       solution: [],
       difficulty: 'Initiate',
+      score: 0,
       seed: 'check',
       createdAt: new Date().toISOString(),
     };

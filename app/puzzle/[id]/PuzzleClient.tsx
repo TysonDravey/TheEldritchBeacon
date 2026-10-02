@@ -8,7 +8,6 @@ import Link from 'next/link';
 import { getPuzzleById, SAMPLE_PUZZLES } from '@/data/samplePuzzles';
 import { loadPlayerState, savePlayerState, createFreshPlayerState } from '@/lib/storage';
 import { getHint } from '@/engine/hints';
-import { scorePuzzle } from '@/engine/difficulty';
 import { isSolved, canPlaceWatcher, watcherRejectionReason } from '@/engine/rules';
 import { findContradictions } from '@/engine/solver';
 import type { PlayerState, CellState, HintResult, ContradictionResult, Difficulty } from '@/engine/boardTypes';
@@ -21,18 +20,6 @@ import { REGION_BY_DIFFICULTY } from '@/data/regions';
 import { haptic } from '@/lib/haptic';
 import { playSound } from '@/lib/sound';
 import { isTechniqueNew, markTechniqueDiscovered } from '@/lib/techniques';
-
-// scorePuzzle runs a full solver simulation — real work, not a cheap lookup
-// (see its own comment in engine/difficulty.ts). Computed once per puzzle at
-// module load and reused by every page, same pattern as
-// app/campaign/map/page.tsx's PUZZLE_SCORE. regionPuzzles below sorts by this
-// for every puzzle's own page; without memoizing, Shattered Realms and Twin
-// Watchers — flat pools of 200+ puzzles each with no per-tier split — would
-// each re-score their *entire* pool on every single one of their own pages'
-// static build, which is what caused the mobile build's puzzle pages to start
-// timing out after the next-puzzle fix below started actually populating
-// regionPuzzles for those two modes (previously always empty, so free).
-const PUZZLE_SCORE = new Map<string, number>(SAMPLE_PUZZLES.map(p => [p.id, scorePuzzle(p)]));
 
 // Chapter completion data — keyed by difficulty tier
 const CHAPTER_COMPLETIONS: Partial<Record<Difficulty, {
@@ -360,7 +347,7 @@ export default function PuzzleClient() {
           puzzle_id:   puzzle.id,
           size:        puzzle.size,
           difficulty:  puzzle.difficulty,
-          score:       scorePuzzle(puzzle),
+          score:       puzzle.score,
           hints_used:  newState.hintsUsed,
           mode:        puzzle.mode ?? 'initiate',
         });
@@ -588,7 +575,7 @@ export default function PuzzleClient() {
     // found a "next puzzle" and fell back to the menu.
     return SAMPLE_PUZZLES
       .filter(p => p.mode === puzzle.mode && (puzzle.mode !== 'initiate' || p.difficulty === puzzle.difficulty))
-      .sort((a, b) => (PUZZLE_SCORE.get(a.id) ?? 0) - (PUZZLE_SCORE.get(b.id) ?? 0));
+      .sort((a, b) => a.score - b.score);
   }, [puzzle]);
 
   if (!puzzle) {
@@ -647,7 +634,7 @@ export default function PuzzleClient() {
             <h1 className="font-lovecraftian text-base text-ink leading-tight truncate">{puzzle.title}</h1>
             <p className="font-serif text-ink-light leading-none" style={{ fontSize: 11 }}>
               {puzzle.size}&times;{puzzle.size} &mdash; {puzzle.difficulty}
-              <span className="ml-1 opacity-50">&#9670; {PUZZLE_SCORE.get(puzzle.id) ?? scorePuzzle(puzzle)}</span>
+              <span className="ml-1 opacity-50">&#9670; {puzzle.score}</span>
               {playerState.hintsUsed > 0 && (
                 <span className="ml-2 text-red-ink">
                   {playerState.hintsUsed} hint{playerState.hintsUsed !== 1 ? 's' : ''}

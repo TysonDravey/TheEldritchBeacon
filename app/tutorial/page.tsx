@@ -26,6 +26,7 @@ const PUZZLE: Puzzle = {
   ],
   solution: [[0, 4], [1, 2], [2, 0], [3, 3], [4, 1]],
   difficulty: 'Initiate',
+  score: 0, // not displayed anywhere on this page — difficulty above is also a simplified placeholder, not the real computed value
   seed: 'tutorial',
   createdAt: '2026-01-01',
 };

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { generatePuzzle } from '@/engine/generator';
-import { rateDifficulty } from '@/engine/difficulty';
+import { rateDifficulty, scorePuzzle } from '@/engine/difficulty';
 import { buildSolveTrace } from '@/engine/solveTrace';
 import type { Puzzle, CellState } from '@/engine/boardTypes';
 import type { SolveTrace, TraceStep } from '@/engine/solveTrace';
@@ -410,7 +410,8 @@ export default function GeneratePage() {
       if (!p) continue;
 
       const difficulty = rateDifficulty(p);
-      const finalPuzzle = { ...p, difficulty };
+      const score = scorePuzzle(p);
+      const finalPuzzle = { ...p, difficulty, score };
       const t = buildSolveTrace(finalPuzzle);
       setPuzzle(finalPuzzle);
       setTrace(t);

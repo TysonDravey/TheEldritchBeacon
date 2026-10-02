@@ -17,6 +17,7 @@
 import './loadEnv';
 import { generateTwinPuzzle } from '../engine/generator-twin';
 import { solveWithTrace } from '../engine/solver';
+import { rateDifficulty, scorePuzzle } from '../engine/difficulty';
 import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import type { Puzzle } from '../engine/boardTypes';
@@ -101,15 +102,20 @@ async function main() {
       continue;
     }
 
+    const diff = rateDifficulty(puzzle);
+
     content = readFileSync(filePath, 'utf-8');
     const idNum = nextTwinIdNum(content, size);
     const id    = `twin-${size}x${size}-${String(idNum).padStart(3, '0')}`;
-    const title = nextUnusedTitle(existingTitles(content), 'Scholar'); // placeholder tier
+    const title = nextUnusedTitle(existingTitles(content), diff);
 
     const cmd = `generateTwin --size ${size} --base ${base}`;
 
-    const { difficulty: _d, ...rest } = puzzle;
-    const entry: Omit<Puzzle, 'difficulty'> = { ...rest, id, title, generatorCmd: cmd };
+    // difficulty/score are now baked into data/samplePuzzles.ts at write time
+    // (no longer computed at runtime — see its own comments), so this has to
+    // write the real values instead of the generator's own placeholder ones.
+    const { difficulty: _d, score: _s, ...rest } = puzzle;
+    const entry: Puzzle = { ...rest, id, title, difficulty: diff, score: scorePuzzle(puzzle), generatorCmd: cmd };
 
     const insertPoint = content.lastIndexOf('\n];');
     if (insertPoint === -1) {

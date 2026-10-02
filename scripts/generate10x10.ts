@@ -487,7 +487,7 @@ async function main() {
       id: 'tmp', title: 'tmp', mode: 'initiate', size: n,
       territoryMap: map, solution,
       seed, createdAt: new Date().toISOString(),
-      difficulty: 'Initiate',
+      difficulty: 'Initiate', score: 0,
     };
 
     // Test depth-1 solvability (forward + hypothesis chains).
@@ -554,8 +554,16 @@ async function main() {
       ...(minScore > 0       ? [`--min-score ${minScore}`]             : []),
     ].join(' ');
 
-    const { difficulty: _d, ...rest } = finalRaw;
-    const entry = { ...rest, id, title, generatorCmd: cmd };
+    // difficulty/score are now baked into data/samplePuzzles.ts at write time
+    // (no longer computed at runtime — see its own comments), so this has to
+    // write the real values instead of the raw/placeholder ones from finalRaw.
+    const { difficulty: _d, score: _s, ...rest } = finalRaw;
+    const entry = {
+      ...rest, id, title,
+      difficulty: diff,
+      score: scorePuzzle({ ...finalRaw, id, title }),
+      generatorCmd: cmd,
+    };
 
     // Insert into samplePuzzles.ts before `\n];`
     const insertPoint = fileContent.lastIndexOf('\n];');

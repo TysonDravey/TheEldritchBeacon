@@ -306,6 +306,7 @@ export function generateTwinPuzzle(opts: TwinPuzzleOptions): Puzzle | null {
       solution,
       seed:         opts.seed,
       difficulty:   'Initiate', // placeholder — difficulty rating not yet wired for twin mode
+      score:        0,         // placeholder — baked for real alongside difficulty once a puzzle ships (see data/samplePuzzles.ts)
       createdAt:    new Date().toISOString(),
     };
 

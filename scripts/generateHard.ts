@@ -20,7 +20,7 @@
 
 import './loadEnv';
 import { generatePuzzle } from '../engine/generator';
-import { rateDifficulty } from '../engine/difficulty';
+import { rateDifficulty, scorePuzzle } from '../engine/difficulty';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import type { Puzzle } from '../engine/boardTypes';
@@ -101,6 +101,7 @@ async function main() {
       id,
       title,
       difficulty,
+      score: scorePuzzle({ ...puzzle, id, title }),
     };
 
     // Only count puzzles that require contradiction-test reasoning (Archon or Unbound)

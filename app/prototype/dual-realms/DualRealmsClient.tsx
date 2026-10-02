@@ -83,6 +83,7 @@ function toPuzzle(territoryMap: number[][], size: number): Puzzle {
     territoryMap,
     solution: [],
     difficulty: 'Initiate',
+    score: 0,
     seed: 'dual-realms-v1',
     createdAt: '',
   };

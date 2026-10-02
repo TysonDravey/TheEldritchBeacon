@@ -202,7 +202,7 @@ export async function tryBuildAllWatcherThreeTilePuzzle(
   strictContinuity = false,
 ) {
   function toPuzzle(territoryMap: number[][]): Puzzle {
-    return { id: 'gen', title: 'gen', mode: 'initiate', size, territoryMap, solution: [], difficulty: 'Initiate', seed: 'gen', createdAt: '' };
+    return { id: 'gen', title: 'gen', mode: 'initiate', size, territoryMap, solution: [], difficulty: 'Initiate', score: 0, seed: 'gen', createdAt: '' };
   }
   function cellKey(r: number, c: number) { return `${r},${c}`; }
 
@@ -618,7 +618,7 @@ export async function tryBuildAllWatcherTwoTilePuzzle(
   strictContinuity = false,
 ) {
   function toPuzzle(territoryMap: number[][]): Puzzle {
-    return { id: 'gen', title: 'gen', mode: 'initiate', size, territoryMap, solution: [], difficulty: 'Initiate', seed: 'gen', createdAt: '' };
+    return { id: 'gen', title: 'gen', mode: 'initiate', size, territoryMap, solution: [], difficulty: 'Initiate', score: 0, seed: 'gen', createdAt: '' };
   }
 
   const isShattered = mode === 'shattered-realms';

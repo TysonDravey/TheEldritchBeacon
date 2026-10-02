@@ -25,6 +25,7 @@ export interface Puzzle {
   territoryMap: number[][];   // [row][col] = territory ID
   solution: [number, number][]; // [row, col] of each Watcher in solution order
   difficulty: Difficulty;
+  score: number;        // raw obscurity score scorePuzzle() would compute — baked in at data-generation time, same reasoning as difficulty (see data/samplePuzzles.ts)
   seed: string;
   createdAt: string;
   generatorCmd?: string;  // exact CLI invocation that produced this puzzle

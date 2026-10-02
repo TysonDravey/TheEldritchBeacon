@@ -44,7 +44,7 @@ import { solveLogically, getNextDeduction, findContradictions } from '../engine/
 import { isSolved } from '../engine/rules';
 import { isAdjacent } from '../engine/rules';
 import { createRNG } from '../lib/randomSeed';
-import { rateDifficulty } from '../engine/difficulty';
+import { rateDifficulty, scorePuzzle } from '../engine/difficulty';
 import type { Puzzle, CellState, DeductionResult } from '../engine/boardTypes';
 import { nextUnusedTitle, existingTitles } from './titlePool';
 
@@ -430,7 +430,7 @@ async function main() {
       id: 'tmp', title: 'tmp', mode: 'initiate', size: n,
       territoryMap: map, solution,
       seed, createdAt: new Date().toISOString(),
-      difficulty: 'Initiate',
+      difficulty: 'Initiate', score: 0,
     };
 
     // Depth-1 solvability check
@@ -452,8 +452,15 @@ async function main() {
     const title = nextUnusedTitle(existingTitles(fileContent));
     const diff = rateDifficulty({ ...raw, id, title });
 
-    const { difficulty: _d, ...rest } = raw;
-    const entry = { ...rest, id, title };
+    // difficulty/score are now baked into data/samplePuzzles.ts at write time
+    // (no longer computed at runtime — see its own comments), so this has to
+    // write the real values instead of the raw/placeholder ones from raw.
+    const { difficulty: _d, score: _s, ...rest } = raw;
+    const entry = {
+      ...rest, id, title,
+      difficulty: diff,
+      score: scorePuzzle({ ...raw, id, title }),
+    };
 
     const insertPoint = fileContent.lastIndexOf('\n];');
     if (insertPoint === -1) { process.stderr.write('ERROR: insertion point not found\n'); process.exit(1); }

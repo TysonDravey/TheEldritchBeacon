@@ -324,6 +324,7 @@ export function generatePuzzle(opts: GenerateOptions): Puzzle | null {
       territoryMap: map,
       solution,
       difficulty:   labelDifficulty(n),
+      score:        0, // placeholder — baked for real alongside difficulty once a puzzle ships (see data/samplePuzzles.ts)
       seed,
       createdAt:    new Date().toISOString(),
     };
