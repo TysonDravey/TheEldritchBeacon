@@ -38,12 +38,10 @@ function getCurrentChapter(completedIds: Set<string>): {
       break;
     }
   }
-  const image = completedCount === 0
-    ? '/titleCards/campaign_01/intro_01.png'
-    : `/titleCards/campaign_01/chapter_${String(completedCount).padStart(2, '0')}.png`;
+  const image = regionsWithPuzzles[idx]?.journalPage ?? REGIONS[0].journalPage;
   return {
     roman: ROMAN[idx] ?? String(idx + 1),
-    regionName: regionsWithPuzzles[idx]?.name ?? 'The Foundations',
+    regionName: regionsWithPuzzles[idx]?.name ?? 'Landfall',
     image,
     completedCount,
   };
@@ -56,7 +54,7 @@ export default function CampaignPage() {
   const [view,    setView]    = useState<View>('intro');
   const [started, setStarted] = useState(false);
   const [ready,   setReady]   = useState(false);
-  const [chapter, setChapter] = useState({ roman: 'I', regionName: 'The Foundations', image: '/titleCards/campaign_01/intro_01.png', completedCount: 0 });
+  const [chapter, setChapter] = useState({ roman: 'I', regionName: 'Landfall', image: REGIONS[0].journalPage, completedCount: 0 });
 
   useEffect(() => {
     const completed = loadCompletedIds();
@@ -182,6 +180,7 @@ export default function CampaignPage() {
         src={chapter.image}
         alt=""
         draggable={false}
+        className="journal-pan"
         style={{
           position: 'absolute',
           inset: 0,

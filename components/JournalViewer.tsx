@@ -62,7 +62,10 @@ export default function JournalViewer({
           src={src}
           alt="A page from Captain Mercer's journal"
           draggable={false}
-          style={{ width: zoomed ? '220%' : '100%', display: 'block' }}
+          // maxWidth: 'none' overrides Tailwind's global `img { max-width:
+          // 100% }` reset, which otherwise silently clamps this straight
+          // back down regardless of the width set here.
+          style={{ width: zoomed ? '220%' : '100%', maxWidth: 'none', display: 'block' }}
         />
       </div>
     </div>

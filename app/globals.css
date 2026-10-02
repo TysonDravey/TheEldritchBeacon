@@ -86,6 +86,21 @@ button, a {
 /* Prevent text selection on game board */
 .game-board { user-select: none; }
 
+/* Slow Ken Burns-style drift for Captain Mercer's journal pages used as
+   chapter art — scale starts above 100% so panning never reveals an edge. */
+@keyframes journal-pan {
+  0%   { transform: scale(1.1) translate(0%, 0%); }
+  50%  { transform: scale(1.18) translate(-3%, -2.5%); }
+  100% { transform: scale(1.1) translate(0%, 0%); }
+}
+.journal-pan {
+  animation: journal-pan 26s ease-in-out infinite;
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .journal-pan { animation: none; }
+}
+
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
   20% { transform: translateX(-3px); }

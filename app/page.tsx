@@ -56,7 +56,7 @@ export default function HomePage() {
       prevComplete = puzzles.every(p => ids.has(p.id));
     }
 
-    if (firstNew && firstNew !== 'The Foundations') {
+    if (firstNew && firstNew !== 'Landfall') {
       setNewlyUnlocked(firstNew);
       setShowBanner(true);
       playSound('region-reveal');
@@ -90,11 +90,8 @@ export default function HomePage() {
       break;
     }
   }
-  const completedChapterCount = allChaptersComplete ? regionsWithPuzzles.length : currentChapterIdx;
   const currentRegion = regionsWithPuzzles[currentChapterIdx];
-  const chapterImage = completedChapterCount === 0
-    ? '/titleCards/campaign_01/intro_01.png'
-    : `/titleCards/campaign_01/chapter_${String(completedChapterCount).padStart(2, '0')}.png`;
+  const chapterImage = currentRegion?.journalPage ?? REGIONS[0].journalPage;
   const chapterRoman = ROMAN[currentChapterIdx] ?? String(currentChapterIdx + 1);
   const campaignStarted = completedIds.size > 0;
 
@@ -162,7 +159,7 @@ export default function HomePage() {
                 src={chapterImage}
                 alt=""
                 draggable={false}
-                className="w-full object-cover"
+                className="journal-pan w-full object-cover"
                 style={{ height: 160, objectPosition: 'center 30%' }}
               />
               <div
@@ -177,7 +174,7 @@ export default function HomePage() {
                 }}
               >
                 <p className="font-serif text-xs" style={{ color: 'rgba(242,233,216,0.55)', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 2 }}>Chapter {chapterRoman}</p>
-                <p className="font-lovecraftian text-xl" style={{ color: 'rgba(242,233,216,0.95)', textShadow: '0 1px 8px rgba(0,0,0,0.9)' }}>{currentRegion?.name ?? 'The Foundations'}</p>
+                <p className="font-lovecraftian text-xl" style={{ color: 'rgba(242,233,216,0.95)', textShadow: '0 1px 8px rgba(0,0,0,0.9)' }}>{currentRegion?.name ?? 'Landfall'}</p>
                 <p className="font-serif text-xs italic" style={{ color: 'rgba(242,233,216,0.6)', marginTop: 2 }}>
                   {allChaptersComplete ? 'Revisit the campaign' : campaignStarted ? 'Continue the campaign' : 'Begin the campaign'}
                 </p>
