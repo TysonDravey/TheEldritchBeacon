@@ -13,6 +13,14 @@
 // 'force-dynamic'` for live progress polling — which `output: 'export'`
 // rejects outright, failing the whole build if left in place.
 //
+// app/test and app/generate are internal puzzle-authoring/rating tools —
+// also never linked from the shipped app's own UI — that built fine into
+// the mobile export but had no business actually shipping inside the App
+// Store binary. app/generate's "save" action calls /api/add-puzzle, which
+// already doesn't exist in this build (see above), so it was already a
+// dead button on mobile; excluding the whole page is just not shipping
+// unreachable dev tooling at all. Neither is touched for the web build.
+//
 // tsconfig.json's `include` sweeps up every .ts file in the repo (not just
 // app/), so the standalone search-allwatcher{2,3}.ts scripts — which import
 // from app/prototype/dual-realms/lib — also need to move aside, or the
@@ -26,6 +34,8 @@ const root = process.cwd();
 const movePairs = [
   [join(root, 'app', 'api'), join(root, '.api-tmp-mobile-build')],
   [join(root, 'app', 'prototype'), join(root, '.prototype-tmp-mobile-build')],
+  [join(root, 'app', 'test'), join(root, '.test-tmp-mobile-build')],
+  [join(root, 'app', 'generate'), join(root, '.generate-tmp-mobile-build')],
   [join(root, 'scripts', 'search-allwatcher2.ts'), join(root, 'scripts', '.search-allwatcher2.ts.mobile-build-bak')],
   [join(root, 'scripts', 'search-allwatcher3.ts'), join(root, 'scripts', '.search-allwatcher3.ts.mobile-build-bak')],
 ];
