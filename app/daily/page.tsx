@@ -190,7 +190,7 @@ function CalendarEmergeCell() {
       {/* Inner clip — overflow hidden keeps the watcher inside the cell */}
       <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <img
-          src={WATCHER_SVGS[0]}
+          src={WATCHER_SVGS[6]}
           alt=""
           draggable={false}
           className="calendar-watcher-emerge"
@@ -367,7 +367,12 @@ function MonthCalendar({
                 <CalendarEmergeCell />
               ) : completed ? (
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <NextImage src="/svg/completion_stamp.svg" alt="done" width={18} height={18} style={{ opacity: 0.75 }} />
+                  <img
+                    src={WATCHER_SVGS[6]}
+                    alt="done"
+                    draggable={false}
+                    style={{ width: '58%', height: '58%', objectFit: 'contain', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.6))' }}
+                  />
                 </div>
               ) : null}
               {started && (
