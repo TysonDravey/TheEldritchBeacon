@@ -991,8 +991,8 @@ export default function DailyPage() {
             isn't attached yet when the auto-fire on mount happens. */}
         <button
           onClick={dumpDailyHints}
-          className="font-serif text-xs mt-4"
-          style={{ opacity: 0.35, color: 'var(--ink)' }}
+          className="font-serif text-xs mt-4 px-3 py-2"
+          style={{ opacity: 0.7, color: 'rgba(242,233,216,0.9)', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}
         >
           dump hints to console
         </button>
