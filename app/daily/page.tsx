@@ -477,8 +477,11 @@ export default function DailyPage() {
   // Temporary, left in on purpose: dumps hints-used per completed daily to
   // the console, to check real hint-usage patterns against the proposed
   // star-rating thresholds (see app-store-prep/ for other session notes —
-  // this one isn't filed anywhere yet, just a one-off data pull).
-  useEffect(() => {
+  // this one isn't filed anywhere yet, just a one-off data pull). Also
+  // triggerable from a button (below, calendar view) since Safari's Web
+  // Inspector console isn't attached yet when this fires on mount after an
+  // app restart — by the time it's reconnected, the auto-fire is long gone.
+  const dumpDailyHints = useCallback(() => {
     const entries = Object.entries(DAILY_CALENDAR).sort(([a], [b]) => a.localeCompare(b));
     let completedCount = 0;
     let hintTotal = 0;
@@ -496,6 +499,8 @@ export default function DailyPage() {
     // eslint-disable-next-line no-console
     console.log(`[daily-hints] TOTAL completed=${completedCount} zeroHint=${zeroHintCount} avgHints=${completedCount > 0 ? (hintTotal / completedCount).toFixed(2) : 'n/a'}`);
   }, []);
+
+  useEffect(() => { dumpDailyHints(); }, [dumpDailyHints]);
 
   // Load started dates for whichever month is currently in view
   useEffect(() => {
@@ -980,6 +985,17 @@ export default function DailyPage() {
             canGoNext={canGoNextMonth}
           />
         </div>
+
+        {/* Temporary, left in on purpose: re-fires the [daily-hints] console
+            dump on demand, since Safari's Web Inspector console usually
+            isn't attached yet when the auto-fire on mount happens. */}
+        <button
+          onClick={dumpDailyHints}
+          className="font-serif text-xs mt-4"
+          style={{ opacity: 0.35, color: 'var(--ink)' }}
+        >
+          dump hints to console
+        </button>
 
       </main>
     );
