@@ -31,6 +31,27 @@ export function clearPlayerState(puzzleId: string): void {
   }
 }
 
+const LANTERN_TOTAL_KEY = 'eldritch_beacon_lantern_total';
+
+export function getLanternTotal(): number {
+  try {
+    const raw = localStorage.getItem(LANTERN_TOTAL_KEY);
+    return raw ? parseInt(raw, 10) || 0 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function addLanterns(amount: number): number {
+  const total = getLanternTotal() + amount;
+  try {
+    localStorage.setItem(LANTERN_TOTAL_KEY, String(total));
+  } catch {
+    // SSR or storage unavailable — silently ignore
+  }
+  return total;
+}
+
 export function createFreshPlayerState(puzzleId: string, size: number): PlayerState {
   return {
     puzzleId,

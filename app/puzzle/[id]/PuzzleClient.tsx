@@ -6,7 +6,7 @@ import posthog from 'posthog-js';
 import NextImage from 'next/image';
 import Link from 'next/link';
 import { getPuzzleById, SAMPLE_PUZZLES } from '@/data/samplePuzzles';
-import { loadPlayerState, savePlayerState, createFreshPlayerState } from '@/lib/storage';
+import { loadPlayerState, savePlayerState, createFreshPlayerState, getLanternTotal, addLanterns } from '@/lib/storage';
 import { getHint } from '@/engine/hints';
 import { hasForcedOpening } from '@/engine/difficulty';
 import { getLanternRating } from '@/engine/lanterns';
@@ -121,6 +121,8 @@ export default function PuzzleClient() {
   const [constraintWards,  setConstraintWards]  = useState<[number, number][]>([]);
   const [isFreshWin,          setIsFreshWin]          = useState(false);
   const [showChapterComplete, setShowChapterComplete] = useState(false);
+  const [lanternTotal,        setLanternTotal]        = useState(0);
+  const [lanternsEarned,      setLanternsEarned]      = useState(0);
   // Tracks how many hints player has asked without making a move — drives escalation
   const hintDepthRef      = useRef(0);
   const flashTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -151,6 +153,10 @@ export default function PuzzleClient() {
         return img.decode().catch(() => {}).then(onLoad);
       })
     ).then(() => setTilesReady(true));
+  }, []);
+
+  useEffect(() => {
+    setLanternTotal(getLanternTotal());
   }, []);
 
   useEffect(() => {
@@ -360,6 +366,9 @@ export default function PuzzleClient() {
           hints_used:  newState.hintsUsed,
           mode:        puzzle.mode ?? 'initiate',
         });
+        const earned = getLanternRating(newState.hintsUsed);
+        setLanternsEarned(earned);
+        setLanternTotal(addLanterns(earned));
         setIsFreshWin(true);
         // 190ms after win-slam (1960ms) rather than right on top of it (was 2000,
         // only 40ms later) — close enough together to read as "simultaneous," not
@@ -826,9 +835,17 @@ export default function PuzzleClient() {
                   <h2 className="font-lovecraftian text-lg text-ink leading-snug">Beacon Restored</h2>
                 </div>
                 <div className="mt-1 mb-1">
-                  <LanternRating rating={getLanternRating(playerState.hintsUsed)} />
+                  <LanternRating rating={getLanternRating(playerState.hintsUsed)} animate={isFreshWin} />
                 </div>
-                <p className="font-serif text-xs text-ink-light italic">The Watchers stand vigilant. The wards hold.</p>
+                {isFreshWin && (
+                  <p className="lantern-badge-pop font-lovecraftian text-sm mt-1" style={{ color: '#B5860D' }}>
+                    +{lanternsEarned} Lantern{lanternsEarned !== 1 ? 's' : ''}
+                  </p>
+                )}
+                <p className="font-serif text-xs text-ink-light mt-0.5" style={{ opacity: 0.6 }}>
+                  {lanternTotal} Lantern{lanternTotal !== 1 ? 's' : ''} collected
+                </p>
+                <p className="font-serif text-xs text-ink-light italic mt-2">The Watchers stand vigilant. The wards hold.</p>
                 {nextPuzzle && (
                   <div className="mt-3">
                     <Link href={`/puzzle/${nextPuzzle.id}`}>

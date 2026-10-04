@@ -8,7 +8,7 @@ import { playSound } from '@/lib/sound';
 import NextImage from 'next/image';
 import { getPuzzleById } from '@/data/samplePuzzles';
 import { DAILY_CALENDAR } from '@/data/dailyCalendar';
-import { loadPlayerState, savePlayerState, createFreshPlayerState } from '@/lib/storage';
+import { loadPlayerState, savePlayerState, createFreshPlayerState, getLanternTotal, addLanterns } from '@/lib/storage';
 import { getHint } from '@/engine/hints';
 import { isSolved, canPlaceWatcher, watcherRejectionReason } from '@/engine/rules';
 import { findContradictions } from '@/engine/solver';
@@ -448,6 +448,8 @@ export default function DailyPage() {
   const [cascadeWards,    setCascadeWards]   = useState<[number, number][]>([]);
   const [constraintWards, setConstraintWards] = useState<[number, number][]>([]);
   const [isFreshWin,           setIsFreshWin]          = useState(false);
+  const [lanternTotal,         setLanternTotal]        = useState(0);
+  const [lanternsEarned,       setLanternsEarned]      = useState(0);
   const [streak,               setStreak]              = useState<StreakData>({ date: '', count: 0 });
   const [alreadyCompleted,     setAlreadyCompleted]    = useState(false);
   const [freshlyCompletedDate, setFreshlyCompletedDate] = useState<string | null>(null);
@@ -469,6 +471,7 @@ export default function DailyPage() {
     setCompletedDates(loadCompletedDates());
     setStreak(loadStreak());
     setMonthAwardCount(loadMonthAwards().size);
+    setLanternTotal(getLanternTotal());
   }, []);
 
   // Temporary, left in on purpose: dumps hints-used per completed daily to
@@ -691,6 +694,9 @@ export default function DailyPage() {
           hints_used:  newState.hintsUsed,
           streak:      streakCount,
         });
+        const earned = getLanternRating(newState.hintsUsed);
+        setLanternsEarned(earned);
+        setLanternTotal(addLanterns(earned));
         setIsFreshWin(true);
         setFreshlyCompletedDate(selectedDate);
 
@@ -1150,9 +1156,17 @@ export default function DailyPage() {
                   <h2 className="font-lovecraftian text-lg text-ink leading-snug">Beacon Restored</h2>
                 </div>
                 <div className="mt-1 mb-1">
-                  <LanternRating rating={getLanternRating(playerState.hintsUsed)} />
+                  <LanternRating rating={getLanternRating(playerState.hintsUsed)} animate={isFreshWin} />
                 </div>
-                <p className="font-serif text-xs text-ink-light italic">
+                {isFreshWin && (
+                  <p className="lantern-badge-pop font-lovecraftian text-sm mt-1" style={{ color: '#B5860D' }}>
+                    +{lanternsEarned} Lantern{lanternsEarned !== 1 ? 's' : ''}
+                  </p>
+                )}
+                <p className="font-serif text-xs text-ink-light mt-0.5" style={{ opacity: 0.6 }}>
+                  {lanternTotal} Lantern{lanternTotal !== 1 ? 's' : ''} collected
+                </p>
+                <p className="font-serif text-xs text-ink-light italic mt-2">
                   {alreadyCompleted ? 'You already lit this beacon.' : 'The Watchers stand vigilant. The wards hold.'}
                 </p>
                 {!alreadyCompleted && streak.count >= 2 && (
