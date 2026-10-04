@@ -8,7 +8,7 @@ import { playSound } from '@/lib/sound';
 import NextImage from 'next/image';
 import { getPuzzleById } from '@/data/samplePuzzles';
 import { DAILY_CALENDAR } from '@/data/dailyCalendar';
-import { loadPlayerState, savePlayerState, createFreshPlayerState, getLanternTotal, addLanterns } from '@/lib/storage';
+import { loadPlayerState, savePlayerState, createFreshPlayerState, getLanternTotal, addLanterns, hasAwardedLanterns, markLanternsAwarded } from '@/lib/storage';
 import { getHint } from '@/engine/hints';
 import { isSolved, canPlaceWatcher, watcherRejectionReason } from '@/engine/rules';
 import { findContradictions } from '@/engine/solver';
@@ -455,6 +455,7 @@ export default function DailyPage() {
   const [isFreshWin,           setIsFreshWin]          = useState(false);
   const [lanternTotal,         setLanternTotal]        = useState(0);
   const [lanternsEarned,       setLanternsEarned]      = useState(0);
+  const [showLanternBadge,     setShowLanternBadge]    = useState(false);
   const [streak,               setStreak]              = useState<StreakData>({ date: '', count: 0 });
   const [alreadyCompleted,     setAlreadyCompleted]    = useState(false);
   const [freshlyCompletedDate, setFreshlyCompletedDate] = useState<string | null>(null);
@@ -709,7 +710,16 @@ export default function DailyPage() {
         });
         const earned = getLanternRating(newState.hintsUsed);
         setLanternsEarned(earned);
-        setLanternTotal(addLanterns(earned));
+        // Restart is available even on a completed day, so a replayed solve
+        // must not re-award lanterns to the lifetime total — only the first
+        // ever completion of a given date counts.
+        if (!hasAwardedLanterns(selectedDate)) {
+          markLanternsAwarded(selectedDate);
+          setLanternTotal(addLanterns(earned));
+          setShowLanternBadge(true);
+        } else {
+          setShowLanternBadge(false);
+        }
         setIsFreshWin(true);
         setFreshlyCompletedDate(selectedDate);
 
@@ -1183,7 +1193,7 @@ export default function DailyPage() {
                 <div className="mt-1 mb-1">
                   <LanternRating rating={getLanternRating(playerState.hintsUsed)} animate={isFreshWin} />
                 </div>
-                {isFreshWin && (
+                {showLanternBadge && (
                   <p className="lantern-badge-pop font-lovecraftian text-sm mt-1" style={{ color: '#B5860D' }}>
                     +{lanternsEarned} Lantern{lanternsEarned !== 1 ? 's' : ''}
                   </p>

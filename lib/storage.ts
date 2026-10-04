@@ -52,6 +52,34 @@ export function addLanterns(amount: number): number {
   return total;
 }
 
+const LANTERNS_AWARDED_KEY = 'eldritch_beacon_lanterns_awarded';
+
+// Tracks which puzzles/days have ever contributed to the lantern total —
+// separate from PlayerState.completed, which Restart legitimately resets
+// (so a replayed puzzle doesn't re-award lanterns and double-count).
+function loadAwardedSet(): Set<string> {
+  try {
+    const raw = localStorage.getItem(LANTERNS_AWARDED_KEY);
+    return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+export function hasAwardedLanterns(key: string): boolean {
+  return loadAwardedSet().has(key);
+}
+
+export function markLanternsAwarded(key: string): void {
+  try {
+    const set = loadAwardedSet();
+    set.add(key);
+    localStorage.setItem(LANTERNS_AWARDED_KEY, JSON.stringify([...set]));
+  } catch {
+    // SSR or storage unavailable — silently ignore
+  }
+}
+
 export function createFreshPlayerState(puzzleId: string, size: number): PlayerState {
   return {
     puzzleId,

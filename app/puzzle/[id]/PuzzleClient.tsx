@@ -6,7 +6,7 @@ import posthog from 'posthog-js';
 import NextImage from 'next/image';
 import Link from 'next/link';
 import { getPuzzleById, SAMPLE_PUZZLES } from '@/data/samplePuzzles';
-import { loadPlayerState, savePlayerState, createFreshPlayerState, getLanternTotal, addLanterns } from '@/lib/storage';
+import { loadPlayerState, savePlayerState, createFreshPlayerState, getLanternTotal, addLanterns, hasAwardedLanterns, markLanternsAwarded } from '@/lib/storage';
 import { getHint } from '@/engine/hints';
 import { hasForcedOpening } from '@/engine/difficulty';
 import { getLanternRating } from '@/engine/lanterns';
@@ -123,6 +123,7 @@ export default function PuzzleClient() {
   const [showChapterComplete, setShowChapterComplete] = useState(false);
   const [lanternTotal,        setLanternTotal]        = useState(0);
   const [lanternsEarned,      setLanternsEarned]      = useState(0);
+  const [showLanternBadge,    setShowLanternBadge]    = useState(false);
   // Tracks how many hints player has asked without making a move — drives escalation
   const hintDepthRef      = useRef(0);
   const flashTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -368,7 +369,16 @@ export default function PuzzleClient() {
         });
         const earned = getLanternRating(newState.hintsUsed);
         setLanternsEarned(earned);
-        setLanternTotal(addLanterns(earned));
+        // Restart is available even on a completed puzzle, so a replayed
+        // solve must not re-award lanterns to the lifetime total — only
+        // the first ever completion of a given puzzle counts.
+        if (!hasAwardedLanterns(puzzle.id)) {
+          markLanternsAwarded(puzzle.id);
+          setLanternTotal(addLanterns(earned));
+          setShowLanternBadge(true);
+        } else {
+          setShowLanternBadge(false);
+        }
         setIsFreshWin(true);
         // 190ms after win-slam (1960ms) rather than right on top of it (was 2000,
         // only 40ms later) — close enough together to read as "simultaneous," not
@@ -838,7 +848,7 @@ export default function PuzzleClient() {
                 <div className="mt-1 mb-1">
                   <LanternRating rating={getLanternRating(playerState.hintsUsed)} animate={isFreshWin} />
                 </div>
-                {isFreshWin && (
+                {showLanternBadge && (
                   <p className="lantern-badge-pop font-lovecraftian text-sm mt-1" style={{ color: '#B5860D' }}>
                     +{lanternsEarned} Lantern{lanternsEarned !== 1 ? 's' : ''}
                   </p>
