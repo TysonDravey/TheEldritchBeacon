@@ -487,7 +487,10 @@ export default function DailyPage() {
     let hintTotal = 0;
     let zeroHintCount = 0;
     for (const [date, puzzleId] of entries) {
-      const state = loadPlayerState(puzzleId);
+      // Daily completions save under `daily_<date>_<puzzleId>` (see
+      // applyChange's storageKey below), not the bare puzzleId — that key
+      // is the campaign slot for this same puzzle, a different save.
+      const state = loadPlayerState(`daily_${date}_${puzzleId}`);
       if (!state?.completed) continue;
       const puzzle = getPuzzleById(puzzleId);
       completedCount++;
