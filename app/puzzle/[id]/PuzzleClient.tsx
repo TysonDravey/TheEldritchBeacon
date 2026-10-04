@@ -9,6 +9,8 @@ import { getPuzzleById, SAMPLE_PUZZLES } from '@/data/samplePuzzles';
 import { loadPlayerState, savePlayerState, createFreshPlayerState } from '@/lib/storage';
 import { getHint } from '@/engine/hints';
 import { hasForcedOpening } from '@/engine/difficulty';
+import { getLanternRating } from '@/engine/lanterns';
+import { LanternRating } from '@/components/LanternRating';
 import { isSolved, canPlaceWatcher, watcherRejectionReason } from '@/engine/rules';
 import { findContradictions } from '@/engine/solver';
 import type { PlayerState, CellState, HintResult, ContradictionResult, Difficulty } from '@/engine/boardTypes';
@@ -822,6 +824,9 @@ export default function PuzzleClient() {
                 <div className="flex items-center justify-center gap-2 mb-1">
                   <NextImage src="/svg/completion_stamp.svg" alt="Completed" width={28} height={28} />
                   <h2 className="font-lovecraftian text-lg text-ink leading-snug">Beacon Restored</h2>
+                </div>
+                <div className="mt-1 mb-1">
+                  <LanternRating rating={getLanternRating(playerState.hintsUsed)} />
                 </div>
                 <p className="font-serif text-xs text-ink-light italic">The Watchers stand vigilant. The wards hold.</p>
                 {nextPuzzle && (

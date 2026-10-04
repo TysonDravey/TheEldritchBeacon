@@ -18,6 +18,8 @@ import GameControls from '@/components/GameControls';
 import HintOverlay from '@/components/HintOverlay';
 import TechniqueDiscovery from '@/components/TechniqueDiscovery';
 import MonthComplete from '@/components/MonthComplete';
+import { LanternRating } from '@/components/LanternRating';
+import { getLanternRating } from '@/engine/lanterns';
 import { WATCHER_SVGS, WARD_PNG } from '@/theme/colors';
 import { isTechniqueNew, markTechniqueDiscovered } from '@/lib/techniques';
 
@@ -1146,6 +1148,9 @@ export default function DailyPage() {
                 <div className="flex items-center justify-center gap-2 mb-1">
                   <NextImage src="/svg/completion_stamp.svg" alt="Completed" width={28} height={28} />
                   <h2 className="font-lovecraftian text-lg text-ink leading-snug">Beacon Restored</h2>
+                </div>
+                <div className="mt-1 mb-1">
+                  <LanternRating rating={getLanternRating(playerState.hintsUsed)} />
                 </div>
                 <p className="font-serif text-xs text-ink-light italic">
                   {alreadyCompleted ? 'You already lit this beacon.' : 'The Watchers stand vigilant. The wards hold.'}
