@@ -20,6 +20,7 @@ interface BoardProps {
   onCellLongPress?: (row: number, col: number) => void;
   primaryCell?: [number, number];
   highlightCells?: [number, number][];
+  watcherTargetCells?: [number, number][];
   secondaryHighlightCells?: [number, number][];
   highlightTerritories?: number[];
   secondaryHighlightTerritories?: number[];
@@ -82,6 +83,7 @@ export default function Board({
   onCellLongPress,
   primaryCell,
   highlightCells,
+  watcherTargetCells,
   secondaryHighlightCells,
   highlightTerritories,
   secondaryHighlightTerritories,
@@ -463,9 +465,10 @@ export default function Board({
             const state     = playerCells[row]?.[col] ?? 'empty';
 
             const outlined = isCellOutlined(row, col, territory, highlightCells, highlightTerritories);
-            const lit = outlined || isCellLit(row, col, territory, highlightCells, highlightTerritories, highlightRows, highlightCols);
+            const isWatcherTarget = watcherTargetCells?.some(([r, c]) => r === row && c === col) ?? false;
+            const lit = outlined || isWatcherTarget || isCellLit(row, col, territory, highlightCells, highlightTerritories, highlightRows, highlightCols);
             const isPrimary = primaryCell ? primaryCell[0] === row && primaryCell[1] === col : false;
-            const secondaryHighlighted = !outlined && !isPrimary && (
+            const secondaryHighlighted = !outlined && !isPrimary && !isWatcherTarget && (
               (secondaryHighlightCells?.some(([r, c]) => r === row && c === col) ?? false) ||
               (secondaryHighlightTerritories?.includes(territory) ?? false)
             );
@@ -484,6 +487,7 @@ export default function Board({
                 isFreshWin={isFreshWin}
                 isHighlighted={outlined}
                 isSecondaryHighlighted={secondaryHighlighted}
+                isWatcherTarget={isWatcherTarget}
                 isDimmed={hintActive && !lit && !secondaryHighlighted && !isPrimary && !isGhost && !isGhostWard && !isConstraintWard}
                 isPrimaryHint={isPrimary}
                 isContradiction={isCellContradiction(row, col, contradiction)}

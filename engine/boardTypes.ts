@@ -91,6 +91,7 @@ export interface HintResult {
   techniqueName?: string;              // named technique this hint demonstrates
   primaryCell?: [number, number];       // single cell that gets the spinner marker
   highlightCells?: [number, number][];  // red outline
+  watcherTargetCells?: [number, number][]; // green outline — "a Watcher must go here" (distinct from the red error outline above)
   secondaryHighlightCells?: [number, number][];  // brass outline (cause cells)
   highlightTerritories?: number[];      // red outline — the affected territory
   secondaryHighlightTerritories?: number[];      // brass outline — the cause territory

@@ -1062,6 +1062,7 @@ export default function DailyPage() {
             onDragEnd={handleDragEnd}
             primaryCell={hintResult?.primaryCell}
             highlightCells={hintResult?.highlightCells}
+            watcherTargetCells={hintResult?.watcherTargetCells}
             secondaryHighlightCells={hintResult?.secondaryHighlightCells}
             highlightTerritories={hintResult?.highlightTerritories}
             secondaryHighlightTerritories={hintResult?.secondaryHighlightTerritories}

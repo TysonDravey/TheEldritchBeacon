@@ -560,7 +560,8 @@ function buildWatcherHint(d: DeductionResult, puzzle: Puzzle): Omit<HintResult, 
   return {
     level: 4,
     message,
-    highlightCells: d.pairedCell ? [[d.row, d.col], d.pairedCell] : [[d.row, d.col]],
+    primaryCell: [d.row, d.col],
+    watcherTargetCells: d.pairedCell ? [[d.row, d.col], d.pairedCell] : [[d.row, d.col]],
     highlightTerritories: [territory],
     deduction: d,
   };

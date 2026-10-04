@@ -14,6 +14,7 @@ interface CellProps {
   state: CellState;
   isHighlighted: boolean;
   isSecondaryHighlighted: boolean;
+  isWatcherTarget: boolean;
   isDimmed: boolean;
   isPrimaryHint: boolean;
   isContradiction: boolean;
@@ -47,6 +48,7 @@ function Cell({
   state,
   isHighlighted,
   isSecondaryHighlighted,
+  isWatcherTarget,
   isDimmed,
   isPrimaryHint,
   isContradiction,
@@ -112,6 +114,7 @@ function Cell({
       {isDimmed && <div className="absolute inset-0 bg-ink opacity-40 pointer-events-none z-10" />}
       {isHighlighted          && <div className="absolute inset-0 pointer-events-none z-10 hint-glow-red" />}
       {isSecondaryHighlighted && <div className="absolute inset-0 pointer-events-none z-10 hint-glow-brass" />}
+      {isWatcherTarget        && <div className="absolute inset-0 pointer-events-none z-10 hint-glow-green" />}
       {state === 'watcher' && (
         <div className="relative z-20">
           <Watcher territory={territory} size={watcherSize} isFreshWin={isFreshWin} />

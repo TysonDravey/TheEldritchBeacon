@@ -728,6 +728,7 @@ export default function PuzzleClient() {
             onDragEnd={handleDragEnd}
             primaryCell={hintResult?.primaryCell}
             highlightCells={hintResult?.highlightCells}
+            watcherTargetCells={hintResult?.watcherTargetCells}
             secondaryHighlightCells={
               hintResult?.chainSteps?.length
                 ? hintResult.chainSteps[activeChainStep]?.cells
