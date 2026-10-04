@@ -129,12 +129,14 @@ function buildWardChainSteps(chain: DeductionResult[]): { cells: [number, number
 // depth 2+ → direct answer with full reason
 // ---------------------------------------------------------------------------
 
+// costsLantern is attached once, at each call site in getHint() below —
+// these builders don't need to know about it themselves.
 function buildWardHint(
   d: DeductionResult,
   puzzle: Puzzle,
   depth: number,
   playerCells: CellState[][],
-): HintResult {
+): Omit<HintResult, 'costsLantern'> {
   const { row, col, reasonType, confinedTerritory, pairedTerritories, blockedBy } = d;
   const cellTerritory = puzzle.territoryMap[row][col];
 
@@ -532,7 +534,7 @@ function buildWardHint(
   };
 }
 
-function buildWatcherHint(d: DeductionResult, puzzle: Puzzle): HintResult {
+function buildWatcherHint(d: DeductionResult, puzzle: Puzzle): Omit<HintResult, 'costsLantern'> {
   const territory = puzzle.territoryMap[d.row][d.col];
   const name = tname(territory);
   const isTwin = puzzle.mode === 'twin-watchers';
@@ -592,32 +594,31 @@ function buildMistakeHint(
   playerCells: CellState[][],
   mismatches: [number, number][],
   depth: number,
-): HintResult {
+): Omit<HintResult, 'costsLantern'> {
+  // Always surface exactly one mismatch, never the full list or a count —
+  // otherwise marking the whole board wrong and hitting hint once would
+  // highlight (or let you infer) the entire solution for free.
+  const [r, c] = mismatches[0];
+
   if (depth === 0) {
     return {
       level: 1,
-      message: mismatches.length > 1
-        ? `Something isn't right. ${mismatches.length} of your markings don't match the true chart.`
-        : `Something isn't right here. One of your markings doesn't match the true chart.`,
-      highlightCells: mismatches,
+      message: `Something isn't right here. One of your markings doesn't match the true chart.`,
+      highlightCells: [[r, c]],
     };
   }
 
-  const [r, c] = mismatches[0];
   const isWatcher = playerCells[r][c] === 'watcher';
   const territory = puzzle.territoryMap[r][c];
   const detail = isWatcher
     ? `The Watcher at row ${r + 1}, column ${c + 1} — the ${tname(territory)} territory — doesn't belong there. Reconsider this placement.`
     : `Row ${r + 1}, column ${c + 1} — the ${tname(territory)} territory — should hold a Watcher. The Ward there is blocking it.`;
-  const extra = mismatches.length > 1
-    ? ` There ${mismatches.length - 1 === 1 ? 'is one more mismatch' : `are ${mismatches.length - 1} more mismatches`} elsewhere on the board too.`
-    : '';
 
   return {
     level: 3,
-    message: detail + extra,
+    message: detail,
     primaryCell: [r, c],
-    highlightCells: mismatches,
+    highlightCells: [[r, c]],
   };
 }
 
@@ -625,7 +626,7 @@ function buildContradictionHint(
   message: string,
   affectedCells?: [number, number][],
   affectedTerritories?: number[],
-): HintResult {
+): Omit<HintResult, 'costsLantern'> {
   const territories = affectedTerritories ?? [];
   const phrase = territories.length > 0
     ? `${tnames(territories)} has`
@@ -641,7 +642,7 @@ function buildContradictionHint(
   };
 }
 
-function buildStudyHint(puzzle: Puzzle, playerCells: CellState[][]): HintResult {
+function buildStudyHint(puzzle: Puzzle, playerCells: CellState[][]): Omit<HintResult, 'costsLantern'> {
   const candidates = getCandidates(puzzle, playerCells);
   let minCands = Infinity;
   let minTerritory = -1;
@@ -688,22 +689,25 @@ export function getHint(
   // it immediately instead.
   const mismatches = findSolutionMismatches(puzzle, playerCells);
   if (mismatches.length > 0) {
-    return buildMistakeHint(puzzle, playerCells, mismatches, depth);
+    return { ...buildMistakeHint(puzzle, playerCells, mismatches, depth), costsLantern: false };
   }
 
   // Contradiction takes priority at any depth
   const contradiction = findContradictions(puzzle, playerCells);
   if (contradiction.found) {
-    return buildContradictionHint(
-      contradiction.message ?? '',
-      contradiction.affectedCells,
-      contradiction.affectedTerritories,
-    );
+    return {
+      ...buildContradictionHint(
+        contradiction.message ?? '',
+        contradiction.affectedCells,
+        contradiction.affectedTerritories,
+      ),
+      costsLantern: false,
+    };
   }
 
   const solverDepth = puzzle.mode === 'twin-watchers' ? 2 : 1;
   const deduction = getNextDeduction(puzzle, playerCells, solverDepth);
-  if (!deduction) return buildStudyHint(puzzle, playerCells);
+  if (!deduction) return { ...buildStudyHint(puzzle, playerCells), costsLantern: true };
 
   if (deduction.type === 'watcher') {
     if (depth === 0) {
@@ -712,10 +716,11 @@ export function getHint(
         level: 1,
         message: `The ${tname(territory)} territory is close to resolution. Study it carefully.`,
         highlightTerritories: [territory],
+        costsLantern: true,
       };
     }
     const hint = buildWatcherHint(deduction, puzzle);
-    return { ...hint, techniqueName: techniqueForDeduction(deduction) };
+    return { ...hint, techniqueName: techniqueForDeduction(deduction), costsLantern: true };
   }
 
   // Ward deductions — adjacency/row/col/territory-occupied are cheap facts,
@@ -734,5 +739,5 @@ export function getHint(
     ? techniqueForDeduction(deduction, isDeepChain)
     : undefined;
 
-  return techniqueName ? { ...rawHint, techniqueName } : rawHint;
+  return { ...rawHint, techniqueName, costsLantern: true };
 }

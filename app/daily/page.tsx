@@ -469,6 +469,29 @@ export default function DailyPage() {
     setMonthAwardCount(loadMonthAwards().size);
   }, []);
 
+  // Temporary, left in on purpose: dumps hints-used per completed daily to
+  // the console, to check real hint-usage patterns against the proposed
+  // star-rating thresholds (see app-store-prep/ for other session notes —
+  // this one isn't filed anywhere yet, just a one-off data pull).
+  useEffect(() => {
+    const entries = Object.entries(DAILY_CALENDAR).sort(([a], [b]) => a.localeCompare(b));
+    let completedCount = 0;
+    let hintTotal = 0;
+    let zeroHintCount = 0;
+    for (const [date, puzzleId] of entries) {
+      const state = loadPlayerState(puzzleId);
+      if (!state?.completed) continue;
+      const puzzle = getPuzzleById(puzzleId);
+      completedCount++;
+      hintTotal += state.hintsUsed;
+      if (state.hintsUsed === 0) zeroHintCount++;
+      // eslint-disable-next-line no-console
+      console.log(`[daily-hints] ${date} ${puzzleId} "${puzzle?.title ?? '?'}" (${puzzle?.difficulty ?? '?'}) hints=${state.hintsUsed}`);
+    }
+    // eslint-disable-next-line no-console
+    console.log(`[daily-hints] TOTAL completed=${completedCount} zeroHint=${zeroHintCount} avgHints=${completedCount > 0 ? (hintTotal / completedCount).toFixed(2) : 'n/a'}`);
+  }, []);
+
   // Load started dates for whichever month is currently in view
   useEffect(() => {
     setStartedDates(loadStartedDates(viewedMonth));
@@ -804,16 +827,22 @@ export default function DailyPage() {
   const handleHint = useCallback(() => {
     if (!puzzle || !playerState) return;
     const hint = getHint(puzzle, playerState.cells, hintDepthRef.current);
+    // hintsUsed only counts hints that hand over real forward-progress
+    // information — a mistake/contradiction correction doesn't cost a
+    // Lantern (see HintResult.costsLantern), since that's the game being
+    // fair to an error, not solving the puzzle for you.
+    const newHintsUsed = hint.costsLantern ? playerState.hintsUsed + 1 : playerState.hintsUsed;
     posthog.capture('hint_used', {
       puzzle_id:    puzzle.id,
       date:         selectedDate,
       hint_level:   hint.level,
-      hints_so_far: playerState.hintsUsed + 1,
+      costs_lantern: hint.costsLantern,
+      hints_so_far: newHintsUsed,
       mode:         'daily',
     });
     hintDepthRef.current += 1;
     const storageKey = `daily_${selectedDate}_${puzzle.id}`;
-    const newState = { ...playerState, hintsUsed: playerState.hintsUsed + 1 };
+    const newState = { ...playerState, hintsUsed: newHintsUsed };
     setPlayerState(newState);
     savePlayerState({ ...newState, puzzleId: storageKey });
     setHintResult(hint);

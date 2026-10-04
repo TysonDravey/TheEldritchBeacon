@@ -81,6 +81,13 @@ export interface DeductionResult {
 export interface HintResult {
   level: 1 | 2 | 3 | 4;
   message: string;
+  // True for a hint that hands over real forward-progress information (a
+  // deduction the player hadn't found yet); false for one that's just
+  // correcting an existing error (a wrong placement, or a rule
+  // contradiction) — only the former counts against the Lantern rating,
+  // since the latter is the game being fair to a mistake, not solving the
+  // puzzle for you.
+  costsLantern: boolean;
   techniqueName?: string;              // named technique this hint demonstrates
   primaryCell?: [number, number];       // single cell that gets the spinner marker
   highlightCells?: [number, number][];  // red outline

@@ -506,14 +506,20 @@ export default function PuzzleClient() {
   const handleHint = useCallback(() => {
     if (!puzzle || !playerState) return;
     const hint     = getHint(puzzle, playerState.cells, hintDepthRef.current);
+    // hintsUsed only counts hints that hand over real forward-progress
+    // information — a mistake/contradiction correction doesn't cost a
+    // Lantern (see HintResult.costsLantern), since that's the game being
+    // fair to an error, not solving the puzzle for you.
+    const newHintsUsed = hint.costsLantern ? playerState.hintsUsed + 1 : playerState.hintsUsed;
     posthog.capture('hint_used', {
       puzzle_id:  puzzle.id,
       difficulty: puzzle.difficulty,
       hint_level: hint.level,
-      hints_so_far: playerState.hintsUsed + 1,
+      costs_lantern: hint.costsLantern,
+      hints_so_far: newHintsUsed,
     });
     hintDepthRef.current += 1;
-    const newState = { ...playerState, hintsUsed: playerState.hintsUsed + 1 };
+    const newState = { ...playerState, hintsUsed: newHintsUsed };
     setPlayerState(newState);
     savePlayerState(newState);
     setHintResult(hint);
