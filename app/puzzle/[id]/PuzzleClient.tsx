@@ -19,7 +19,9 @@ import GameControls from '@/components/GameControls';
 import HintOverlay from '@/components/HintOverlay';
 import TechniqueDiscovery from '@/components/TechniqueDiscovery';
 import { WATCHER_SVGS, WARD_PNG } from '@/theme/colors';
-import { REGION_BY_DIFFICULTY, campaignRegionDifficulty } from '@/data/regions';
+import { campaignRegionDifficulty, findRegionForPuzzle, getRegionPuzzles, sortPuzzlesForRegion } from '@/data/regions';
+import { isRuleChangeNew } from '@/lib/ruleChanges';
+import RuleChangeIntro from '@/components/RuleChangeIntro';
 import { haptic } from '@/lib/haptic';
 import { playSound } from '@/lib/sound';
 import { isTechniqueNew, markTechniqueDiscovered } from '@/lib/techniques';
@@ -110,6 +112,7 @@ export default function PuzzleClient() {
   const [hintResult,       setHintResult]       = useState<HintResult | null>(null);
   const [activeChainStep,  setActiveChainStep]  = useState(0);
   const [pendingDiscovery, setPendingDiscovery] = useState<string | null>(null);
+  const [pendingRuleChange, setPendingRuleChange] = useState<'shattered-realms' | 'twin-watchers' | null>(null);
   const [showCompletion,   setShowCompletion]   = useState(false);
   const [tilesReady,       setTilesReady]       = useState(false);
   const [loadProgress,     setLoadProgress]     = useState(0);
@@ -176,6 +179,11 @@ export default function PuzzleClient() {
     hintDepthRef.current = 0;
     winTimersRef.current.forEach(clearTimeout);
     winTimersRef.current = [];
+    setPendingRuleChange(
+      (puzzle.mode === 'shattered-realms' || puzzle.mode === 'twin-watchers') && isRuleChangeNew(puzzle.mode)
+        ? puzzle.mode
+        : null
+    );
 
     const saved = loadPlayerState(puzzle.id);
     if (saved) {
@@ -417,12 +425,13 @@ export default function PuzzleClient() {
             }
           }
         }
-        // Check if this completes the whole chapter (initiate-mode puzzles only)
-        const tierPuzzles = SAMPLE_PUZZLES.filter(p => campaignRegionDifficulty(p) === campaignRegionDifficulty(puzzle) && p.mode === 'initiate');
+        // Check if this completes the whole chapter
+        const finishedRegion = findRegionForPuzzle(puzzle);
+        const tierPuzzles = finishedRegion ? getRegionPuzzles(finishedRegion) : [];
         const allCompleted = loadAllCompleted();
         allCompleted.add(puzzle.id);
-        const chapterJustFinished = puzzle.mode === 'initiate'
-          && CHAPTER_COMPLETIONS[campaignRegionDifficulty(puzzle)] != null
+        const chapterJustFinished = finishedRegion != null
+          && CHAPTER_COMPLETIONS[finishedRegion.difficulty] != null
           && tierPuzzles.length > 0
           && tierPuzzles.every(p => allCompleted.has(p.id));
 
@@ -601,22 +610,17 @@ export default function PuzzleClient() {
   // Must be called before any early return below (hooks can't be conditional).
   const regionPuzzles = useMemo(() => {
     if (!puzzle) return [];
-    // Initiate mode is grouped into difficulty-tier "regions" (chapters), so next-puzzle
-    // must stay within the same tier. Shattered Realms and Twin Watchers aren't split into
-    // tiers at all (see app/page.tsx's flat shatteredPuzzles/twinPuzzles lists) — matching
-    // mode alone is both correct and necessary, since this was hardcoded to 'initiate' and
-    // silently left those two modes with an always-empty list, so completing one never
-    // found a "next puzzle" and fell back to the menu.
-    // Twin Watchers also sorts puzzles with a guaranteed easy opening move
-    // first (see app/page.tsx's matching comment) — keep this in sync with
-    // that list's order, or "next puzzle" here would lead somewhere
-    // different from what the home page itself would have suggested next.
-    return SAMPLE_PUZZLES
-      .filter(p => p.mode === puzzle.mode && (puzzle.mode !== 'initiate' || campaignRegionDifficulty(p) === campaignRegionDifficulty(puzzle)))
-      .sort((a, b) => puzzle.mode === 'twin-watchers'
-        ? Number(hasForcedOpening(b)) - Number(hasForcedOpening(a)) || a.score - b.score
-        : a.score - b.score
-      );
+    // Scope "next puzzle" to the puzzle's own campaign region when it has
+    // one (Keeper's Quarters, The Reply, or any of the initiate-mode
+    // regions) — falls back to the flat mode-wide pool only for a genuinely
+    // standalone puzzle (e.g. an Advanced-Modes puzzle outside any region's
+    // difficultyPool), matching app/page.tsx's own flat shatteredPuzzles/
+    // twinPuzzles lists for that case.
+    const region = findRegionForPuzzle(puzzle);
+    const pool = region
+      ? getRegionPuzzles(region)
+      : SAMPLE_PUZZLES.filter(p => p.mode === puzzle.mode);
+    return sortPuzzlesForRegion(pool, puzzle.mode);
   }, [puzzle]);
 
   if (!puzzle) {
@@ -641,7 +645,7 @@ export default function PuzzleClient() {
     );
   }
 
-  const region = REGION_BY_DIFFICULTY[campaignRegionDifficulty(puzzle)] ?? null;
+  const region = findRegionForPuzzle(puzzle);
   const currentIdx = regionPuzzles.findIndex(p => p.id === puzzle.id);
   const nextPuzzle = currentIdx >= 0 && currentIdx < regionPuzzles.length - 1
     ? regionPuzzles[currentIdx + 1]
@@ -799,6 +803,13 @@ export default function PuzzleClient() {
         />
       )}
 
+      {pendingRuleChange && (
+        <RuleChangeIntro
+          mode={pendingRuleChange}
+          onDismiss={() => setPendingRuleChange(null)}
+        />
+      )}
+
       {/* Contradiction / rejection — floats above footer */}
       {(rejectionMessage || (contradiction.found && !showCompletion)) && (
         <div style={{
@@ -878,7 +889,7 @@ export default function PuzzleClient() {
 
       {/* Chapter completion overlay */}
       {showChapterComplete && (() => {
-        const completion = CHAPTER_COMPLETIONS[campaignRegionDifficulty(puzzle)];
+        const completion = CHAPTER_COMPLETIONS[region?.difficulty ?? campaignRegionDifficulty(puzzle)];
         if (!completion) return null;
         return (
           <div

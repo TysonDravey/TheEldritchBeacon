@@ -3,10 +3,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { SAMPLE_PUZZLES } from '@/data/samplePuzzles';
-import type { Puzzle, Difficulty } from '@/engine/boardTypes';
 import { hasForcedOpening } from '@/engine/difficulty';
 import SplashScreen from '@/components/SplashScreen';
-import { REGIONS, campaignRegionDifficulty } from '@/data/regions';
+import { REGIONS, getRegionPuzzles } from '@/data/regions';
 import { useSettings } from '@/lib/settings';
 import { playSound } from '@/lib/sound';
 import PuzzleCard from '@/components/PuzzleCard';
@@ -33,19 +32,13 @@ export default function HomePage() {
 
     // Detect newly unlocked regions for the celebration banner
     const known = new Set<string>(JSON.parse(localStorage.getItem(UNLOCKED_KEY) ?? '[]'));
-    const byDiff = new Map<Difficulty, Puzzle[]>();
-    for (const p of SAMPLE_PUZZLES.filter(p => p.mode === 'initiate')) {
-      const region = campaignRegionDifficulty(p);
-      if (!byDiff.has(region)) byDiff.set(region, []);
-      byDiff.get(region)!.push(p);
-    }
 
     // Walk the region chain to find what's newly unlocked
     let prevComplete = true;
     const nowKnown = new Set(known);
     let firstNew: string | null = null;
     for (const region of REGIONS) {
-      const puzzles = byDiff.get(region.difficulty) ?? [];
+      const puzzles = getRegionPuzzles(region);
       if (puzzles.length === 0) continue;
       if (!prevComplete) break;
       // This region is unlocked
@@ -66,24 +59,14 @@ export default function HomePage() {
     }
   }, []);
 
-  // Group campaign puzzles by difficulty — only needed here to compute the
-  // "Chapter N — Region Name" banner text, not to render per-region detail
-  // (that detail now lives entirely on /campaign/map).
-  const campaignPuzzles = SAMPLE_PUZZLES.filter(p => p.mode === 'initiate');
-  const byDifficulty = new Map<Difficulty, Puzzle[]>();
-  for (const p of campaignPuzzles) {
-    const region = campaignRegionDifficulty(p);
-    if (!byDifficulty.has(region)) byDifficulty.set(region, []);
-    byDifficulty.get(region)!.push(p);
-  }
-
-  // Compute current chapter for the campaign banner
+  // Compute current chapter for the campaign banner — per-region detail now
+  // lives entirely on /campaign/map.
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
-  const regionsWithPuzzles = REGIONS.filter(r => (byDifficulty.get(r.difficulty) ?? []).length > 0);
+  const regionsWithPuzzles = REGIONS.filter(r => getRegionPuzzles(r).length > 0);
   let currentChapterIdx = regionsWithPuzzles.length - 1;
   let allChaptersComplete = true;
   for (let i = 0; i < regionsWithPuzzles.length; i++) {
-    const puzzles = byDifficulty.get(regionsWithPuzzles[i].difficulty) ?? [];
+    const puzzles = getRegionPuzzles(regionsWithPuzzles[i]);
     if (!puzzles.every(p => completedIds.has(p.id))) {
       currentChapterIdx = i;
       allChaptersComplete = false;

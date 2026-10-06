@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { SAMPLE_PUZZLES } from '@/data/samplePuzzles';
-import { REGIONS, campaignRegionDifficulty } from '@/data/regions';
+import { REGIONS, getRegionPuzzles, sortPuzzlesForRegion, type CampaignRegion } from '@/data/regions';
 import type { Puzzle, Difficulty } from '@/engine/boardTypes';
 import PuzzleCard from '@/components/PuzzleCard';
 import JournalViewer from '@/components/JournalViewer';
@@ -57,14 +57,14 @@ function RegionNode({
   isLast,
   onOpenJournal,
 }: {
-  region: typeof REGIONS[number];
+  region: CampaignRegion;
   puzzles: Puzzle[];
   completedIds: Set<string>;
   status: RegionStatus;
   isLast: boolean;
   onOpenJournal: (src: string) => void;
 }) {
-  const sorted = [...puzzles].sort((a, b) => a.score - b.score);
+  const sorted = sortPuzzlesForRegion(puzzles, region.mode ?? 'initiate');
   const completedCount = sorted.filter(p => completedIds.has(p.id)).length;
   const currentPuzzle = sorted.find(p => !completedIds.has(p.id)) ?? null;
   const currentIdx = sorted.findIndex(p => !completedIds.has(p.id));
@@ -159,19 +159,12 @@ export default function CampaignMapPage() {
     setReady(true);
   }, []);
 
-  const campaignPuzzles = SAMPLE_PUZZLES.filter(p => p.mode === 'initiate');
-  const byDifficulty = new Map<Difficulty, Puzzle[]>();
-  for (const p of campaignPuzzles) {
-    const region = campaignRegionDifficulty(p);
-    if (!byDifficulty.has(region)) byDifficulty.set(region, []);
-    byDifficulty.get(region)!.push(p);
-  }
-
-  const regionsWithPuzzles = REGIONS.filter(r => (byDifficulty.get(r.difficulty) ?? []).length > 0);
+  const puzzlesByRegion = new Map<Difficulty, Puzzle[]>(REGIONS.map(r => [r.difficulty, getRegionPuzzles(r)]));
+  const regionsWithPuzzles = REGIONS.filter(r => (puzzlesByRegion.get(r.difficulty) ?? []).length > 0);
 
   let prevComplete = true;
   const statuses: RegionStatus[] = regionsWithPuzzles.map(region => {
-    const puzzles = byDifficulty.get(region.difficulty) ?? [];
+    const puzzles = puzzlesByRegion.get(region.difficulty) ?? [];
     const allDone = puzzles.every(p => completedIds.has(p.id));
     let status: RegionStatus;
     if (!prevComplete) status = 'locked';
@@ -205,7 +198,7 @@ export default function CampaignMapPage() {
             <RegionNode
               key={region.difficulty}
               region={region}
-              puzzles={byDifficulty.get(region.difficulty) ?? []}
+              puzzles={puzzlesByRegion.get(region.difficulty) ?? []}
               completedIds={completedIds}
               status={statuses[i]}
               isLast={i === regionsWithPuzzles.length - 1}

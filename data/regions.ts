@@ -1,6 +1,8 @@
-import type { Difficulty, Puzzle } from '@/engine/boardTypes';
+import type { Difficulty, Puzzle, PuzzleMode } from '@/engine/boardTypes';
+import { SAMPLE_PUZZLES } from '@/data/samplePuzzles';
+import { hasForcedOpening } from '@/engine/difficulty';
 
-export const REGIONS: {
+export interface CampaignRegion {
   name: string;
   difficulty: Difficulty;
   ward: string;
@@ -12,7 +14,26 @@ export const REGIONS: {
   // arrival, survey, the geometry stops making sense, blood enters, the
   // impossible window, the full realization, the quiet aftermath.
   journalPage: string;
-}[] = [
+  // Puzzle mode this region draws from — defaults to 'initiate' when absent,
+  // so the five base-ruleset regions below need no changes.
+  mode?: PuzzleMode;
+  // When present, membership is "difficulty is one of these" instead of the
+  // usual exact `campaignRegionDifficulty(puzzle) === difficulty` match.
+  // Needed for regions whose nominal `difficulty` has no puzzles of its own
+  // (e.g. nothing is ever solver-scored 'Harbinger') — this is checked
+  // against the puzzle's RAW difficulty, deliberately bypassing
+  // campaignRegionDifficulty's board-size cap below, since that cap exists
+  // to preserve escalating board *size* across the initiate-only track and
+  // doesn't apply to a region whose escalation signal is "the rules
+  // changed," not "the board grew."
+  difficultyPool?: Difficulty[];
+  // Caps how many puzzles of a given board size land in this region (lowest
+  // -score/easiest kept, rest dropped) — lets a region open with a handful
+  // of small boards without being dominated by them.
+  maxBoardCountBySize?: Partial<Record<number, number>>;
+}
+
+export const REGIONS: CampaignRegion[] = [
   {
     name: 'Landfall',
     difficulty: 'Initiate',
@@ -60,6 +81,9 @@ export const REGIONS: {
     description: 'The observations converge. They should not match.',
     techniques: ['Forced Territory Chain', 'Chain of Madness'],
     journalPage: '/journal/page-06.jpg',
+    mode: 'shattered-realms',
+    difficultyPool: ['Occultist', 'High Priest', 'Archon'],
+    maxBoardCountBySize: { 5: 5 },
   },
   {
     name: 'The Reply',
@@ -68,6 +92,7 @@ export const REGIONS: {
     description: 'I did not draw this. Something already knew.',
     techniques: ['Deep Current', 'Watcher Network'],
     journalPage: '/journal/page-07.jpg',
+    mode: 'twin-watchers',
   },
 ];
 
@@ -99,4 +124,58 @@ export function campaignRegionDifficulty(puzzle: Puzzle): Difficulty {
   // sequential regions at all — leave those alone rather than guess.
   if (ownRank === -1 || capRank === -1 || ownRank <= capRank) return puzzle.difficulty;
   return cap;
+}
+
+/** Does this puzzle belong to this campaign region? The one place mode +
+ *  difficulty(-pool) membership logic lives — every call site that needs to
+ *  group campaign puzzles by region should call this (or one of the helpers
+ *  below) instead of inlining its own mode/difficulty check. */
+export function puzzleBelongsToRegion(puzzle: Puzzle, region: CampaignRegion): boolean {
+  if (puzzle.mode !== (region.mode ?? 'initiate')) return false;
+  if (region.difficultyPool) return region.difficultyPool.includes(puzzle.difficulty);
+  return campaignRegionDifficulty(puzzle) === region.difficulty;
+}
+
+/** Which single region (if any) this puzzle belongs to. Returns null for a
+ *  puzzle that isn't part of any campaign region (e.g. a standalone
+ *  Advanced-Modes puzzle whose difficulty isn't in a difficultyPool). */
+export function findRegionForPuzzle(puzzle: Puzzle): CampaignRegion | null {
+  return REGIONS.find(r => puzzleBelongsToRegion(puzzle, r)) ?? null;
+}
+
+/** All puzzles backing this region, from the given pool. Applies
+ *  maxBoardCountBySize (lowest-score/easiest kept per size) when the region
+ *  declares it. */
+export function getRegionPuzzles(region: CampaignRegion, allPuzzles: Puzzle[] = SAMPLE_PUZZLES): Puzzle[] {
+  const matches = allPuzzles.filter(p => puzzleBelongsToRegion(p, region));
+  const cap = region.maxBoardCountBySize;
+  if (!cap) return matches;
+  const bySize = new Map<number, Puzzle[]>();
+  for (const p of matches) {
+    if (!bySize.has(p.size)) bySize.set(p.size, []);
+    bySize.get(p.size)!.push(p);
+  }
+  const result: Puzzle[] = [];
+  for (const [size, puzzles] of bySize) {
+    const limit = cap[size];
+    if (limit == null) { result.push(...puzzles); continue; }
+    result.push(...[...puzzles].sort((a, b) => a.score - b.score).slice(0, limit));
+  }
+  return result;
+}
+
+/** Centralized "next puzzle" ordering so every surface (campaign map, the
+ *  puzzle header's next-puzzle memo, the home page's Advanced Modes lists)
+ *  stays in sync. For twin-watchers, puzzles with a guaranteed easy opening
+ *  move (engine/difficulty.ts's hasForcedOpening) come first regardless of
+ *  raw score — score alone doesn't know whether the first move is a fair
+ *  one, and nearly every twin puzzle ends up Archon-or-harder overall
+ *  anyway, so sorting by score alone buried easier-opening puzzles behind
+ *  harder-opening ones with a coincidentally lower total score. */
+export function sortPuzzlesForRegion(puzzles: Puzzle[], mode: PuzzleMode): Puzzle[] {
+  return [...puzzles].sort((a, b) =>
+    mode === 'twin-watchers'
+      ? Number(hasForcedOpening(b)) - Number(hasForcedOpening(a)) || a.score - b.score
+      : a.score - b.score
+  );
 }

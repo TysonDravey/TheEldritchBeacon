@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SAMPLE_PUZZLES } from '@/data/samplePuzzles';
-import { REGIONS } from '@/data/regions';
+import { REGIONS, getRegionPuzzles } from '@/data/regions';
 
 const STORAGE_KEY_PREFIX = 'eldritch_beacon_state_';
 const NOTE_SEEN_KEY      = 'eldritch_beacon_keeper_note_seen';
@@ -23,15 +23,11 @@ function loadCompletedIds(): Set<string> {
 function getCurrentChapter(completedIds: Set<string>): {
   roman: string; regionName: string; image: string; completedCount: number;
 } {
-  const regionsWithPuzzles = REGIONS.filter(r =>
-    SAMPLE_PUZZLES.some(p => p.difficulty === r.difficulty && p.mode === 'initiate')
-  );
+  const regionsWithPuzzles = REGIONS.filter(r => getRegionPuzzles(r).length > 0);
   let idx = regionsWithPuzzles.length - 1;
   let completedCount = regionsWithPuzzles.length;
   for (let i = 0; i < regionsWithPuzzles.length; i++) {
-    const puzzles = SAMPLE_PUZZLES.filter(
-      p => p.difficulty === regionsWithPuzzles[i].difficulty && p.mode === 'initiate'
-    );
+    const puzzles = getRegionPuzzles(regionsWithPuzzles[i]);
     if (!puzzles.every(p => completedIds.has(p.id))) {
       idx = i;
       completedCount = i;
