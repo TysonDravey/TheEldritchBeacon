@@ -833,6 +833,10 @@ export function getNextDeduction(
   const tde = territoryDeadEnd(puzzle, playerCells, candidates);
   if (tde) return tde;
 
+  // Technique 5b: Mutual exclusion
+  const me = mutualExclusion(puzzle, playerCells, candidates);
+  if (me) return me;
+
   // Technique 6: Hidden set elimination
   const hs = hiddenSetElimination(puzzle, playerCells, candidates);
   if (hs) return hs;
@@ -920,6 +924,92 @@ function territoryDeadEnd(
             affectedTerritories: [territory, t2],
           };
         }
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Technique 5b: Mutual exclusion.
+ * For each hypothesized watcher placement (r,c), compute the DIRECT
+ * (non-cascading) effect on every OTHER unsatisfied territory's candidates —
+ * same row/col-once-full, or adjacency — exactly like territoryDeadEnd does.
+ * If that narrows two different territories down to exactly one surviving
+ * cell each, and those two surviving cells would themselves conflict
+ * (same row, same col, or adjacent), then (r,c) is impossible: it would
+ * force those two territories into a dead end against each other.
+ *
+ * Twin-watchers mode is not supported — a territory narrowing to exactly 1
+ * candidate while needing 2 watchers is a different (currently unhandled)
+ * failure mode, not a forced single, so the "single mode" semantics below
+ * don't generalize. Matches hiddenSetElimination's precedent.
+ */
+function mutualExclusion(
+  puzzle: Puzzle,
+  playerCells: CellState[][],
+  candidates: Map<number, [number, number][]>
+): DeductionResult | null {
+  if (puzzle.mode === 'twin-watchers') return null;
+
+  const n = puzzle.size;
+  const watchers = getWatcherPositions(playerCells);
+  const rowCounts = new Map<number, number>();
+  const colCounts = new Map<number, number>();
+  for (const [wr, wc] of watchers) {
+    rowCounts.set(wr, (rowCounts.get(wr) ?? 0) + 1);
+    colCounts.set(wc, (colCounts.get(wc) ?? 0) + 1);
+  }
+
+  const satisfiedTerritories = new Set<number>();
+  for (const [t, cands] of candidates) {
+    if (cands.length === 0) satisfiedTerritories.add(t);
+  }
+
+  for (const [territory, cands] of candidates) {
+    if (cands.length === 0) continue;
+
+    for (const [r, c] of cands) {
+      const rowWouldBeFull = (rowCounts.get(r) ?? 0) + 1 >= 1;
+      const colWouldBeFull = (colCounts.get(c) ?? 0) + 1 >= 1;
+
+      const adjSet = new Set<string>();
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          const nr = r + dr, nc = c + dc;
+          if (nr >= 0 && nr < n && nc >= 0 && nc < n) adjSet.add(`${nr},${nc}`);
+        }
+      }
+
+      // Territories (other than the hypothesis's own) that this placement
+      // narrows down to exactly one surviving candidate cell.
+      const narrowed: { territory: number; cell: [number, number] }[] = [];
+
+      for (const [t2, tc] of candidates) {
+        if (t2 === territory || satisfiedTerritories.has(t2) || tc.length === 0) continue;
+
+        const remaining = tc.filter(([r2, c2]) =>
+          !((rowWouldBeFull && r2 === r) || (colWouldBeFull && c2 === c) || adjSet.has(`${r2},${c2}`))
+        );
+        if (remaining.length !== 1) continue;
+
+        const [rB, cB] = remaining[0];
+        for (const prior of narrowed) {
+          const [rA, cA] = prior.cell;
+          if (isAdjacent(rA, cA, rB, cB) || rA === rB || cA === cB) {
+            return {
+              type: 'ward', row: r, col: c,
+              reason: `Placing a Watcher here would force territories ${prior.territory + 1} and ${t2 + 1} each into their one remaining cell — and those cells conflict with each other.`,
+              reasonType: 'mutual-exclusion',
+              pairedTerritories: [prior.territory, t2],
+              affectedCells: [prior.cell, remaining[0]],
+              affectedTerritories: [territory, prior.territory, t2],
+            };
+          }
+        }
+        narrowed.push({ territory: t2, cell: remaining[0] });
       }
     }
   }

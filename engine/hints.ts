@@ -25,6 +25,7 @@ export const TECHNIQUE_NAMES: Partial<Record<string, string>> = {
   'hidden-set-col':     'Hidden Set',
   'dual-confinement':   'Dual Confinement',
   'territory-dead-end': 'Territory Dead-End',
+  'mutual-exclusion':   'Mutual Exclusion',
   'hypothetical':       'Forbidden Tide',
   'hypothetical-deep':  'Forced Territory Chain',
   'naked-single-territory': 'Last Refuge',
@@ -137,7 +138,7 @@ function buildWardHint(
   depth: number,
   playerCells: CellState[][],
 ): Omit<HintResult, 'costsLantern'> {
-  const { row, col, reasonType, confinedTerritory, pairedTerritories, blockedBy } = d;
+  const { row, col, reasonType, confinedTerritory, pairedTerritories, blockedBy, affectedCells } = d;
   const cellTerritory = puzzle.territoryMap[row][col];
 
   // ---- Direct post-watcher cleanup (adjacency / row/col/territory occupied) ----
@@ -512,6 +513,40 @@ function buildWardHint(
       cascadeSteps: forcedSteps,
       cascadeConstraintWaves: constraintWaves,
       cascadeVictimCells: remainingVictimCells,
+    };
+  }
+
+  // ---- Mutual exclusion ----
+  if (reasonType === 'mutual-exclusion' && pairedTerritories?.length === 2 && affectedCells?.length === 2) {
+    const [tA, tB] = pairedTerritories;
+    const [cellA, cellB] = affectedCells;
+
+    if (depth === 0) {
+      return {
+        level: 1,
+        message: `Consider what would happen if a Watcher rose at this cell. Watch what happens to the ${tname(tA)} and ${tname(tB)} territories.`,
+        primaryCell: [row, col],
+        secondaryHighlightTerritories: [tA, tB],
+      };
+    }
+
+    if (depth === 1) {
+      return {
+        level: 2,
+        message: `If a Watcher rose here, the ${tname(tA)} and ${tname(tB)} territories would each be narrowed down to a single remaining cell. Study where those two cells sit relative to each other.`,
+        primaryCell: [row, col],
+        highlightCells: affectedCells,
+        secondaryHighlightTerritories: [tA, tB],
+      };
+    }
+
+    return {
+      level: 3,
+      message: `A Watcher here is impossible. It would force the ${tname(tA)} territory into row ${cellA[0] + 1}, column ${cellA[1] + 1} and the ${tname(tB)} territory into row ${cellB[0] + 1}, column ${cellB[1] + 1} — and those two cells cannot both hold a Watcher. Mark this cell with a Ward.`,
+      primaryCell: [row, col],
+      highlightCells: affectedCells,
+      secondaryHighlightTerritories: [tA, tB],
+      deduction: d,
     };
   }
 

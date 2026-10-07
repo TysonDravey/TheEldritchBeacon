@@ -18,6 +18,7 @@ interface TechniqueRecord {
   dualConfinement: number;
   pairElimination: number;
   territoryDeadEnd: number;
+  mutualExclusion: number;
   hiddenSet: number;
   contradictionTest: number;      // hypothetical, chain ≤ 2 forced steps
   contradictionTestDeep: number;  // hypothetical, chain 3+ forced steps
@@ -28,6 +29,7 @@ function classifyDeduction(d: DeductionResult): keyof TechniqueRecord {
   if (d.reasonType === 'hypothetical') return 'contradictionTest';
   if (d.reasonType === 'dual-confinement') return 'dualConfinement';
   if (d.reasonType === 'territory-dead-end') return 'territoryDeadEnd';
+  if (d.reasonType === 'mutual-exclusion') return 'mutualExclusion';
   if (d.reasonType === 'hidden-set-row' || d.reasonType === 'hidden-set-col') return 'hiddenSet';
   if (d.reasonType === 'row-confinement') return 'rowConfinement';
   if (d.reasonType === 'col-confinement') return 'columnConfinement';
@@ -43,6 +45,7 @@ function computeScore(record: TechniqueRecord): number {
     record.dualConfinement * 3 +
     record.pairElimination * 3 +
     record.territoryDeadEnd * 4 +
+    record.mutualExclusion * 5 +
     record.hiddenSet * 4 +
     record.contradictionTest * 5 +
     record.contradictionTestDeep * 12
@@ -105,6 +108,7 @@ function buildRecord(puzzle: Puzzle): TechniqueRecord {
     dualConfinement: 0,
     pairElimination: 0,
     territoryDeadEnd: 0,
+    mutualExclusion: 0,
     hiddenSet: 0,
     contradictionTest: 0,
     contradictionTestDeep: 0,

@@ -50,6 +50,11 @@ export const TECHNIQUES: Record<string, TechniqueEntry> = {
     description: 'Placing a Watcher in a cell would immediately leave another territory with no valid placements. The cell is forbidden.',
     flavour: 'Some choices do not merely fail — they doom what comes after.',
   },
+  'Mutual Exclusion': {
+    name: 'Mutual Exclusion',
+    description: 'A placement that would force two other territories each down to their one remaining cell — and those two cells cannot coexist — is itself forbidden.',
+    flavour: 'Two watches set against each other can never both be kept. Something must give, and it will not be this.',
+  },
   'Forbidden Tide': {
     name: 'Forbidden Tide',
     description: 'A candidate appears legal, but following its consequences reveals an unavoidable contradiction. The candidate is eliminated.',

@@ -58,6 +58,7 @@ export type DeductionReasonType =
   | 'naked-single-col'
   | 'dual-confinement'
   | 'territory-dead-end'
+  | 'mutual-exclusion'
   | 'hypothetical';
 
 export interface DeductionResult {
@@ -68,12 +69,15 @@ export interface DeductionResult {
   reasonType?: DeductionReasonType;
   /** For confinement: the territory whose confinement caused this elimination */
   confinedTerritory?: number;
-  /** For pair: the group of territories that share the rows/cols */
+  /** For pair: the group of territories that share the rows/cols. For
+   *  mutual-exclusion: the two territories [tA, tB] forced into conflicting
+   *  singletons. */
   pairedTerritories?: number[];
   /** For row/col occupied: the watcher position that blocks this */
   blockedBy?: [number, number];
   /** Twin mode only: the other cell that's equally forced alongside this one */
   pairedCell?: [number, number];
+  /** For mutual-exclusion: the two forced/conflicting cells [cellA, cellB]. */
   affectedCells?: [number, number][];
   affectedTerritories?: number[];
 }
