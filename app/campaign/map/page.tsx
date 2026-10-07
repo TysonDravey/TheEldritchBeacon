@@ -49,12 +49,15 @@ function JournalPreview({ src, onOpen }: { src: string; onOpen: () => void }) {
   );
 }
 
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+
 function RegionNode({
   region,
   puzzles,
   completedIds,
   status,
   isLast,
+  chapterNumber,
   onOpenJournal,
 }: {
   region: CampaignRegion;
@@ -62,6 +65,7 @@ function RegionNode({
   completedIds: Set<string>;
   status: RegionStatus;
   isLast: boolean;
+  chapterNumber: number;
   onOpenJournal: (src: string) => void;
 }) {
   const sorted = sortPuzzlesForRegion(puzzles, region.mode ?? 'initiate');
@@ -105,7 +109,9 @@ function RegionNode({
       <div className="flex-1 min-w-0 pb-8">
         {status === 'locked' ? (
           <div className="bg-parchment border border-ink border-opacity-20 rounded-sm px-4 py-3 opacity-60">
-            <h3 className="font-lovecraftian text-base text-ink">{region.name}</h3>
+            <h3 className="font-lovecraftian text-base text-ink">
+              Chapter {ROMAN[chapterNumber] ?? chapterNumber + 1}
+            </h3>
             <p className="font-serif text-xs text-ink-light italic mt-0.5">Sealed until the previous chart is restored</p>
           </div>
         ) : status === 'completed' ? (
@@ -202,6 +208,7 @@ export default function CampaignMapPage() {
               completedIds={completedIds}
               status={statuses[i]}
               isLast={i === regionsWithPuzzles.length - 1}
+              chapterNumber={i}
               onOpenJournal={setOpenJournalSrc}
             />
           ))}

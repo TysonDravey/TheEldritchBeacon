@@ -14,6 +14,12 @@ export interface CampaignRegion {
   // arrival, survey, the geometry stops making sense, blood enters, the
   // impossible window, the full realization, the quiet aftermath.
   journalPage: string;
+  // CSS object-position for journalPage when shown full-bleed (campaign intro,
+  // chapter-complete overlay) — each page's actual illustration sits in a
+  // different part of the frame, not the center, so this anchors the crop
+  // (and the journal-pan animation's oscillation) on the real subject instead
+  // of generically panning around the middle. Defaults to 'center 42%'.
+  journalFocus?: string;
   // Puzzle mode this region draws from — defaults to 'initiate' when absent,
   // so the five base-ruleset regions below need no changes.
   mode?: PuzzleMode;
@@ -41,6 +47,7 @@ export const REGIONS: CampaignRegion[] = [
     description: 'Keeper Vale has gone silent. The light still turns.',
     techniques: ['Last Refuge', 'Full Row', 'Full Column', 'Touching Shadows'],
     journalPage: '/journal/page-01.jpg',
+    journalFocus: '72% 58%', // the lighthouse sits right-of-center, lower half
   },
   {
     name: 'The Survey',
@@ -49,6 +56,7 @@ export const REGIONS: CampaignRegion[] = [
     description: 'Marks cut above the entrance. Mason’s work, surely.',
     techniques: ['Territory Lock', 'Column Lock'],
     journalPage: '/journal/page-02.jpg',
+    journalFocus: '64% 50%', // the tower runs full-height, right-of-center
   },
   {
     name: 'The Lower Level',
@@ -57,6 +65,7 @@ export const REGIONS: CampaignRegion[] = [
     description: 'The measurements will not close. It is larger within.',
     techniques: ['Narrow Channel', 'Shared Horizon'],
     journalPage: '/journal/page-03.jpg',
+    journalFocus: '60% 48%', // the spiral stair sits right-of-center
   },
   {
     name: 'The Lantern Room',
@@ -65,6 +74,7 @@ export const REGIONS: CampaignRegion[] = [
     description: 'Thirty-six seconds by the gears. Forty-one by the light.',
     techniques: ['Beacon Pair', 'Territory Dead-End', 'Dual Confinement'],
     journalPage: '/journal/page-04.jpg',
+    journalFocus: '56% 46%', // the blood-streaked lens sits center-right
   },
   {
     name: 'The West Wall',
@@ -73,6 +83,7 @@ export const REGIONS: CampaignRegion[] = [
     description: 'Two windows without. Three within.',
     techniques: ['Mutual Exclusion', 'Forbidden Tide', 'Territory Network'],
     journalPage: '/journal/page-05.jpg',
+    journalFocus: '24% 50%', // the window/doorway drawing sits on the left this time
   },
   {
     name: 'The Keeper’s Quarters',
@@ -81,6 +92,7 @@ export const REGIONS: CampaignRegion[] = [
     description: 'The observations converge. They should not match.',
     techniques: ['Forced Territory Chain', 'Chain of Madness'],
     journalPage: '/journal/page-06.jpg',
+    journalFocus: '48% 40%', // busy/chaotic page — stair + lens both near center
     mode: 'shattered-realms',
     difficultyPool: ['Occultist', 'High Priest', 'Archon'],
     maxBoardCountBySize: { 5: 5 },
@@ -92,6 +104,7 @@ export const REGIONS: CampaignRegion[] = [
     description: 'I did not draw this. Something already knew.',
     techniques: ['Deep Current', 'Watcher Network'],
     journalPage: '/journal/page-07.jpg',
+    journalFocus: '58% 58%', // the figure at the desk sits center-right, lower half
     mode: 'twin-watchers',
   },
 ];
@@ -108,8 +121,11 @@ const DIFFICULTY_ORDER = REGIONS.map(r => r.difficulty);
 // undercuts the sense of escalating scale regardless of how demanding its
 // logic actually is. Caps which region a puzzle can be grouped into by
 // board size, independent of (and without altering) its real difficulty.
+// Every 5x5 initiate-mode puzzle funnels all the way down to Landfall (not
+// just to Scholar) — keeps every small board as part of the easy opening
+// stretch, and keeps The Survey (and every region after it) free of them.
 const MAX_REGION_BY_SIZE: Partial<Record<number, Difficulty>> = {
-  5: 'Scholar',
+  5: 'Initiate',
 };
 
 /** Which region's puzzle pool this puzzle should be grouped into for campaign

@@ -907,7 +907,7 @@ export default function PuzzleClient() {
               style={{
                 position: 'absolute', inset: 0,
                 width: '100%', height: '100%',
-                objectFit: 'cover', objectPosition: 'center top',
+                objectFit: 'cover', objectPosition: region?.journalFocus ?? 'center 42%',
               }}
             />
             <div style={{
@@ -931,7 +931,7 @@ export default function PuzzleClient() {
                 {completion.lore}
               </p>
               <button
-                onClick={() => router.push('/')}
+                onClick={() => router.push('/campaign/map')}
                 className="transition-all duration-100 hover:brightness-110 active:scale-95 relative"
                 style={{ filter: 'drop-shadow(3px 7px 3px rgba(0,0,0,0.75))' }}
               >

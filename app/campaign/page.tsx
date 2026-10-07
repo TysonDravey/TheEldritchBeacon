@@ -21,7 +21,7 @@ function loadCompletedIds(): Set<string> {
 }
 
 function getCurrentChapter(completedIds: Set<string>): {
-  roman: string; regionName: string; image: string; completedCount: number;
+  roman: string; regionName: string; image: string; focus: string; completedCount: number;
 } {
   const regionsWithPuzzles = REGIONS.filter(r => getRegionPuzzles(r).length > 0);
   let idx = regionsWithPuzzles.length - 1;
@@ -35,10 +35,12 @@ function getCurrentChapter(completedIds: Set<string>): {
     }
   }
   const image = regionsWithPuzzles[idx]?.journalPage ?? REGIONS[0].journalPage;
+  const focus = regionsWithPuzzles[idx]?.journalFocus ?? REGIONS[0].journalFocus ?? 'center 42%';
   return {
     roman: ROMAN[idx] ?? String(idx + 1),
     regionName: regionsWithPuzzles[idx]?.name ?? 'Landfall',
     image,
+    focus,
     completedCount,
   };
 }
@@ -50,7 +52,7 @@ export default function CampaignPage() {
   const [view,    setView]    = useState<View>('intro');
   const [started, setStarted] = useState(false);
   const [ready,   setReady]   = useState(false);
-  const [chapter, setChapter] = useState({ roman: 'I', regionName: 'Landfall', image: REGIONS[0].journalPage, completedCount: 0 });
+  const [chapter, setChapter] = useState({ roman: 'I', regionName: 'Landfall', image: REGIONS[0].journalPage, focus: REGIONS[0].journalFocus ?? 'center 42%', completedCount: 0 });
 
   useEffect(() => {
     const completed = loadCompletedIds();
@@ -183,7 +185,7 @@ export default function CampaignPage() {
           width: '100%',
           height: '100%',
           objectFit: 'cover',
-          objectPosition: 'center top',
+          objectPosition: chapter.focus,
           opacity: ready ? 1 : 0,
           transition: 'opacity 0.8s ease',
         }}
