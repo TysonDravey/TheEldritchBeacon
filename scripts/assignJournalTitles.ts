@@ -25,6 +25,7 @@ import type { Puzzle } from '../engine/boardTypes';
 import {
   LANDFALL_TITLES, SURVEY_TITLES, LOWER_LEVEL_TITLES, LANTERN_ROOM_TITLES, WEST_WALL_TITLES,
 } from './journalTitles';
+import { KEEPERS_QUARTERS_TITLES, REPLY_TITLES } from './journalTitlesExtended';
 
 const FILE = join(process.cwd(), 'data', 'samplePuzzles.ts');
 
@@ -34,6 +35,8 @@ const BANKS: Record<string, string[]> = {
   'The Lower Level': LOWER_LEVEL_TITLES,
   'The Lantern Room': LANTERN_ROOM_TITLES,
   'The West Wall': WEST_WALL_TITLES,
+  'The Keeper’s Quarters': KEEPERS_QUARTERS_TITLES,
+  'The Reply': REPLY_TITLES,
 };
 
 function parseAllPuzzles(content: string): Puzzle[] {
