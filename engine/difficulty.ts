@@ -37,19 +37,45 @@ function classifyDeduction(d: DeductionResult): keyof TechniqueRecord {
   return 'naked';
 }
 
+/**
+ * Revamped 2026-10-08: the old formula was a raw, unbounded additive sum
+ * over every solve step. That made it track solve LENGTH more than real
+ * difficulty — a bigger board mechanically needs more naked-singles and
+ * confinement passes just from having more cells/territories, regardless of
+ * whether it ever requires real structural reasoning. Confirmed in practice:
+ * several 9x9 puzzles using zero mutual-exclusion/contradiction-testing
+ * outscored 8x8 puzzles that used mutual-exclusion 5 times and
+ * contradiction-testing 5 times, purely from step-count volume, badly
+ * scrambling campaign difficulty ordering (data/samplePuzzles.ts sorts each
+ * region by this score).
+ *
+ * Fix: split techniques into two groups.
+ *   "Mechanical" (naked, row/col confinement, pair elimination, territory
+ *   dead-end, dual confinement) — their COUNT scales with board size on its
+ *   own, confirmed by this session's own technique-distribution profiling
+ *   (territory-dead-end 3.20->4.85/puzzle, pair-row 1.67->3.30/puzzle just
+ *   from 6x6->7x7). Dampened with sqrt so volume alone can't dominate.
+ *   "Real" (mutual-exclusion, hidden-set, contradiction-test, its deep
+ *   variant) — rare, structural, NOT a mechanical byproduct of board size;
+ *   a 9x9 board doesn't need more mutual-exclusion events than a 7x7 one
+ *   just for being bigger. Kept linear, weighted far higher, so a handful
+ *   of real techniques dominates any amount of mechanical volume.
+ */
 function computeScore(record: TechniqueRecord): number {
-  return (
-    record.naked * 1 +
-    record.rowConfinement * 2 +
-    record.columnConfinement * 2 +
-    record.dualConfinement * 3 +
-    record.pairElimination * 3 +
-    record.territoryDeadEnd * 4 +
-    record.mutualExclusion * 5 +
-    record.hiddenSet * 4 +
-    record.contradictionTest * 5 +
-    record.contradictionTestDeep * 12
-  );
+  const mechanical =
+    Math.sqrt(record.naked) * 1 +
+    Math.sqrt(record.rowConfinement + record.columnConfinement) * 2 +
+    Math.sqrt(record.pairElimination) * 3 +
+    Math.sqrt(record.territoryDeadEnd) * 4 +
+    Math.sqrt(record.dualConfinement) * 3;
+
+  const real =
+    record.mutualExclusion * 10 +
+    record.hiddenSet * 10 +
+    record.contradictionTest * 15 +
+    record.contradictionTestDeep * 30;
+
+  return Math.round((mechanical + real) * 10) / 10;
 }
 
 function applyDeductionToBoard(cells: CellState[][], d: DeductionResult, n: number): void {
@@ -149,11 +175,20 @@ export function scorePuzzle(puzzle: Puzzle): number {
   return computeScore(buildRecord(puzzle));
 }
 
+// Recalibrated 2026-10-08 for the revamped computeScore (see its own comment)
+// against the actual resulting distribution: puzzles using zero "real"
+// technique (mutual-exclusion/hidden-set/contradiction-test) cluster roughly
+// 2-40 by board size/step volume alone (p25=12.5, p50=21.7, p75=31.1,
+// p90=39.7 across the existing non-technique puzzle pool); puzzles using
+// real technique at all start around 23.5 and mostly land 40+. These
+// thresholds keep that separation — Eldritch is now reachable by volume
+// alone only at the extreme tail, and is reliably where real technique use
+// lands.
 function scoreTodifficulty(score: number): Difficulty {
-  if (score <= 8)  return 'Initiate';
-  if (score <= 22) return 'Scholar';
-  if (score <= 45) return 'Occultist';
-  if (score <= 85) return 'High Priest';
+  if (score <= 10) return 'Initiate';
+  if (score <= 20) return 'Scholar';
+  if (score <= 32) return 'Occultist';
+  if (score <= 42) return 'High Priest';
   return 'Eldritch';
 }
 
