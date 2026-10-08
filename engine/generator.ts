@@ -7,7 +7,7 @@ import { createRNG } from '../lib/randomSeed';
 // Solution generation — place N non-touching watchers, one per row/col
 // ---------------------------------------------------------------------------
 
-function generateSolution(n: number, rng: () => number): [number, number][] | null {
+export function generateSolution(n: number, rng: () => number): [number, number][] | null {
   const solution: [number, number][] = [];
 
   function backtrack(row: number): boolean {
@@ -107,6 +107,122 @@ function generateTerritoryMap(
         if (map[r][c] !== -1) continue;
         hasUnfilled = true;
         for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+          const nr = r + dr, nc = c + dc;
+          if (nr >= 0 && nr < n && nc >= 0 && nc < n && map[nr][nc] !== -1) {
+            map[r][c] = map[nr][nc];
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  return map;
+}
+
+// ---------------------------------------------------------------------------
+// Varied territory map — EXPERIMENTAL. generateTerritoryMap above applies one
+// biasStrength to every territory in a puzzle, so a whole puzzle is uniformly
+// stripe-like or blob-like. Reference puzzles from a competitor game mix
+// wildly different territory shapes AND sizes within the SAME board — a
+// near-straight 9-cell stripe next to a huge irregular blob next to a bare
+// 1-2 cell sliver, all in one puzzle. This is that: per-territory bias AND
+// an optional per-territory max cell count (so some territories get frozen
+// small deliberately, not just by chance). Connectivity is guaranteed by
+// construction (cells are only ever added as neighbours of already-owned
+// cells), so no separate connectivity check is needed, unlike the standard
+// path in generatePuzzle.
+// ---------------------------------------------------------------------------
+
+export function generateVariedTerritoryMap(
+  n: number,
+  solution: [number, number][],
+  rng: () => number,
+  territoryBias: number[],
+  territoryMaxSize: (number | undefined)[],
+  territoryBendChance: number[] = [],
+): number[][] {
+  const map: number[][] = Array.from({ length: n }, () => Array(n).fill(-1));
+  const territoryCount: number[] = solution.map(() => 1); // seed cell counts as 1
+
+  const axes: ('row' | 'col')[] = solution.map(() => rng() < 0.5 ? 'row' : 'col');
+
+  const pending: Array<{ row: number; col: number; territory: number }> = [];
+  for (let t = 0; t < solution.length; t++) {
+    const [r, c] = solution[t];
+    map[r][c] = t;
+    pending.push({ row: r, col: c, territory: t });
+  }
+
+  for (let i = pending.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [pending[i], pending[j]] = [pending[j], pending[i]];
+  }
+
+  while (pending.length > 0) {
+    const idx = Math.floor(rng() * Math.min(pending.length, 4));
+    const { row, col, territory } = pending.splice(idx, 1)[0];
+
+    const cap = territoryMaxSize[territory];
+    if (cap !== undefined && territoryCount[territory] >= cap) continue;
+
+    // Bending: with territoryBendChance[t] probability per growth step, flip
+    // this territory's preferred axis instead of keeping it fixed for its
+    // whole lifetime. A fixed axis can only ever grow a straight stripe or
+    // rectangle — reference puzzles mix in hook/kinked shapes (e.g. a stripe
+    // that runs down one column then bends into the next), which a
+    // never-reconsidered axis structurally cannot produce. Default chance is
+    // 0 (existing straight-shape behavior, unchanged for every current
+    // caller) — only generation calls that explicitly want bent shapes for
+    // harder difficulty tiers pass a nonzero chance.
+    const bendChance = territoryBendChance[territory] ?? 0;
+    if (bendChance > 0 && rng() < bendChance) {
+      axes[territory] = axes[territory] === 'row' ? 'col' : 'row';
+    }
+
+    const axis = axes[territory];
+    const preferred: [number, number][] = axis === 'row'
+      ? [[row, col - 1], [row, col + 1]]
+      : [[row - 1, col], [row + 1, col]];
+    const secondary: [number, number][] = axis === 'row'
+      ? [[row - 1, col], [row + 1, col]]
+      : [[row, col - 1], [row, col + 1]];
+
+    const bias = territoryBias[territory] ?? 0.75;
+
+    for (const [nr, nc] of preferred) {
+      if (cap !== undefined && territoryCount[territory] >= cap) break;
+      if (nr < 0 || nr >= n || nc < 0 || nc >= n) continue;
+      if (map[nr][nc] !== -1) continue;
+      map[nr][nc] = territory;
+      territoryCount[territory]++;
+      pending.push({ row: nr, col: nc, territory });
+    }
+    if (rng() >= bias) {
+      for (const [nr, nc] of secondary) {
+        if (cap !== undefined && territoryCount[territory] >= cap) break;
+        if (nr < 0 || nr >= n || nc < 0 || nc >= n) continue;
+        if (map[nr][nc] !== -1) continue;
+        map[nr][nc] = territory;
+        territoryCount[territory]++;
+        pending.push({ row: nr, col: nc, territory });
+      }
+    }
+  }
+
+  // Any cells left as -1 (frozen caps / strong bias leaving gaps) — fill with
+  // multi-pass BFS, same fallback as generateTerritoryMap. These fallback
+  // assignments ignore caps deliberately — every cell must end up owned by
+  // SOME territory, and a filled-in cell or two beyond a cap is harmless
+  // (the cap is a growth-shaping tool, not a hard puzzle-structure guarantee).
+  let hasUnfilled = true;
+  while (hasUnfilled) {
+    hasUnfilled = false;
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        if (map[r][c] !== -1) continue;
+        hasUnfilled = true;
+        for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
           const nr = r + dr, nc = c + dc;
           if (nr >= 0 && nr < n && nc >= 0 && nc < n && map[nr][nc] !== -1) {
             map[r][c] = map[nr][nc];

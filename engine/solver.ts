@@ -797,6 +797,7 @@ export function getNextDeduction(
   puzzle: Puzzle,
   playerCells: CellState[][],
   maxDepth: number = 1,
+  options?: { skipContradiction?: boolean },
 ): DeductionResult | null {
   const candidates = getCandidates(puzzle, playerCells);
 
@@ -841,9 +842,15 @@ export function getNextDeduction(
   const hs = hiddenSetElimination(puzzle, playerCells, candidates);
   if (hs) return hs;
 
-  // Technique 7: Contradiction test (depth controlled by maxDepth)
-  const ct = contradictionTest(puzzle, playerCells, candidates, maxDepth);
-  if (ct) return ct;
+  // Technique 7: Contradiction test (depth controlled by maxDepth) — skippable
+  // so callers can run the ladder to a "cheap fixed point" without ever
+  // invoking hypothetical/contradiction reasoning. Every other technique's
+  // relative order is unchanged; this only ever removes the last, most
+  // expensive step.
+  if (!options?.skipContradiction) {
+    const ct = contradictionTest(puzzle, playerCells, candidates, maxDepth);
+    if (ct) return ct;
+  }
 
   return null;
 }

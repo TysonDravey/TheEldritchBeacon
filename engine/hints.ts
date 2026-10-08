@@ -382,7 +382,11 @@ function buildWardHint(
           ? `Consider what would happen if a Watcher rose at this cell. Trace how it forces other placements, and watch what happens to the ${tname(victim)} territory.`
           : `Consider what would happen if a Watcher rose at this cell. Study where the ${tname(victim)} territory can still place its Watcher.`,
         primaryCell: [row, col],
-        highlightTerritories: [victim],
+        // Highlight only the territory's genuinely-still-open cells
+        // (victimCells already excludes warded ones — see getCandidates),
+        // not the whole territory, or "study where it can STILL go" would
+        // be pointing at already-dead cells too.
+        highlightCells: victimCells,
       };
     }
 
