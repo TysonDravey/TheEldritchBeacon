@@ -32,6 +32,12 @@ const CHAPTER_COMPLETIONS: Partial<Record<Difficulty, {
   chapterLabel: string;
   title: string;
   lore: string;
+  // Short forward-looking postscript, only set on the chapter immediately
+  // before a mode change (Eldritch -> shattered-realms, Harbinger ->
+  // twin-watchers) — a quiet narrative beat that the rules are about to
+  // change, read before RuleChangeIntro's more mechanical explanation on
+  // the next puzzle.
+  transitionHint?: string;
 }>> = {
   Initiate: {
     image: '/journal/page-01.jpg',
@@ -62,12 +68,14 @@ const CHAPTER_COMPLETIONS: Partial<Record<Difficulty, {
     chapterLabel: 'Chapter V Complete',
     title: 'The Third Window',
     lore: 'The exterior records two windows on the western face. I have counted from the stair and found three.\n\nThe centre opening has no corresponding stone outside it. I struck the wall myself to be sure. From within, the sound came through glass.\n\nThrough it, the horizon sits lower than it should — as though I am standing somewhere higher than I am.',
+    transitionHint: 'One more thing, before the stair down. I found the same mark twice on this page, in two places that do not touch. I assumed an error in my own hand. I am no longer certain of that.',
   },
   Harbinger: {
     image: '/journal/page-06.jpg',
     chapterLabel: 'Chapter VI Complete',
     title: 'They Should Not Match',
     lore: 'I have laid the drawings over one another by lamplight — the shoreline, the lower floor, the lantern rings, the window.\n\nThe centres do not agree, and should not agree, and yet the same shape persists through every one of them.\n\nVale wrote the same thing I am now writing: it is missing again. I begin to understand what he meant by it.',
+    transitionHint: 'I note, before closing this page, that every mark I set down left a second beside it in the lamp-glass — faint, but exact. I did not ask for a twin. I expect I will need to find a place for it regardless.',
   },
   Archon: {
     image: '/journal/page-07.jpg',
@@ -323,7 +331,16 @@ export default function PuzzleClient() {
       }
 
       const dragging = isDraggingRef.current;
-      const solved = dragging ? false : isSolved(puzzle, newCells);
+      // Always compute this directly from cell state rather than short-circuiting
+      // to false while dragging — a drag gesture only ever places/removes wards
+      // (see handleCellDrag), never watchers, so isSolved's result is unaffected
+      // by dragging in practice. Short-circuiting on the `dragging` flag instead
+      // meant a stale isDraggingRef (e.g. a leftover true from an overlapping
+      // gesture, only reset by Board.tsx's global pointerup/pointercancel safety
+      // net — which resets the flag but never rechecks completion) could cause
+      // the exact watcher placement that finishes the puzzle to be silently
+      // scored as unsolved, with nothing downstream ever re-checking it.
+      const solved = isSolved(puzzle, newCells);
 
       const becameWatcher = next === 'watcher';
       const removedWatcher = next === 'empty' && current.cells[row][col] === 'watcher';
@@ -362,7 +379,12 @@ export default function PuzzleClient() {
       // in the same frame sees this call's changes, not the stale closure state.
       playerStateRef.current = newState;
       setPlayerState(newState);
-      if (!dragging) {
+      // Persisting on every drag tick would hit localStorage dozens of times a
+      // second, so that's still skipped mid-drag — except a genuine win, which
+      // is rare enough to always persist immediately rather than risk it being
+      // silently dropped by a stale `dragging` flag (see the `solved` comment
+      // above for the exact scenario this guards against).
+      if (!dragging || solved) {
         if (contra !== null) setContradiction(contra);
         savePlayerState(newState);
       }
@@ -721,7 +743,27 @@ export default function PuzzleClient() {
       </div>
 
       {/* ── Board — fills remaining space ── */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8, minHeight: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 8, minHeight: 0, gap: 6 }}>
+        {(puzzle.mode === 'shattered-realms' || puzzle.mode === 'twin-watchers') && (
+          <span
+            className="font-serif"
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: '#2a1a00',
+              background: '#e8b84b',
+              border: '1px solid rgba(0,0,0,0.25)',
+              borderRadius: 5,
+              padding: '4px 10px',
+              flexShrink: 0,
+              boxShadow: '0 2px 10px rgba(0,0,0,0.5)',
+            }}
+          >
+            {puzzle.mode === 'shattered-realms' ? 'Split Territories' : 'Two Per Territory'}
+          </span>
+        )}
         <div style={{ opacity: tilesReady ? 1 : 0, transition: 'opacity 0.4s ease', position: 'relative' }}>
           {!tilesReady && (
             <div className="absolute inset-0 flex flex-col items-center justify-center z-50 gap-3" style={{ minWidth: 200 }}>
@@ -930,6 +972,23 @@ export default function PuzzleClient() {
               <p className="font-journal text-center" style={{ fontSize: 18, color: 'rgba(242,233,216,0.78)', textShadow: '0 1px 8px rgba(0,0,0,0.9)', lineHeight: 1.65, maxWidth: 300, whiteSpace: 'pre-line' }}>
                 {completion.lore}
               </p>
+              {completion.transitionHint && (
+                <p
+                  className="font-journal text-center italic"
+                  style={{
+                    fontSize: 14,
+                    color: 'rgba(242,233,216,0.55)',
+                    textShadow: '0 1px 8px rgba(0,0,0,0.9)',
+                    lineHeight: 1.5,
+                    maxWidth: 270,
+                    marginTop: -6,
+                    paddingTop: 10,
+                    borderTop: '1px solid rgba(242,233,216,0.15)',
+                  }}
+                >
+                  {completion.transitionHint}
+                </p>
+              )}
               <button
                 onClick={() => router.push('/campaign/map')}
                 className="transition-all duration-100 hover:brightness-110 active:scale-95 relative"
