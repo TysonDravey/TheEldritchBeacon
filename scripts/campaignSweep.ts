@@ -72,15 +72,15 @@ for (const region of REGIONS) {
     if (a.hypothetical + a.me > 0) deepCount++;
   }
 
-  // Print every 1-in-N for large regions to keep output scannable, always show gaps
-  const SHOW_EVERY = sorted.length > 20 ? Math.ceil(sorted.length / 20) : 1;
+  const FULL = process.env.FULL === '1';
+  const SHOW_EVERY = FULL ? 1 : (sorted.length > 20 ? Math.ceil(sorted.length / 20) : 1);
   for (let i = 0; i < profiles.length; i++) {
     const { p, a } = profiles[i];
     const ratio = a.total > 0 ? (a.trivial / a.total * 100).toFixed(0) : '?';
     const gap = prevScore >= 0 ? p.score - prevScore : 0;
-    const flag = gap > 40 ? '  <-- BIG JUMP' : '';
-    if (i % SHOW_EVERY === 0 || gap > 40 || i === profiles.length - 1) {
-      console.log(`  #${String(i + 1).padStart(3)} ${p.id.padEnd(26)} ${p.size}x${p.size}  score=${String(p.score).padStart(4)}  trivial=${ratio}%  hyp=${a.hypothetical} me=${a.me}${flag}`);
+    const flag = gap > 15 ? `  <-- GAP +${gap.toFixed(1)}` : '';
+    if (i % SHOW_EVERY === 0 || gap > 15 || i === profiles.length - 1) {
+      console.log(`  #${String(i + 1).padStart(3)} ${p.id.padEnd(26)} ${p.size}x${p.size}  score=${String(p.score).padStart(6)}  trivial=${ratio}%  hyp=${a.hypothetical} me=${a.me}${flag}`);
     }
     prevScore = p.score;
   }

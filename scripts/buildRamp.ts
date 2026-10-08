@@ -82,11 +82,14 @@ interface RampTarget {
   count: number;
 }
 
+// Round 2 bands, targeted at the specific gaps left after the scoring
+// revamp (engine/difficulty.ts) changed every puzzle's score — see
+// scripts/campaignSweep.ts's GAP flags for the exact jumps these close.
 const TARGETS: RampTarget[] = [
-  { name: 'The Survey', difficulty: 'Scholar', minScore: 23, maxScore: 65, count: 10 },
-  { name: 'The Lower Level', difficulty: 'Occultist', minScore: 45, maxScore: 95, count: 10 },
-  { name: 'The Lantern Room', difficulty: 'High Priest', minScore: 85, maxScore: 130, count: 8 },
-  { name: 'The West Wall', difficulty: 'Eldritch', minScore: 108, maxScore: 200, count: 14 },
+  { name: 'The Survey', difficulty: 'Scholar', minScore: 25, maxScore: 65, count: 6 },
+  { name: 'The Lower Level', difficulty: 'Occultist', minScore: 50, maxScore: 125, count: 8 },
+  { name: 'The Lantern Room', difficulty: 'High Priest', minScore: 65, maxScore: 145, count: 8 },
+  { name: 'The West Wall', difficulty: 'Eldritch', minScore: 80, maxScore: 188, count: 6 },
 ];
 
 function ts() { return new Date().toISOString().slice(11, 19); }
