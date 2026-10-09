@@ -83,6 +83,64 @@ export function watcherRejectionReason(
 }
 
 /**
+ * Returns every currently-empty cell that placing/holding the given Watchers
+ * makes un-placeable by rule alone, split into 4 groups in priority order —
+ * adjacency, row, column, territory — with each cell appearing in only the
+ * FIRST group it matches (so the groups partition the result, nothing
+ * appears twice). This is bookkeeping, not deduction: it never infers
+ * anything beyond what canPlaceWatcher already enforces, so it's safe for an
+ * "Auto-Ward" assist to apply automatically without giving away any real
+ * solving technique. The grouping exists so a caller can stage a visual
+ * reveal (adjacency, then row, then column, then territory) rather than
+ * dumping everything on the board at once — see getForcedWardCells for
+ * callers that just want the flat set. Recomputed fresh from playerCells
+ * each call (not incremental), so it naturally catches up any
+ * previously-unmarked forced cells too.
+ */
+export function getForcedWardCellGroups(puzzle: Puzzle, playerCells: CellState[][]): [number, number][][] {
+  const n = puzzle.size;
+  const limit = puzzle.mode === 'twin-watchers' ? 2 : 1;
+  const watchers = getWatcherPositions(playerCells);
+
+  const rowCounts = new Map<number, number>();
+  const colCounts = new Map<number, number>();
+  const territoryCounts = new Map<number, number>();
+  for (const [wr, wc] of watchers) {
+    rowCounts.set(wr, (rowCounts.get(wr) ?? 0) + 1);
+    colCounts.set(wc, (colCounts.get(wc) ?? 0) + 1);
+    const t = puzzle.territoryMap[wr][wc];
+    territoryCounts.set(t, (territoryCounts.get(t) ?? 0) + 1);
+  }
+
+  const claimed = new Set<string>();
+  const collect = (predicate: (r: number, c: number) => boolean): [number, number][] => {
+    const group: [number, number][] = [];
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        const key = `${r},${c}`;
+        if (claimed.has(key) || playerCells[r][c] !== 'empty' || !predicate(r, c)) continue;
+        claimed.add(key);
+        group.push([r, c]);
+      }
+    }
+    return group;
+  };
+
+  const adjacency = collect((r, c) => watchers.some(([wr, wc]) => isAdjacent(r, c, wr, wc)));
+  const rowGroup = collect((r) => (rowCounts.get(r) ?? 0) >= limit);
+  const colGroup = collect((_r, c) => (colCounts.get(c) ?? 0) >= limit);
+  const territoryGroup = collect((r, c) => (territoryCounts.get(puzzle.territoryMap[r][c]) ?? 0) >= limit);
+
+  return [adjacency, rowGroup, colGroup, territoryGroup];
+}
+
+/** Flat, deduplicated version of getForcedWardCellGroups, for callers that
+ *  don't need the staged grouping. */
+export function getForcedWardCells(puzzle: Puzzle, playerCells: CellState[][]): [number, number][] {
+  return getForcedWardCellGroups(puzzle, playerCells).flat();
+}
+
+/**
  * Returns true if the current full board state is a valid complete solution.
  *
  * Standard:       1 watcher per territory / row / col, no adjacency.

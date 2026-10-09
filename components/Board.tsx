@@ -40,6 +40,11 @@ interface BoardProps {
   /** Optional: per-cell 3D flip-reveal stagings, keyed "row,col". Used by
    *  the Dual Realms prototype's "flip all" gem button; unused elsewhere. */
   flipReveals?: Map<string, { delayMs: number; from: string; to: string }>;
+  /** Optional: per-cell pop-in delay (ms) for an already-real Ward, keyed
+   *  "row,col". Used by the Auto-Ward assist to stage its reveal
+   *  (adjacency, then row, then column, then territory) instead of
+   *  snapping every forced cell in at once; unused elsewhere. */
+  wardRevealDelays?: Map<string, number>;
 }
 
 // Red outline — only explicit cells and territories, NOT rows/cols
@@ -99,6 +104,7 @@ export default function Board({
   isFreshWin = false,
   reversibleOutlines,
   flipReveals,
+  wardRevealDelays,
 }: BoardProps) {
   const { size, territoryMap } = puzzle;
 
@@ -497,6 +503,7 @@ export default function Board({
                 isConstraintWard={isConstraintWard}
                 reversibleOutline={reversibleOutlines?.get(`${row},${col}`)}
                 flipReveal={flipReveals?.get(`${row},${col}`)}
+                wardRevealDelayMs={wardRevealDelays?.get(`${row},${col}`)}
                 size={size}
                 thickTop={row === 0          || territoryMap[row - 1][col] !== territory}
                 thickBottom={row === size - 1 || territoryMap[row + 1][col] !== territory}

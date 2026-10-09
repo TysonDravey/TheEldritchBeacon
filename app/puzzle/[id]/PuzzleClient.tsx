@@ -6,12 +6,16 @@ import posthog from 'posthog-js';
 import NextImage from 'next/image';
 import Link from 'next/link';
 import { getPuzzleById, SAMPLE_PUZZLES } from '@/data/samplePuzzles';
-import { loadPlayerState, savePlayerState, createFreshPlayerState, getLanternTotal, addLanterns, hasAwardedLanterns, markLanternsAwarded } from '@/lib/storage';
+import {
+  loadPlayerState, savePlayerState, createFreshPlayerState, getLanternTotal, addLanterns, hasAwardedLanterns, markLanternsAwarded,
+  getAutoWardCharges, hasConsumedAutoWardCharge, markAutoWardChargeConsumed, spendAutoWardCharge,
+} from '@/lib/storage';
+import { useSettings } from '@/lib/settings';
 import { getHint } from '@/engine/hints';
 import { hasForcedOpening } from '@/engine/difficulty';
 import { getLanternRating } from '@/engine/lanterns';
 import { LanternRating } from '@/components/LanternRating';
-import { isSolved, canPlaceWatcher, watcherRejectionReason } from '@/engine/rules';
+import { isSolved, canPlaceWatcher, watcherRejectionReason, getForcedWardCellGroups } from '@/engine/rules';
 import { findContradictions } from '@/engine/solver';
 import type { PlayerState, CellState, HintResult, ContradictionResult, Difficulty } from '@/engine/boardTypes';
 import Board from '@/components/Board';
@@ -22,6 +26,8 @@ import { WATCHER_SVGS, WARD_PNG } from '@/theme/colors';
 import { campaignRegionDifficulty, findRegionForPuzzle, getRegionPuzzles, sortPuzzlesForRegion } from '@/data/regions';
 import { isRuleChangeNew } from '@/lib/ruleChanges';
 import RuleChangeIntro from '@/components/RuleChangeIntro';
+import LanternBadge from '@/components/LanternBadge';
+import { flyLanternsToWallet } from '@/lib/lanternFly';
 import { haptic } from '@/lib/haptic';
 import { playSound } from '@/lib/sound';
 import { isTechniqueNew, markTechniqueDiscovered } from '@/lib/techniques';
@@ -135,11 +141,15 @@ export default function PuzzleClient() {
   const [lanternTotal,        setLanternTotal]        = useState(0);
   const [lanternsEarned,      setLanternsEarned]      = useState(0);
   const [showLanternBadge,    setShowLanternBadge]    = useState(false);
+  const [settings, updateSettings] = useSettings();
+  const [wardRevealDelays, setWardRevealDelays] = useState<Map<string, number>>(new Map());
+  const [autoWardCharges, setAutoWardCharges] = useState(0);
   // Tracks how many hints player has asked without making a move — drives escalation
   const hintDepthRef      = useRef(0);
   const flashTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cascadeTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const winTimersRef      = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const autoWardTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const isDraggingRef     = useRef(false);
   const preDragCellsRef   = useRef<CellState[][] | null>(null);
   // Mutable ref kept in sync with playerState — applyChange reads and writes this
@@ -169,6 +179,7 @@ export default function PuzzleClient() {
 
   useEffect(() => {
     setLanternTotal(getLanternTotal());
+    setAutoWardCharges(getAutoWardCharges());
   }, []);
 
   useEffect(() => {
@@ -293,7 +304,7 @@ export default function PuzzleClient() {
     };
   }, [hintResult]);
 
-  useEffect(() => () => { winTimersRef.current.forEach(clearTimeout); }, []);
+  useEffect(() => () => { winTimersRef.current.forEach(clearTimeout); autoWardTimersRef.current.forEach(clearTimeout); }, []);
   // Skip during an active drag: applyChange already keeps playerStateRef.current synchronously
   // up to date on every cell (see comment there), strictly ahead of what's been rendered. Under
   // the flood of rapid-fire setPlayerState calls a fast drag produces, React can commit and fire
@@ -310,7 +321,7 @@ export default function PuzzleClient() {
 
   // Shared logic for applying any cell state change
   const applyChange = useCallback(
-    (row: number, col: number, next: CellState) => {
+    (row: number, col: number, next: CellState, extraWardCells?: [number, number][]) => {
       // Read from the ref so that multiple rapid calls in the same JS frame (e.g. from
       // coalesced pointer events during a drag) each build on the previous result rather
       // than all starting from the same stale React state closure.
@@ -319,6 +330,15 @@ export default function PuzzleClient() {
 
       const newCells: CellState[][] = current.cells.map((r) => [...r]);
       newCells[row][col] = next;
+      // Auto-Ward: cells the new watcher (plus any already on the board) make
+      // un-placeable by rule — see getForcedWardCells. Folded into the same
+      // state transition as the watcher placement itself so undo, the solved
+      // check, and the win-cascade animation all treat it as one move.
+      if (extraWardCells) {
+        for (const [r, c] of extraWardCells) {
+          if (newCells[r][c] === 'empty') newCells[r][c] = 'ward';
+        }
+      }
 
       let newUndoStack: CellState[][][];
       if (isDraggingRef.current && preDragCellsRef.current) {
@@ -351,6 +371,8 @@ export default function PuzzleClient() {
         // ~0.6s watcher-placement sound starting right on top of it would still be
         // sounding when win-lift starts, masking the start of the rise.
         if (!solved) playSound(becameWatcher ? 'watcher' : 'watcher-remove');
+        // Auto-Ward's own staged reveal (handleCellWatcher) plays a bell-ping
+        // per wave as it stages in, so no extra cue is needed here.
       } else {
         // A drag never produces a watcher (see handleCellDrag), so this is always
         // the ward/empty case for a dragged cell — use the selection-generator
@@ -397,15 +419,17 @@ export default function PuzzleClient() {
           hints_used:  newState.hintsUsed,
           mode:        puzzle.mode ?? 'initiate',
         });
-        const earned = getLanternRating(newState.hintsUsed);
+        const earned = getLanternRating(newState.hintsUsed, puzzle.mode ?? 'initiate', puzzle.difficulty);
         setLanternsEarned(earned);
         // Restart is available even on a completed puzzle, so a replayed
         // solve must not re-award lanterns to the lifetime total — only
         // the first ever completion of a given puzzle counts.
+        let justAwardedLanterns = false;
         if (!hasAwardedLanterns(puzzle.id)) {
           markLanternsAwarded(puzzle.id);
           setLanternTotal(addLanterns(earned));
           setShowLanternBadge(true);
+          justAwardedLanterns = true;
         } else {
           setShowLanternBadge(false);
         }
@@ -465,6 +489,11 @@ export default function PuzzleClient() {
             setShowChapterComplete(true);
           } else {
             setShowCompletion(true);
+            if (justAwardedLanterns) {
+              // Small delay so React has actually committed the "+N Lanterns"
+              // text (setShowCompletion above is async) before we measure it.
+              setTimeout(() => flyLanternsToWallet(earned), 80);
+            }
           }
         }, Math.max(maxDelay, WATCHER_ANIM_END) + 500);
         winTimersRef.current.push(completionT);
@@ -550,9 +579,35 @@ export default function PuzzleClient() {
         return;
       }
 
-      applyChange(row, col, 'watcher');
+      let extra: [number, number][] | undefined;
+      if (settings.autoWardEnabled && (hasConsumedAutoWardCharge(puzzle.id) || getAutoWardCharges() > 0)) {
+        if (!hasConsumedAutoWardCharge(puzzle.id)) {
+          spendAutoWardCharge();
+          markAutoWardChargeConsumed(puzzle.id);
+          setAutoWardCharges(getAutoWardCharges());
+        }
+        const simulated = testCells.map((r) => [...r]);
+        simulated[row][col] = 'watcher';
+        // Staged in 4 waves — adjacency, row, column, territory — matching
+        // the hint cascade's own 380ms cadence. The real state commit below
+        // is still instant/atomic; only the VISUAL pop-in (wardRevealDelays,
+        // consumed by Board/Cell via animation-delay) and the bell-ping per
+        // wave are staggered.
+        const STAGE_MS = 380;
+        const groups = getForcedWardCellGroups(puzzle, simulated);
+        extra = groups.flat();
+        const delayMap = new Map<string, number>();
+        groups.forEach((group, i) => group.forEach(([r, c]) => delayMap.set(`${r},${c}`, i * STAGE_MS)));
+        setWardRevealDelays(delayMap);
+        autoWardTimersRef.current.forEach(clearTimeout);
+        autoWardTimersRef.current = groups
+          .filter(g => g.length > 0)
+          .map((_, i) => setTimeout(() => playSound('win-ward'), i * STAGE_MS));
+        autoWardTimersRef.current.push(setTimeout(() => setWardRevealDelays(new Map()), groups.length * STAGE_MS + 400));
+      }
+      applyChange(row, col, 'watcher', extra);
     },
-    [puzzle, applyChange],
+    [puzzle, applyChange, settings.autoWardEnabled],
   );
 
   const handleHint = useCallback(() => {
@@ -621,6 +676,9 @@ export default function PuzzleClient() {
     setHintResult(null);
     winTimersRef.current.forEach(clearTimeout);
     winTimersRef.current = [];
+    autoWardTimersRef.current.forEach(clearTimeout);
+    autoWardTimersRef.current = [];
+    setWardRevealDelays(new Map());
   }, [puzzle]);
 
   // Scoring every puzzle in a tier to sort it is real, non-trivial work (measured over a full
@@ -675,6 +733,8 @@ export default function PuzzleClient() {
 
   return (
     <main style={{ height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+      <LanternBadge />
 
       {/* ── Compact header ── */}
       <div style={{
@@ -802,6 +862,7 @@ export default function PuzzleClient() {
             constraintWardCells={constraintWards}
             isCompleted={playerState.completed}
             isFreshWin={isFreshWin}
+            wardRevealDelays={wardRevealDelays}
           />
         </div>
       </div>
@@ -825,6 +886,9 @@ export default function PuzzleClient() {
           hintsUsed={playerState.hintsUsed}
           canUndo={playerState.undoStack.length > 0}
           completed={playerState.completed}
+          autoWardEnabled={settings.autoWardEnabled}
+          autoWardCharges={autoWardCharges}
+          onToggleAutoWard={() => updateSettings({ autoWardEnabled: !settings.autoWardEnabled })}
         />
       </div>
 
@@ -899,10 +963,10 @@ export default function PuzzleClient() {
                   <h2 className="font-lovecraftian text-lg text-ink leading-snug">Beacon Restored</h2>
                 </div>
                 <div className="mt-1 mb-1">
-                  <LanternRating rating={getLanternRating(playerState.hintsUsed)} animate={isFreshWin} />
+                  <LanternRating rating={getLanternRating(playerState.hintsUsed, puzzle.mode ?? 'initiate', puzzle.difficulty)} animate={isFreshWin} />
                 </div>
                 {showLanternBadge && (
-                  <p className="lantern-badge-pop font-lovecraftian text-sm mt-1" style={{ color: '#B5860D' }}>
+                  <p data-lantern-earned-badge className="lantern-badge-pop font-lovecraftian text-sm mt-1" style={{ color: '#B5860D' }}>
                     +{lanternsEarned} Lantern{lanternsEarned !== 1 ? 's' : ''}
                   </p>
                 )}

@@ -10,6 +10,9 @@ interface GameControlsProps {
   hintsUsed: number;
   canUndo: boolean;
   completed: boolean;
+  autoWardEnabled: boolean;
+  autoWardCharges: number;
+  onToggleAutoWard: () => void;
 }
 
 function PlaqButton({
@@ -18,12 +21,16 @@ function PlaqButton({
   disabled,
   badge,
   title,
+  active,
 }: {
   label: string;
   onClick: () => void;
   disabled?: boolean;
   badge?: number;
   title?: string;
+  /** Persistent on/off state (vs. the other momentary-action buttons) —
+   *  draws the existing brass hint-glow ring when true. */
+  active?: boolean;
 }) {
   return (
     <button
@@ -34,7 +41,8 @@ function PlaqButton({
         disabled
           ? 'opacity-40 cursor-not-allowed'
           : 'hover:brightness-110 active:scale-95'
-      }`}
+      } ${active ? 'hint-glow-brass' : ''}`}
+      style={active ? { borderRadius: 8 } : undefined}
     >
       <img
         src="/buttons/button_01.png"
@@ -71,6 +79,9 @@ export default function GameControls({
   hintsUsed,
   canUndo,
   completed,
+  autoWardEnabled,
+  autoWardCharges,
+  onToggleAutoWard,
 }: GameControlsProps) {
   const [confirming, setConfirming] = useState(false);
 
@@ -94,6 +105,13 @@ export default function GameControls({
           label="Restart"
           onClick={() => setConfirming(true)}
           title="Restart puzzle"
+        />
+        <PlaqButton
+          label="Auto-Ward"
+          onClick={onToggleAutoWard}
+          badge={autoWardCharges}
+          active={autoWardEnabled}
+          title={autoWardEnabled ? 'Auto-Ward is on' : 'Auto-Ward is off'}
         />
       </div>
 

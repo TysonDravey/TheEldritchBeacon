@@ -12,6 +12,7 @@ export interface Settings {
   sfxVolume: number; // 0–1
   hapticsEnabled: boolean;
   tutorialDismissed: boolean;
+  autoWardEnabled: boolean;
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -21,6 +22,7 @@ const DEFAULT_SETTINGS: Settings = {
   sfxVolume: 1,
   hapticsEnabled: true,
   tutorialDismissed: false,
+  autoWardEnabled: true,
 };
 
 export function loadSettings(): Settings {

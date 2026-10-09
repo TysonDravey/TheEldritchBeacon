@@ -9,6 +9,7 @@ import { REGIONS, getRegionPuzzles } from '@/data/regions';
 import { useSettings } from '@/lib/settings';
 import { playSound } from '@/lib/sound';
 import PuzzleCard from '@/components/PuzzleCard';
+import LanternBadge from '@/components/LanternBadge';
 
 const STORAGE_KEY_PREFIX = 'eldritch_beacon_state_';
 const UNLOCKED_KEY = 'eb_unlocked_regions';
@@ -111,6 +112,8 @@ export default function HomePage() {
         >
           <span style={{ fontSize: 16 }}>&#9881;</span>
         </Link>
+
+        <LanternBadge />
 
         {/* Header scroll */}
         <div

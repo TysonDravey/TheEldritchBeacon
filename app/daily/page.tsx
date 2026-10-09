@@ -8,9 +8,14 @@ import { playSound } from '@/lib/sound';
 import NextImage from 'next/image';
 import { getPuzzleById } from '@/data/samplePuzzles';
 import { DAILY_CALENDAR } from '@/data/dailyCalendar';
-import { loadPlayerState, savePlayerState, createFreshPlayerState, getLanternTotal, addLanterns, hasAwardedLanterns, markLanternsAwarded } from '@/lib/storage';
+import {
+  loadPlayerState, savePlayerState, createFreshPlayerState, getLanternTotal, addLanterns, hasAwardedLanterns, markLanternsAwarded,
+  getAutoWardCharges, hasConsumedAutoWardCharge, markAutoWardChargeConsumed, spendAutoWardCharge, spendLanterns,
+} from '@/lib/storage';
+import StreakRescue from '@/components/StreakRescue';
+import { useSettings } from '@/lib/settings';
 import { getHint } from '@/engine/hints';
-import { isSolved, canPlaceWatcher, watcherRejectionReason } from '@/engine/rules';
+import { isSolved, canPlaceWatcher, watcherRejectionReason, getForcedWardCellGroups } from '@/engine/rules';
 import { findContradictions } from '@/engine/solver';
 import type { PlayerState, CellState, HintResult, ContradictionResult } from '@/engine/boardTypes';
 import Board from '@/components/Board';
@@ -22,6 +27,8 @@ import { LanternRating } from '@/components/LanternRating';
 import { getLanternRating } from '@/engine/lanterns';
 import { WATCHER_SVGS, WARD_PNG } from '@/theme/colors';
 import { isTechniqueNew, markTechniqueDiscovered } from '@/lib/techniques';
+import LanternBadge from '@/components/LanternBadge';
+import { flyLanternsToWallet } from '@/lib/lanternFly';
 
 const UNDO_LIMIT = 50;
 const DAILY_COMPLETED_KEY = 'eldritch_beacon_daily_completed';
@@ -89,6 +96,35 @@ function updateStreak(completedDate: string): StreakData {
     localStorage.setItem(DAILY_STREAK_KEY, JSON.stringify(streak));
     return streak;
   } catch { return { date: completedDate, count: 1 }; }
+}
+
+// True when the streak has a nonzero count but the last completion was
+// neither today nor yesterday — i.e. completing today's puzzle as-is would
+// have `updateStreak` silently reset it back to 1.
+function isStreakAtRisk(streak: StreakData, todayStr: string): boolean {
+  if (streak.count === 0 || streak.date === todayStr) return false;
+  const yesterday = new Date(todayStr + 'T12:00:00Z');
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  return streak.date !== yesterday.toISOString().slice(0, 10);
+}
+
+function streakRescueCost(streak: StreakData): number {
+  return Math.min(5 + streak.count * 2, 40);
+}
+
+// Back-dates streak.date to yesterday, count untouched — updateStreak's own
+// (unmodified) logic then naturally extends the streak on today's real
+// completion instead of resetting it.
+function rescueStreak(streak: StreakData, todayStr: string): StreakData {
+  const yesterday = new Date(todayStr + 'T12:00:00Z');
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  const rescued: StreakData = { date: yesterday.toISOString().slice(0, 10), count: streak.count };
+  try { localStorage.setItem(DAILY_STREAK_KEY, JSON.stringify(rescued)); } catch { /* best-effort */ }
+  return rescued;
+}
+
+function streakRescueDeclinedKey(todayStr: string): string {
+  return `eb_streak_rescue_declined_${todayStr}`;
 }
 
 function loadMonthAwards(): Set<string> {
@@ -462,12 +498,17 @@ export default function DailyPage() {
   const [monthAwardCount,      setMonthAwardCount]     = useState(0);
   const [showMonthComplete,    setShowMonthComplete]   = useState(false);
   const [monthCompleteInfo,    setMonthCompleteInfo]   = useState<{ label: string; dayCount: number; monthsCompleted: number } | null>(null);
+  const [showStreakRescue,     setShowStreakRescue]    = useState(false);
+  const [settings, updateSettings] = useSettings();
+  const [wardRevealDelays, setWardRevealDelays] = useState<Map<string, number>>(new Map());
+  const [autoWardCharges, setAutoWardCharges] = useState(0);
 
   const hintDepthRef    = useRef(0);
   const flashTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cascadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const contradictionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const winTimersRef    = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const autoWardTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const isDraggingRef   = useRef(false);
   const preDragCellsRef = useRef<CellState[][] | null>(null);
   const playerStateRef  = useRef<PlayerState | null>(null);
@@ -475,10 +516,15 @@ export default function DailyPage() {
   // Load completed dates, streak and month awards from localStorage on mount
   useEffect(() => {
     setCompletedDates(loadCompletedDates());
-    setStreak(loadStreak());
+    const loadedStreak = loadStreak();
+    setStreak(loadedStreak);
     setMonthAwardCount(loadMonthAwards().size);
     setLanternTotal(getLanternTotal());
-  }, []);
+    setAutoWardCharges(getAutoWardCharges());
+    let alreadyDeclined = false;
+    try { alreadyDeclined = sessionStorage.getItem(streakRescueDeclinedKey(todayStr)) === '1'; } catch { /* ignore */ }
+    if (isStreakAtRisk(loadedStreak, todayStr) && !alreadyDeclined) setShowStreakRescue(true);
+  }, [todayStr]);
 
   // Temporary, left in on purpose: dumps hints-used per completed daily to
   // the console, to check real hint-usage patterns against the proposed
@@ -617,17 +663,26 @@ export default function DailyPage() {
     return () => { if (cascadeTimerRef.current) { clearTimeout(cascadeTimerRef.current); cascadeTimerRef.current = null; } };
   }, [hintResult]);
 
-  useEffect(() => () => { winTimersRef.current.forEach(clearTimeout); }, []);
+  useEffect(() => () => { winTimersRef.current.forEach(clearTimeout); autoWardTimersRef.current.forEach(clearTimeout); }, []);
   useEffect(() => () => { if (contradictionTimerRef.current) clearTimeout(contradictionTimerRef.current); }, []);
   useEffect(() => { playerStateRef.current = playerState; }, [playerState]);
 
   const applyChange = useCallback(
-    (row: number, col: number, next: CellState) => {
+    (row: number, col: number, next: CellState, extraWardCells?: [number, number][]) => {
       const current = playerStateRef.current;
       if (!current || !puzzle || current.completed) return;
 
       const newCells: CellState[][] = current.cells.map((r) => [...r]);
       newCells[row][col] = next;
+      // Auto-Ward: cells the new watcher (plus any already on the board) make
+      // un-placeable by rule — see getForcedWardCells. Folded into the same
+      // state transition as the watcher placement itself so undo, the solved
+      // check, and the win-cascade animation all treat it as one move.
+      if (extraWardCells) {
+        for (const [r, c] of extraWardCells) {
+          if (newCells[r][c] === 'empty') newCells[r][c] = 'ward';
+        }
+      }
 
       let newUndoStack: CellState[][][];
       if (isDraggingRef.current && preDragCellsRef.current) {
@@ -650,6 +705,8 @@ export default function DailyPage() {
         // ~0.6s watcher-placement sound starting right on top of it would still be
         // sounding when win-lift starts, masking the start of the rise.
         if (!solved) playSound(becameWatcher ? 'watcher' : 'watcher-remove');
+        // Auto-Ward's own staged reveal (handleCellWatcher) plays a bell-ping
+        // per wave as it stages in, so no extra cue is needed here.
       } else {
         // A drag never produces a watcher (see handleCellDrag), so this is always
         // the ward/empty case for a dragged cell — use the selection-generator
@@ -708,15 +765,17 @@ export default function DailyPage() {
           hints_used:  newState.hintsUsed,
           streak:      streakCount,
         });
-        const earned = getLanternRating(newState.hintsUsed);
+        const earned = getLanternRating(newState.hintsUsed, puzzle.mode ?? 'initiate', puzzle.difficulty);
         setLanternsEarned(earned);
         // Restart is available even on a completed day, so a replayed solve
         // must not re-award lanterns to the lifetime total — only the first
         // ever completion of a given date counts.
+        let justAwardedLanterns = false;
         if (!hasAwardedLanterns(selectedDate)) {
           markLanternsAwarded(selectedDate);
           setLanternTotal(addLanterns(earned));
           setShowLanternBadge(true);
+          justAwardedLanterns = true;
         } else {
           setShowLanternBadge(false);
         }
@@ -778,8 +837,16 @@ export default function DailyPage() {
         }
         const completionT = setTimeout(() => {
           playSound('complete');
-          if (monthJustFinished) setShowMonthComplete(true);
-          else setShowCompletion(true);
+          if (monthJustFinished) {
+            setShowMonthComplete(true);
+          } else {
+            setShowCompletion(true);
+            if (justAwardedLanterns) {
+              // Small delay so React has actually committed the "+N Lanterns"
+              // text (setShowCompletion above is async) before we measure it.
+              setTimeout(() => flyLanternsToWallet(earned), 80);
+            }
+          }
         }, maxDelay + 500);
         winTimersRef.current.push(completionT);
       }
@@ -850,9 +917,35 @@ export default function DailyPage() {
         flashTimerRef.current = setTimeout(() => { setFlashCells([]); setRejectionMessage(null); }, 1600);
         return;
       }
-      applyChange(row, col, 'watcher');
+      let extra: [number, number][] | undefined;
+      if (settings.autoWardEnabled && (hasConsumedAutoWardCharge(selectedDate) || getAutoWardCharges() > 0)) {
+        if (!hasConsumedAutoWardCharge(selectedDate)) {
+          spendAutoWardCharge();
+          markAutoWardChargeConsumed(selectedDate);
+          setAutoWardCharges(getAutoWardCharges());
+        }
+        const simulated = testCells.map((r) => [...r]);
+        simulated[row][col] = 'watcher';
+        // Staged in 4 waves — adjacency, row, column, territory — matching
+        // the hint cascade's own 380ms cadence. The real state commit below
+        // is still instant/atomic; only the VISUAL pop-in (wardRevealDelays,
+        // consumed by Board/Cell via animation-delay) and the bell-ping per
+        // wave are staggered.
+        const STAGE_MS = 380;
+        const groups = getForcedWardCellGroups(puzzle, simulated);
+        extra = groups.flat();
+        const delayMap = new Map<string, number>();
+        groups.forEach((group, i) => group.forEach(([r, c]) => delayMap.set(`${r},${c}`, i * STAGE_MS)));
+        setWardRevealDelays(delayMap);
+        autoWardTimersRef.current.forEach(clearTimeout);
+        autoWardTimersRef.current = groups
+          .filter(g => g.length > 0)
+          .map((_, i) => setTimeout(() => playSound('win-ward'), i * STAGE_MS));
+        autoWardTimersRef.current.push(setTimeout(() => setWardRevealDelays(new Map()), groups.length * STAGE_MS + 400));
+      }
+      applyChange(row, col, 'watcher', extra);
     },
-    [puzzle, applyChange],
+    [puzzle, applyChange, settings.autoWardEnabled, selectedDate],
   );
 
   const handleHint = useCallback(() => {
@@ -920,12 +1013,17 @@ export default function DailyPage() {
     setHintResult(null);
     winTimersRef.current.forEach(clearTimeout);
     winTimersRef.current = [];
+    autoWardTimersRef.current.forEach(clearTimeout);
+    autoWardTimersRef.current = [];
+    setWardRevealDelays(new Map());
   }, [puzzle, selectedDate]);
 
   // ── Calendar view ──────────────────────────────────────────────────────────
   if (view === 'calendar') {
     return (
       <main className="min-h-screen flex flex-col items-center px-6 py-8">
+
+        <LanternBadge />
 
         {/* Back button */}
         <div className="w-full max-w-md mb-4">
@@ -1036,6 +1134,8 @@ export default function DailyPage() {
   return (
     <main style={{ height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
+      <LanternBadge />
+
       {/* ── Compact header ── */}
       <div style={{
         flexShrink: 0,
@@ -1110,6 +1210,7 @@ export default function DailyPage() {
             constraintWardCells={constraintWards}
             isCompleted={playerState.completed}
             isFreshWin={isFreshWin}
+            wardRevealDelays={wardRevealDelays}
           />
         </div>
       </div>
@@ -1133,6 +1234,9 @@ export default function DailyPage() {
           hintsUsed={playerState.hintsUsed}
           canUndo={playerState.undoStack.length > 0}
           completed={playerState.completed}
+          autoWardEnabled={settings.autoWardEnabled}
+          autoWardCharges={autoWardCharges}
+          onToggleAutoWard={() => updateSettings({ autoWardEnabled: !settings.autoWardEnabled })}
         />
       </div>
 
@@ -1191,10 +1295,10 @@ export default function DailyPage() {
                   <h2 className="font-lovecraftian text-lg text-ink leading-snug">Beacon Restored</h2>
                 </div>
                 <div className="mt-1 mb-1">
-                  <LanternRating rating={getLanternRating(playerState.hintsUsed)} animate={isFreshWin} />
+                  <LanternRating rating={getLanternRating(playerState.hintsUsed, puzzle.mode ?? 'initiate', puzzle.difficulty)} animate={isFreshWin} />
                 </div>
                 {showLanternBadge && (
-                  <p className="lantern-badge-pop font-lovecraftian text-sm mt-1" style={{ color: '#B5860D' }}>
+                  <p data-lantern-earned-badge className="lantern-badge-pop font-lovecraftian text-sm mt-1" style={{ color: '#B5860D' }}>
                     +{lanternsEarned} Lantern{lanternsEarned !== 1 ? 's' : ''}
                   </p>
                 )}
@@ -1224,6 +1328,24 @@ export default function DailyPage() {
           dayCount={monthCompleteInfo.dayCount}
           monthsCompleted={monthCompleteInfo.monthsCompleted}
           onDismiss={() => { setShowMonthComplete(false); setView('calendar'); }}
+        />
+      )}
+
+      {showStreakRescue && (
+        <StreakRescue
+          streakCount={streak.count}
+          cost={streakRescueCost(streak)}
+          lanternTotal={lanternTotal}
+          onRestore={() => {
+            const cost = streakRescueCost(streak);
+            if (!spendLanterns(cost)) return;
+            setLanternTotal(getLanternTotal());
+            setStreak(rescueStreak(streak, todayStr));
+          }}
+          onDismiss={() => {
+            setShowStreakRescue(false);
+            try { sessionStorage.setItem(streakRescueDeclinedKey(todayStr), '1'); } catch { /* ignore */ }
+          }}
         />
       )}
 

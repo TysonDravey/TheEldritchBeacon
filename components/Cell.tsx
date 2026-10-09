@@ -34,6 +34,10 @@ interface CellProps {
    *  Used by the Dual Realms prototype's "flip all" gem button; unused
    *  everywhere else. */
   flipReveal?: { delayMs: number; from: string; to: string };
+  /** Optional: stages this cell's (already-real) Ward pop-in by this many
+   *  ms — see Auto-Ward's staged reveal in the puzzle pages. Unset for a
+   *  normal manual Ward placement, which still appears instantly. */
+  wardRevealDelayMs?: number;
   size: number;
   thickTop?: boolean;
   thickRight?: boolean;
@@ -60,6 +64,7 @@ function Cell({
   isFreshWin,
   reversibleOutline,
   flipReveal,
+  wardRevealDelayMs,
   size,
   thickTop,
   thickRight,
@@ -120,7 +125,16 @@ function Cell({
           <Watcher territory={territory} size={watcherSize} isFreshWin={isFreshWin} />
         </div>
       )}
-      {state === 'ward'    && <div className="relative z-20"><Ward territory={territory} size={wardSize} /></div>}
+      {state === 'ward' && (
+        <div
+          className="relative z-20"
+          {...(wardRevealDelayMs != null
+            ? { 'data-ward-animate': 'true', style: { '--reveal-delay': `${wardRevealDelayMs}ms` } as React.CSSProperties }
+            : {})}
+        >
+          <Ward territory={territory} size={wardSize} />
+        </div>
+      )}
       {(isPrimaryHint || isGhost) && state === 'empty' && (
         <img
           src="/svg/watcher_spinner.svg"

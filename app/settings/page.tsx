@@ -1,11 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSettings } from '@/lib/settings';
+import { getLanternTotal, getAutoWardCharges, spendLanterns, addAutoWardCharges, LANTERNS_CHANGED_EVENT } from '@/lib/storage';
 
 const STORAGE_KEY_PREFIX = 'eldritch_beacon_state_';
 const UNLOCKED_KEY = 'eb_unlocked_regions';
+
+// Starting prices — easy to retune once there's real play data on how fast
+// Lanterns accumulate vs. how often players actually want Auto-Ward.
+const AUTOWARD_PACKS = [
+  { charges: 5, cost: 12 },
+  { charges: 15, cost: 30 },
+];
 
 function VolumeSlider({
   value,
@@ -81,6 +89,27 @@ function Toggle({
 export default function SettingsPage() {
   const [settings, updateSettings] = useSettings();
   const [confirmingReset, setConfirmingReset] = useState(false);
+  const [lanternTotal, setLanternTotal] = useState(0);
+  const [autoWardCharges, setAutoWardCharges] = useState(0);
+  const [purchaseError, setPurchaseError] = useState(false);
+
+  useEffect(() => {
+    setLanternTotal(getLanternTotal());
+    setAutoWardCharges(getAutoWardCharges());
+    const onLanternsChanged = (e: Event) => setLanternTotal((e as CustomEvent<number>).detail);
+    window.addEventListener(LANTERNS_CHANGED_EVENT, onLanternsChanged);
+    return () => window.removeEventListener(LANTERNS_CHANGED_EVENT, onLanternsChanged);
+  }, []);
+
+  function handlePurchase(pack: { charges: number; cost: number }) {
+    if (!spendLanterns(pack.cost)) {
+      setPurchaseError(true);
+      setTimeout(() => setPurchaseError(false), 1600);
+      return;
+    }
+    setLanternTotal(getLanternTotal());
+    setAutoWardCharges(addAutoWardCharges(pack.charges));
+  }
 
   function handleReset() {
     for (let i = localStorage.length - 1; i >= 0; i--) {
@@ -150,6 +179,41 @@ export default function SettingsPage() {
             checked={!settings.tutorialDismissed}
             onChange={v => updateSettings({ tutorialDismissed: !v })}
           />
+        </section>
+
+        <section className="flex flex-col gap-4 border border-ink border-opacity-30 rounded-sm p-4 bg-parchment">
+          <div className="flex items-center justify-between">
+            <h2 className="font-lovecraftian text-lg text-ink">Lantern Vault</h2>
+            <span className="font-serif text-sm text-ink">{lanternTotal} Lanterns</span>
+          </div>
+
+          <div className="border-t border-ink opacity-10" />
+
+          <Toggle
+            label="Auto-Ward"
+            description="When you place a Watcher, automatically mark every cell its row, column, adjacency, and territory rule out — no deduction, just the bookkeeping"
+            checked={settings.autoWardEnabled}
+            onChange={v => updateSettings({ autoWardEnabled: v })}
+          />
+          <p className="font-serif text-xs text-ink-light">
+            {autoWardCharges} charge{autoWardCharges === 1 ? '' : 's'} remaining — one charge unlocks Auto-Ward for a full puzzle.
+          </p>
+
+          <div className="flex gap-2">
+            {AUTOWARD_PACKS.map(pack => (
+              <button
+                key={pack.charges}
+                onClick={() => handlePurchase(pack)}
+                className="flex-1 font-serif text-xs text-ink border border-ink border-opacity-30 rounded-sm px-3 py-2 bg-parchment hover:bg-parchment-dark transition-colors"
+              >
+                +{pack.charges} charges<br />
+                <span className="opacity-60">{pack.cost} Lanterns</span>
+              </button>
+            ))}
+          </div>
+          {purchaseError && (
+            <p className="font-serif text-xs text-red-ink">Not enough Lanterns for that pack.</p>
+          )}
         </section>
 
         <section className="text-center pt-4">

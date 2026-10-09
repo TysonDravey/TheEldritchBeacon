@@ -121,6 +121,10 @@ button, a {
 
 [data-ward-animate] .ward-sigil {
   animation: ward-appear 180ms ease-out both;
+  /* Auto-Ward's staged reveal sets --reveal-delay per cell; every other
+     [data-ward-animate] user (the tutorial) never sets it, so this defaults
+     to no delay and changes nothing for them. */
+  animation-delay: var(--reveal-delay, 0ms);
 }
 
 @keyframes ghost-appear {
@@ -209,6 +213,26 @@ button, a {
 .lantern-badge-pop {
   animation: lantern-badge-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
   animation-delay: 0.5s;
+}
+
+/* Same pop as .lantern-badge-pop but with no baked-in delay — used to
+   replay the pop on the persistent LanternBadge the instant a flying
+   lantern lands on it (lantern-fly below), which already supplies its own
+   timing via setTimeout. */
+.lantern-badge-catch {
+  animation: lantern-badge-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes lantern-fly {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--fly-dx), var(--fly-dy)) scale(0.4); opacity: 0.3; }
+}
+
+.lantern-fly {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  animation: lantern-fly 550ms cubic-bezier(0.3, 0, 0.6, 1) both;
 }
 
 @keyframes tile-wiggle {
