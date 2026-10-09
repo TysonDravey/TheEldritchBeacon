@@ -92,13 +92,28 @@ async function main() {
   const clean: { p: Puzzle; a: ReturnType<typeof analyze> }[] = [];
   let grindCount = 0;
 
+  // Confirmed weak by direct live playtesting tonight (deepreason-* V1 batch:
+  // "a slight speed bump", not genuinely tricky; hybridtrap/hybridtrapv2:
+  // "6/10", "size was the real only issue") — excluded outright, not just
+  // screened for grind. A previous round let these back in because the
+  // grind screen only checks solve-trace shape, not whether the batch had
+  // already been confirmed weak by a human; that diluted the campaign
+  // badly (user: "boring... didn't see a single tricky ME"). Only promote
+  // from sources with actual positive human confirmation, or the unproven
+  // mutsearch-* pool (which has its OWN per-puzzle vetting via
+  // runExperiment.ts's explainable-hypothetical + full-solve gates).
+  const WEAK_PREFIXES = ['deepreason-', 'hybridtrap-', 'hybridtrapv2-'];
+  let weakSkipped = 0;
+
   for (const p of all) {
     if (already.has(p.id)) continue;
+    if (WEAK_PREFIXES.some(prefix => p.id.startsWith(prefix))) { weakSkipped++; continue; }
     const a = analyze(p);
     const isGrind = a.longestRun >= 4 || a.eventCount >= 8;
     if (isGrind) { grindCount++; continue; }
     clean.push({ p, a });
   }
+  console.log(`(${weakSkipped} skipped outright as confirmed-weak-batch, not just grind-screened)`);
 
   console.log(`${clean.length} clean (non-grind) candidates, ${grindCount} rejected as grind.\n`);
 

@@ -103,6 +103,8 @@ export const LANTERN_ROOM_TITLES: string[] = [
   "The Light Through the Wound in the Lens", "Five Seconds That Should Not Exist",
   "The Mechanism, Taken Apart and Found Sound", "Drawing the Shape the Blood Insists On",
   "The Interval, Measured a Fifth Time",
+  "The Count That Refuses to Settle", "A Sixth Hand on the Dial", "What the Lens Won't Let Me Unsee",
+  "The Gears Keep Their Own Time Now",
 ];
 
 export const WEST_WALL_TITLES: string[] = [
@@ -126,4 +128,6 @@ export const WEST_WALL_TITLES: string[] = [
   "Standing Somewhere I Have No Stair To", "The West Wall's Impossible Third Frame",
   "What I See Through It I Cannot Reach", "The Window That Answers to No Measurement",
   "Three Windows, Confirmed, Still Unexplained",
+  "The Wall Rings Hollow Everywhere Now", "A Height No Stone Admits To",
+  "The Third Window, Measured a Final Time", "What the Exterior Will Never Record",
 ];

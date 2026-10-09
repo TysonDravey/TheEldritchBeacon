@@ -48,6 +48,11 @@ export const REGIONS: CampaignRegion[] = [
     techniques: ['Last Refuge', 'Full Row', 'Full Column', 'Touching Shadows'],
     journalPage: '/journal/page-01.jpg',
     journalFocus: '72% 58%', // the lighthouse sits right-of-center, lower half
+    // A 5x5 board is barely a puzzle — fine as the very first level ever
+    // seen, repetitive and padding-like anywhere after that. Every 5x5
+    // initiate puzzle funnels here (MAX_REGION_BY_SIZE below), so without
+    // this cap they dominated the region (15 of 32 puzzles).
+    maxBoardCountBySize: { 5: 1 },
   },
   {
     name: 'The Survey',

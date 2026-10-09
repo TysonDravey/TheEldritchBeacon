@@ -86,10 +86,10 @@ interface RampTarget {
 // revamp (engine/difficulty.ts) changed every puzzle's score — see
 // scripts/campaignSweep.ts's GAP flags for the exact jumps these close.
 const TARGETS: RampTarget[] = [
-  { name: 'The Survey', difficulty: 'Scholar', minScore: 25, maxScore: 65, count: 6 },
-  { name: 'The Lower Level', difficulty: 'Occultist', minScore: 50, maxScore: 125, count: 8 },
-  { name: 'The Lantern Room', difficulty: 'High Priest', minScore: 65, maxScore: 145, count: 8 },
-  { name: 'The West Wall', difficulty: 'Eldritch', minScore: 80, maxScore: 188, count: 6 },
+  { name: 'The Survey', difficulty: 'Scholar', minScore: 25, maxScore: 65, count: 10 },
+  { name: 'The Lower Level', difficulty: 'Occultist', minScore: 50, maxScore: 125, count: 10 },
+  { name: 'The Lantern Room', difficulty: 'High Priest', minScore: 65, maxScore: 145, count: 10 },
+  { name: 'The West Wall', difficulty: 'Eldritch', minScore: 80, maxScore: 188, count: 8 },
 ];
 
 function ts() { return new Date().toISOString().slice(11, 19); }
@@ -106,15 +106,33 @@ async function main() {
     if (m[1].startsWith('promoted-')) alreadyPromoted.add(m[1].replace('promoted-', ''));
   }
 
+  // Confirmed weak by direct live playtesting ("boring... didn't see a
+  // single tricky ME"): the deepreason-* V1 batch and hybridtrap/
+  // hybridtrapv2 — excluded outright, not just grind-screened. (Mirrors
+  // the same exclusion in harvestForRamp.ts — that script has its own
+  // separate copy of this screening loop, which is what let these back in
+  // on the previous rebuild; keep both in sync if this list changes.)
+  const WEAK_PREFIXES = ['deepreason-', 'hybridtrap-', 'hybridtrapv2-'];
   console.log(`[${ts()}] Screening ${all.length} candidates for grind pattern...`);
   const clean: { p: Puzzle; eventCount: number }[] = [];
+  let weakSkipped = 0, zeroEventSkipped = 0;
   for (const p of all) {
     if (alreadyPromoted.has(p.id)) continue;
+    if (WEAK_PREFIXES.some(prefix => p.id.startsWith(prefix))) { weakSkipped++; continue; }
     const a = analyze(p);
     if (a.longestRun >= 4 || a.eventCount >= 8) continue;
+    // The grind screen only ever excluded TOO MUCH real technique — it had
+    // no floor, so a purely trivial puzzle (zero hypothetical/mutual-
+    // exclusion events, scoring moderately from confinement/pair-elimination
+    // volume alone) could still pass as "clean" and get promoted. That's
+    // the exact problem being fixed here, just via a different loophole
+    // (confirmed: promoted-blob-7x7-04 and promoted-blob-8x8-01, both
+    // eventCount=0, slipped in this way on the previous rebuild).
+    if (a.eventCount < 1) { zeroEventSkipped++; continue; }
     clean.push({ p, eventCount: a.eventCount });
   }
-  console.log(`[${ts()}] ${clean.length} clean candidates available.\n`);
+  console.log(`(${zeroEventSkipped} skipped for zero real-technique events)`);
+  console.log(`[${ts()}] ${clean.length} clean candidates available (${weakSkipped} skipped as confirmed-weak-batch).\n`);
 
   const usedTitles = new Set<string>();
   const titleRe = /"title":"((?:[^"\\]|\\.)*)"/g;
@@ -134,25 +152,40 @@ async function main() {
       continue;
     }
 
-    // Evenly spaced indices across the sorted-by-score pool, with a light
-    // diversity pass: skip a pick if it shares a generator prefix with
-    // either of the previous 2 picks and an alternative is available nearby.
+    // Evenly spaced indices across the sorted-by-score pool, with a STRICT
+    // per-batch cap: at most 2 picks total (not just "not adjacent in
+    // selection order") from any single originating batch — same mutation-
+    // search run, i.e. small boundary edits of ONE starting board. Found via
+    // live play that even non-adjacent-in-selection-order same-batch picks
+    // can land next to each other once everything is re-sorted by score
+    // (near-identical boards score near-identically), producing the
+    // "feels like the same puzzle twice" effect the user flagged.
+    const MAX_PICKS_PER_BATCH = 2;
     const picks: typeof pool = [];
+    const batchCounts = new Map<string, number>();
     const n = Math.min(target.count, pool.length);
-    for (let i = 0; i < n; i++) {
-      let idx = Math.round((i * (pool.length - 1)) / Math.max(1, n - 1));
-      const recentPrefixes = picks.slice(-2).map(({ p }) => generatorPrefix(p));
-      if (recentPrefixes.includes(generatorPrefix(pool[idx].p))) {
-        // look for a nearby alternative with a different prefix
-        for (let d = 1; d < 8; d++) {
-          const alt = pool[idx + d] ?? pool[idx - d];
-          if (alt && !recentPrefixes.includes(generatorPrefix(alt.p)) && !picks.includes(alt)) {
-            idx = pool.indexOf(alt);
-            break;
-          }
+    let idx = 0;
+    while (picks.length < n && idx < pool.length * 3) {
+      const candidateIdx = Math.round(((picks.length) * (pool.length - 1)) / Math.max(1, n - 1));
+      let chosen: typeof pool[number] | null = null;
+      // search outward from the ideal evenly-spaced index for the nearest
+      // candidate that doesn't exceed the per-batch cap
+      for (let d = 0; d < pool.length; d++) {
+        for (const probe of [candidateIdx + d, candidateIdx - d]) {
+          const cand = pool[probe];
+          if (!cand || picks.includes(cand)) continue;
+          const batchKey = (cand.p.seed ?? '').split('-shortlist-')[0] || generatorPrefix(cand.p);
+          if ((batchCounts.get(batchKey) ?? 0) >= MAX_PICKS_PER_BATCH) continue;
+          chosen = cand;
+          break;
         }
+        if (chosen) break;
       }
-      if (!picks.includes(pool[idx])) picks.push(pool[idx]);
+      if (!chosen) break; // exhausted pool under the cap
+      const batchKey = (chosen.p.seed ?? '').split('-shortlist-')[0] || generatorPrefix(chosen.p);
+      batchCounts.set(batchKey, (batchCounts.get(batchKey) ?? 0) + 1);
+      picks.push(chosen);
+      idx++;
     }
 
     console.log(`[${ts()}] ${target.name}: picked ${picks.length}/${target.count} from ${pool.length} candidates in band`);
