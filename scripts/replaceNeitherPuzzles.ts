@@ -131,7 +131,9 @@ async function main() {
   while ((tm = titleRe.exec(sampleContent)) !== null) usedTitles.add(tm[1].replace(/\\"/g, '"'));
 
   const usedIdsThisRun = new Set<string>();
-  const MAX_PICKS_PER_BATCH = 2;
+  // Tightened to 1 — see scripts/dedupeBatchClustering.ts for why 2 still produced
+  // visually-identical puzzle pairs.
+  const MAX_PICKS_PER_BATCH = 1;
   const allPromoted: Puzzle[] = [];
 
   for (const target of TARGETS) {

@@ -160,7 +160,9 @@ async function main() {
     // can land next to each other once everything is re-sorted by score
     // (near-identical boards score near-identically), producing the
     // "feels like the same puzzle twice" effect the user flagged.
-    const MAX_PICKS_PER_BATCH = 2;
+    // Tightened to 1 — see scripts/dedupeBatchClustering.ts for why 2 still produced
+    // visually-identical puzzle pairs.
+    const MAX_PICKS_PER_BATCH = 1;
     const picks: typeof pool = [];
     const batchCounts = new Map<string, number>();
     const n = Math.min(target.count, pool.length);

@@ -28,7 +28,13 @@ import { REGIONS, getRegionPuzzles } from '../data/regions';
 
 const EXP_FILE = join(process.cwd(), 'data', 'experimentalPuzzles.ts');
 const SAMPLE_FILE = join(process.cwd(), 'data', 'samplePuzzles.ts');
-const MAX_PICKS_PER_BATCH = 2;
+// Tightened from 2 to 1 after live testing found that even 2 puzzles from
+// the same mutation-search batch are visually indistinguishable — confirmed
+// via promoted-mutsearch-6x6-21 vs -22 (same "six2" batch, territory maps
+// differing by exactly 1 cell out of 36, same score). A single originating
+// board's mutation-search output can only ever contribute ONE puzzle to a
+// region now.
+const MAX_PICKS_PER_BATCH = 1;
 
 function parseAllPuzzles(content: string): Puzzle[] {
   const puzzles: Puzzle[] = [];

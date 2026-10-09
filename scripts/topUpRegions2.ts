@@ -21,7 +21,9 @@ import { REGIONS, getRegionPuzzles } from '../data/regions';
 
 const EXP_FILE = join(process.cwd(), 'data', 'experimentalPuzzles.ts');
 const SAMPLE_FILE = join(process.cwd(), 'data', 'samplePuzzles.ts');
-const MAX_PICKS_PER_BATCH = 2;
+// Tightened to 1 — see scripts/dedupeBatchClustering.ts for why 2 still produced
+// visually-identical puzzle pairs.
+const MAX_PICKS_PER_BATCH = 1;
 
 function parseAllPuzzles(content: string): Puzzle[] {
   const puzzles: Puzzle[] = [];
@@ -82,10 +84,9 @@ function ts() { return new Date().toISOString().slice(11, 19); }
 
 interface TargetRegion { name: string; difficulty: Difficulty; minScore: number; maxScore: number; topUpCount: number; }
 const TARGETS: TargetRegion[] = [
-  { name: 'The Survey', difficulty: 'Scholar', minScore: 10, maxScore: 66, topUpCount: 13 },
-  { name: 'The Lower Level', difficulty: 'Occultist', minScore: 20, maxScore: 128, topUpCount: 21 },
-  { name: 'The Lantern Room', difficulty: 'High Priest', minScore: 32, maxScore: 148, topUpCount: 9 },
-  { name: 'The West Wall', difficulty: 'Eldritch', minScore: 40, maxScore: 189, topUpCount: 3 },
+  { name: 'The Survey', difficulty: 'Scholar', minScore: 10, maxScore: 66, topUpCount: 9 },
+  { name: 'The Lower Level', difficulty: 'Occultist', minScore: 20, maxScore: 128, topUpCount: 26 },
+  { name: 'The Lantern Room', difficulty: 'High Priest', minScore: 32, maxScore: 148, topUpCount: 10 },
 ];
 
 async function main() {
