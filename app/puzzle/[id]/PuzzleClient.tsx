@@ -734,7 +734,7 @@ export default function PuzzleClient() {
   return (
     <main style={{ height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-      <LanternBadge />
+      <LanternBadge corner="right" />
 
       {/* ── Compact header ── */}
       <div style={{

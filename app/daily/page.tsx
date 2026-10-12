@@ -29,6 +29,7 @@ import { WATCHER_SVGS, WARD_PNG } from '@/theme/colors';
 import { isTechniqueNew, markTechniqueDiscovered } from '@/lib/techniques';
 import LanternBadge from '@/components/LanternBadge';
 import { flyLanternsToWallet } from '@/lib/lanternFly';
+import { ShardProgress } from '@/components/ShardProgress';
 
 const UNDO_LIMIT = 50;
 const DAILY_COMPLETED_KEY = 'eldritch_beacon_daily_completed';
@@ -1023,7 +1024,7 @@ export default function DailyPage() {
     return (
       <main className="min-h-screen flex flex-col items-center px-6 py-8">
 
-        <LanternBadge />
+        <LanternBadge corner="right" />
 
         {/* Back button */}
         <div className="w-full max-w-md mb-4">
@@ -1134,7 +1135,7 @@ export default function DailyPage() {
   return (
     <main style={{ height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-      <LanternBadge />
+      <LanternBadge corner="right" />
 
       {/* ── Compact header ── */}
       <div style={{
@@ -1308,10 +1309,8 @@ export default function DailyPage() {
                 <p className="font-serif text-xs text-ink-light italic mt-2">
                   {alreadyCompleted ? 'You already lit this beacon.' : 'The Watchers stand vigilant. The wards hold.'}
                 </p>
-                {!alreadyCompleted && streak.count >= 2 && (
-                  <p className="font-serif text-xs text-ink mt-2" style={{ opacity: 0.75 }}>
-                    {streak.count}-day streak
-                  </p>
+                {!alreadyCompleted && (
+                  <ShardProgress streakCount={streak.count} animate={isFreshWin} />
                 )}
                 <p className="font-serif text-xs text-ink-light mt-2" style={{ opacity: 0.6 }}>
                   {selectedDate === todayStr ? 'Return tomorrow for the next beacon.' : 'Play today\'s beacon when you\'re ready.'}

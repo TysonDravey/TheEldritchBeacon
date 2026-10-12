@@ -45,6 +45,17 @@ const nextConfig: NextConfig = {
     ? {
         output: "export" as const,
         images: { unoptimized: true },
+        // Each dynamic route exports as a bare file (puzzle/<id>.html) by
+        // default — reported bug: after the app sits backgrounded a while,
+        // tapping into a campaign level bounces back to Home instead of
+        // opening it, fixed by a full app relaunch. iOS can reclaim a
+        // backgrounded WKWebView's render process; on resume it has to
+        // reload whatever URL the client-side router had pushed it to, and
+        // Capacitor's local static server resolves a directory-style
+        // `puzzle/<id>/index.html` far more reliably on that kind of cold
+        // reload than an extension-less bare-filename lookup. Scoped to the
+        // mobile export only — doesn't touch the Vercel/web build's URLs.
+        trailingSlash: true,
       }
     : {
         async rewrites() {

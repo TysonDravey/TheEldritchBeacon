@@ -22,6 +22,7 @@ function PlaqButton({
   badge,
   title,
   active,
+  alwaysShowBadge,
 }: {
   label: string;
   onClick: () => void;
@@ -31,6 +32,10 @@ function PlaqButton({
   /** Persistent on/off state (vs. the other momentary-action buttons) —
    *  draws the existing brass hint-glow ring when true. */
   active?: boolean;
+  /** Show the badge even at 0 — for Auto-Ward, where "0 charges" is
+   *  meaningful information (go buy more), unlike Hint's badge, where 0
+   *  just means nothing to report. */
+  alwaysShowBadge?: boolean;
 }) {
   return (
     <button
@@ -56,7 +61,7 @@ function PlaqButton({
       >
         {label}
       </span>
-      {badge != null && badge > 0 && (
+      {badge != null && (badge > 0 || alwaysShowBadge) && (
         <span
           className="absolute top-0.5 right-0.5 font-serif text-xs leading-none px-1 rounded-sm"
           style={{
@@ -110,8 +115,9 @@ export default function GameControls({
           label="Auto-Ward"
           onClick={onToggleAutoWard}
           badge={autoWardCharges}
+          alwaysShowBadge
           active={autoWardEnabled}
-          title={autoWardEnabled ? 'Auto-Ward is on' : 'Auto-Ward is off'}
+          title={autoWardEnabled ? `Auto-Ward is on — ${autoWardCharges} charge${autoWardCharges === 1 ? '' : 's'} left` : 'Auto-Ward is off'}
         />
       </div>
 
