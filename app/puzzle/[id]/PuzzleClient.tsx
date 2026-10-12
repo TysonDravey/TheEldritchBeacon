@@ -15,7 +15,8 @@ import { getHint } from '@/engine/hints';
 import { hasForcedOpening } from '@/engine/difficulty';
 import { getLanternRating } from '@/engine/lanterns';
 import { LanternRating } from '@/components/LanternRating';
-import { isSolved, canPlaceWatcher, watcherRejectionReason, getForcedWardCellGroups } from '@/engine/rules';
+import { isSolved, canPlaceWatcher, watcherRejectionReason, getForcedWardCellGroups, getAlreadyWardedTouchedGroups } from '@/engine/rules';
+import { wiggleCell } from '@/lib/cellWiggle';
 import { findContradictions } from '@/engine/solver';
 import type { PlayerState, CellState, HintResult, ContradictionResult, Difficulty } from '@/engine/boardTypes';
 import Board from '@/components/Board';
@@ -599,10 +600,22 @@ export default function PuzzleClient() {
         const delayMap = new Map<string, number>();
         groups.forEach((group, i) => group.forEach(([r, c]) => delayMap.set(`${r},${c}`, i * STAGE_MS)));
         setWardRevealDelays(delayMap);
+        // Cells already warded before this placement still belong to the
+        // same row/column/adjacency/territory sweep — they just don't need
+        // marking. Acknowledge them with the same wiggle the win sequence
+        // uses, on the same per-wave beat, so the sweep doesn't silently
+        // skip past them.
+        const alreadyWardedGroups = getAlreadyWardedTouchedGroups(puzzle, simulated);
         autoWardTimersRef.current.forEach(clearTimeout);
-        autoWardTimersRef.current = groups
-          .filter(g => g.length > 0)
-          .map((_, i) => setTimeout(() => playSound('win-ward'), i * STAGE_MS));
+        autoWardTimersRef.current = [];
+        groups.forEach((group, i) => {
+          const alreadyWarded = alreadyWardedGroups[i] ?? [];
+          if (group.length === 0 && alreadyWarded.length === 0) return; // nothing happened this wave
+          autoWardTimersRef.current.push(setTimeout(() => {
+            playSound('win-ward');
+            for (const [r, c] of alreadyWarded) wiggleCell(r, c);
+          }, i * STAGE_MS));
+        });
         autoWardTimersRef.current.push(setTimeout(() => setWardRevealDelays(new Map()), groups.length * STAGE_MS + 400));
       }
       applyChange(row, col, 'watcher', extra);

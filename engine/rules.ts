@@ -97,11 +97,9 @@ export function watcherRejectionReason(
  * each call (not incremental), so it naturally catches up any
  * previously-unmarked forced cells too.
  */
-export function getForcedWardCellGroups(puzzle: Puzzle, playerCells: CellState[][]): [number, number][][] {
-  const n = puzzle.size;
+function watcherLineCounts(puzzle: Puzzle, playerCells: CellState[][]) {
   const limit = puzzle.mode === 'twin-watchers' ? 2 : 1;
   const watchers = getWatcherPositions(playerCells);
-
   const rowCounts = new Map<number, number>();
   const colCounts = new Map<number, number>();
   const territoryCounts = new Map<number, number>();
@@ -111,27 +109,56 @@ export function getForcedWardCellGroups(puzzle: Puzzle, playerCells: CellState[]
     const t = puzzle.territoryMap[wr][wc];
     territoryCounts.set(t, (territoryCounts.get(t) ?? 0) + 1);
   }
+  return { limit, watchers, rowCounts, colCounts, territoryCounts };
+}
 
+/** Same adjacency/row/column/territory partition as getForcedWardCells,
+ *  but filtered for the opposite cell state — groups the predicate function
+ *  itself stays identical, only which existing CellState qualifies differs. */
+function collectByGroup(
+  n: number,
+  playerCells: CellState[][],
+  wantState: CellState,
+  predicates: ((r: number, c: number) => boolean)[],
+): [number, number][][] {
   const claimed = new Set<string>();
-  const collect = (predicate: (r: number, c: number) => boolean): [number, number][] => {
+  return predicates.map((predicate) => {
     const group: [number, number][] = [];
     for (let r = 0; r < n; r++) {
       for (let c = 0; c < n; c++) {
         const key = `${r},${c}`;
-        if (claimed.has(key) || playerCells[r][c] !== 'empty' || !predicate(r, c)) continue;
+        if (claimed.has(key) || playerCells[r][c] !== wantState || !predicate(r, c)) continue;
         claimed.add(key);
         group.push([r, c]);
       }
     }
     return group;
-  };
+  });
+}
 
-  const adjacency = collect((r, c) => watchers.some(([wr, wc]) => isAdjacent(r, c, wr, wc)));
-  const rowGroup = collect((r) => (rowCounts.get(r) ?? 0) >= limit);
-  const colGroup = collect((_r, c) => (colCounts.get(c) ?? 0) >= limit);
-  const territoryGroup = collect((r, c) => (territoryCounts.get(puzzle.territoryMap[r][c]) ?? 0) >= limit);
+export function getForcedWardCellGroups(puzzle: Puzzle, playerCells: CellState[][]): [number, number][][] {
+  const { limit, watchers, rowCounts, colCounts, territoryCounts } = watcherLineCounts(puzzle, playerCells);
+  return collectByGroup(puzzle.size, playerCells, 'empty', [
+    (r, c) => watchers.some(([wr, wc]) => isAdjacent(r, c, wr, wc)),
+    (r) => (rowCounts.get(r) ?? 0) >= limit,
+    (_r, c) => (colCounts.get(c) ?? 0) >= limit,
+    (r, c) => (territoryCounts.get(puzzle.territoryMap[r][c]) ?? 0) >= limit,
+  ]);
+}
 
-  return [adjacency, rowGroup, colGroup, territoryGroup];
+/** Same 4-group partition as getForcedWardCellGroups, but for cells that
+ *  are ALREADY wards the new watcher's rule-sweep also touches — these
+ *  don't need marking (they're already correct), but a caller doing a
+ *  staged visual reveal of the sweep can use this to acknowledge them too
+ *  (e.g. a brief wiggle) instead of silently skipping past them. */
+export function getAlreadyWardedTouchedGroups(puzzle: Puzzle, playerCells: CellState[][]): [number, number][][] {
+  const { limit, watchers, rowCounts, colCounts, territoryCounts } = watcherLineCounts(puzzle, playerCells);
+  return collectByGroup(puzzle.size, playerCells, 'ward', [
+    (r, c) => watchers.some(([wr, wc]) => isAdjacent(r, c, wr, wc)),
+    (r) => (rowCounts.get(r) ?? 0) >= limit,
+    (_r, c) => (colCounts.get(c) ?? 0) >= limit,
+    (r, c) => (territoryCounts.get(puzzle.territoryMap[r][c]) ?? 0) >= limit,
+  ]);
 }
 
 /** Flat, deduplicated version of getForcedWardCellGroups, for callers that
