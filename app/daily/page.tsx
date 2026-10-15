@@ -944,7 +944,7 @@ export default function DailyPage() {
         // marking. Acknowledge them with the same wiggle the win sequence
         // uses, on the same per-wave beat, so the sweep doesn't silently
         // skip past them.
-        const alreadyWardedGroups = getAlreadyWardedTouchedGroups(puzzle, simulated);
+        const alreadyWardedGroups = getAlreadyWardedTouchedGroups(puzzle, simulated, row, col);
         autoWardTimersRef.current.forEach(clearTimeout);
         autoWardTimersRef.current = [];
         groups.forEach((group, i) => {

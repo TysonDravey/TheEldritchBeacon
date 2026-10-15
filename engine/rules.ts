@@ -146,18 +146,29 @@ export function getForcedWardCellGroups(puzzle: Puzzle, playerCells: CellState[]
   ]);
 }
 
-/** Same 4-group partition as getForcedWardCellGroups, but for cells that
- *  are ALREADY wards the new watcher's rule-sweep also touches — these
- *  don't need marking (they're already correct), but a caller doing a
- *  staged visual reveal of the sweep can use this to acknowledge them too
- *  (e.g. a brief wiggle) instead of silently skipping past them. */
-export function getAlreadyWardedTouchedGroups(puzzle: Puzzle, playerCells: CellState[][]): [number, number][][] {
-  const { limit, watchers, rowCounts, colCounts, territoryCounts } = watcherLineCounts(puzzle, playerCells);
+/** Same 4-group shape as getForcedWardCellGroups, but scoped to ONE
+ *  specific watcher's own row/column/8-adjacency/territory — not every
+ *  watcher on the board — and for cells that are ALREADY wards within
+ *  that scope. These don't need marking (they're already correct), but a
+ *  caller doing a staged visual reveal of (watcherRow, watcherCol)'s own
+ *  sweep can use this to acknowledge them too (e.g. a brief wiggle)
+ *  instead of silently skipping past them. Deliberately NOT based on
+ *  watcherLineCounts/every-watcher-on-the-board like getForcedWardCellGroups
+ *  is — that would pull in already-ward cells from every OTHER watcher's
+ *  already-resolved row/col/territory too, not just this placement's own
+ *  sweep (the exact bug reported after the first version of this). */
+export function getAlreadyWardedTouchedGroups(
+  puzzle: Puzzle,
+  playerCells: CellState[][],
+  watcherRow: number,
+  watcherCol: number,
+): [number, number][][] {
+  const territory = puzzle.territoryMap[watcherRow][watcherCol];
   return collectByGroup(puzzle.size, playerCells, 'ward', [
-    (r, c) => watchers.some(([wr, wc]) => isAdjacent(r, c, wr, wc)),
-    (r) => (rowCounts.get(r) ?? 0) >= limit,
-    (_r, c) => (colCounts.get(c) ?? 0) >= limit,
-    (r, c) => (territoryCounts.get(puzzle.territoryMap[r][c]) ?? 0) >= limit,
+    (r, c) => isAdjacent(r, c, watcherRow, watcherCol),
+    (r) => r === watcherRow,
+    (_r, c) => c === watcherCol,
+    (r, c) => puzzle.territoryMap[r][c] === territory,
   ]);
 }
 
