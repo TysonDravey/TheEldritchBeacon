@@ -1163,7 +1163,7 @@ export default function DailyPage() {
         WebkitBackdropFilter: 'blur(8px)',
         paddingTop: 'env(safe-area-inset-top)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 96px 8px 12px' }}>
           <button
             onClick={() => setView('calendar')}
             className="transition-all duration-100 hover:brightness-110 active:scale-95 shrink-0"
