@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { ADVANCED_MODES_PRODUCT_ID, getEntitlements, getProducts, purchaseProduct, restorePurchases } from './purchases';
 import { isAdvancedModesUnlockedCached, setAdvancedModesUnlockedCache, ADVANCED_MODES_CHANGED_EVENT } from './storage';
+import { track } from './track';
 
 // Shared between PuzzleClient.tsx (the enforcement gate), app/page.tsx (the
 // locked-card UX), and app/settings/page.tsx (Restore Purchases) — kept in
@@ -37,6 +38,7 @@ export function useAdvancedModesEntitlement() {
     if (result.success) {
       setUnlocked(true);
       setAdvancedModesUnlockedCache(true);
+      track('iap_purchased', { product_id: ADVANCED_MODES_PRODUCT_ID });
     } else if (!result.cancelled) {
       setError('Purchase failed — please try again.');
     }

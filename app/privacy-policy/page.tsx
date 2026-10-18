@@ -22,34 +22,34 @@ export default function PrivacyPolicyPage() {
           </p>
 
           <p className="font-serif text-sm text-ink">
-            The Eldritch Beacon does not collect, store, or transmit any personal data.
+            The Eldritch Beacon does not collect any personal data, and does not ask for your
+            name, email, or any other identifying information. It does collect anonymous usage
+            analytics, described below.
           </p>
 
           <ul className="font-serif text-sm text-ink flex flex-col gap-3" style={{ listStyle: 'none', paddingLeft: 0 }}>
             <li>
-              <strong>No account.</strong> The app has no sign-in, no account creation, and does not
-              ask for your name, email, or any other personal information.
+              <strong>No account.</strong> The app has no sign-in and no account creation.
             </li>
             <li>
-              <strong>No data leaves your device.</strong> Your puzzle progress, completion status,
-              and settings are stored locally on your device only. None of it is sent to us or to
-              any third party. Uninstalling the app deletes this data.
+              <strong>Your progress stays on your device.</strong> Puzzle progress, completion
+              status, and settings are stored locally only, never sent to us or anyone else.
+              Uninstalling the app deletes this data.
             </li>
             <li>
-              <strong>No analytics or tracking.</strong> This build of the app does not include any
-              analytics, advertising, or tracking of any kind.
+              <strong>Anonymous usage analytics.</strong> The app sends anonymous event data (for
+              example, that a puzzle was completed, a hint was used, or a purchase went through)
+              to PostHog, an analytics provider, so we can tell whether the game is being played
+              and where. This data is tied to a random identifier generated on your device, not to
+              you personally &mdash; it is never combined with your name, email, or any other
+              identifying information, because we never collect those in the first place. It is
+              not used for advertising and is not shared with any other app or website.
             </li>
             <li>
-              <strong>No third-party services.</strong> The app does not integrate with any
-              third-party SDK that collects data on this build.
+              <strong>Purchases.</strong> In-app purchases are handled entirely by Apple&rsquo;s
+              App Store / StoreKit. We never see your payment details.
             </li>
           </ul>
-
-          <p className="font-serif text-sm text-ink">
-            If a future version of this app adds optional, anonymized analytics (to understand
-            which puzzles are too hard, for example), this policy will be updated first, and the
-            update will describe exactly what&rsquo;s collected before it ships.
-          </p>
 
           <p className="font-serif text-sm text-ink">
             <strong>Contact:</strong> kirk.brillon@gmail.com

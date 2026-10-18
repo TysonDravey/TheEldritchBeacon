@@ -6,6 +6,7 @@ import { useSettings } from '@/lib/settings';
 import { getLanternTotal, getAutoWardCharges, spendLanterns, addAutoWardCharges, LANTERNS_CHANGED_EVENT } from '@/lib/storage';
 import { getProducts, purchaseProduct, AUTOWARD_PACK_PRODUCT_IDS, AUTOWARD_PACK_CHARGES, type StoreProduct } from '@/lib/purchases';
 import { useAdvancedModesEntitlement } from '@/lib/useAdvancedModesEntitlement';
+import { track } from '@/lib/track';
 
 const STORAGE_KEY_PREFIX = 'eldritch_beacon_state_';
 const UNLOCKED_KEY = 'eb_unlocked_regions';
@@ -128,6 +129,7 @@ export default function SettingsPage() {
     setPurchasingPackId(null);
     if (result.success) {
       setAutoWardCharges(addAutoWardCharges(AUTOWARD_PACK_CHARGES[product.id] ?? 0));
+      track('iap_purchased', { product_id: product.id });
     }
   }
 
@@ -315,6 +317,10 @@ export default function SettingsPage() {
             </div>
           )}
         </section>
+
+        <p className="font-serif text-xs text-ink-light text-center opacity-50 pt-2">
+          Campaign art by Tyson Draws Stuff
+        </p>
       </div>
     </main>
   );

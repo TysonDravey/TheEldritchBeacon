@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import posthog from 'posthog-js';
+import { track } from '@/lib/track';
 import { haptic } from '@/lib/haptic';
 import { playSound } from '@/lib/sound';
 import NextImage from 'next/image';
@@ -762,7 +762,7 @@ export default function DailyPage() {
           setStreak(newStreak);
           streakCount = newStreak.count;
         }
-        posthog.capture('daily_completed', {
+        track('daily_completed', {
           date:        selectedDate,
           is_today:    isToday,
           puzzle_id:   puzzle.id,
@@ -807,7 +807,7 @@ export default function DailyPage() {
             dayCount: monthDates.filter(d => DAILY_CALENDAR[d] != null).length,
             monthsCompleted: updatedAwards.size,
           });
-          posthog.capture('daily_month_completed', { year_month: targetMonth, day_count: monthDates.length });
+          track('daily_month_completed', { year_month: targetMonth, day_count: monthDates.length });
         }
 
         winTimersRef.current.forEach(clearTimeout);
@@ -974,7 +974,7 @@ export default function DailyPage() {
     // Lantern (see HintResult.costsLantern), since that's the game being
     // fair to an error, not solving the puzzle for you.
     const newHintsUsed = hint.costsLantern ? playerState.hintsUsed + 1 : playerState.hintsUsed;
-    posthog.capture('hint_used', {
+    track('hint_used', {
       puzzle_id:    puzzle.id,
       date:         selectedDate,
       hint_level:   hint.level,
@@ -1357,6 +1357,7 @@ export default function DailyPage() {
             if (!spendLanterns(cost)) return;
             setLanternTotal(getLanternTotal());
             setStreak(rescueStreak(streak, todayStr));
+            track('streak_rescued', { method: 'lanterns', cost, streak: streak.count });
           }}
           onDismiss={() => {
             setShowStreakRescue(false);
@@ -1371,6 +1372,8 @@ export default function DailyPage() {
             if (result.success) {
               setStreak(rescueStreak(streak, todayStr));
               setShowStreakRescue(false);
+              track('streak_rescued', { method: 'real_money', streak: streak.count });
+              track('iap_purchased', { product_id: STREAK_RESCUE_PRODUCT_ID });
             }
           }}
         />

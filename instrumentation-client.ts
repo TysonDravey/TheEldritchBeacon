@@ -1,4 +1,5 @@
 import posthog from 'posthog-js';
+import { initNativeAnalytics } from '@/lib/analytics';
 
 // NEXT_PUBLIC_* env vars are baked in at build time — Vercel injects this one
 // for the web build, but `npm run build:ios` is a local build with no such
@@ -28,3 +29,7 @@ if (POSTHOG_TOKEN) {
     capture_pageview: false,
   });
 }
+
+// Native PostHog for the iOS app -- see lib/analytics.ts for why this is a
+// separate SDK rather than just letting posthog-js run in the webview.
+initNativeAnalytics();

@@ -19,7 +19,7 @@
 >
 > The Eldritch Beacon is a logic puzzle in the spirit of Star Battle and Queens — place a Watcher in every row, column, and territory, with none ever touching another, not even at the corners. When a cell can't hold a Watcher, mark it with a Ward instead. Pure deduction, no guessing required: every puzzle has exactly one correct chart, and the logic to find it.
 >
-> **A campaign with a story.** Follow Captain Mercer's own journal as the charts grow stranger — the tower's measurements stop adding up, a window opens onto a view that shouldn't exist, and something that was never drawn starts answering back. Seven chapters, each unlocking a real page of hand-illustrated journal art.
+> **A campaign with a story.** Follow Captain Mercer's own journal as the charts grow stranger — the tower's measurements stop adding up, a window opens onto a view that shouldn't exist, and something that was never drawn starts answering back. Seven chapters, each unlocking a real page of hand-illustrated journal art by Tyson Draws Stuff.
 >
 > **Hundreds of puzzles.** A full campaign plus two advanced variants — Shattered Realms (scattered, non-contiguous territories) and Twin Watchers (two Watchers per row, column, and territory) — for over 370 puzzles in total, from a gentle introduction to genuinely difficult late-game charts.
 >
@@ -51,7 +51,23 @@ Apple's current system is a self-answered questionnaire (Horror/Fear Themes, Mat
 My best guess at the resulting rating is **12+**, but this is Apple's algorithm from your own honest answers, not something I can determine for you.
 
 ## App Privacy (the separate questionnaire, not the `.xcprivacy` manifest)
-As currently built, the shipped iOS app collects **no data at all** (see `privacy-policy-draft.md` for why — PostHog never initializes on mobile builds). Answer every category in App Store Connect's "App Privacy" section as **Data Not Collected**. If you later add mobile analytics, this needs to change before that build ships, not after.
+The app now ships with native PostHog analytics (anonymous event tracking — puzzle/campaign
+progress, hint usage, IAP purchases; see `/privacy-policy`). Answer App Store Connect's "App
+Privacy" questionnaire like this:
+
+- **Data Used to Track You:** No. Nothing here is linked across other companies' apps or
+  websites, used for third-party advertising, or shared/sold — it's first-party product
+  analytics only. This means the App Tracking Transparency (ATT) prompt is **not** required.
+- **Data Types collected:** Under "Usage Data" → check **Product Interaction** (puzzle
+  completions, hints used, purchases). Everything else (contact info, identifiers like email/
+  name, financial info, location, etc.) stays **not collected** — the app has no account system
+  and never asks for any of it.
+- **Linked to You?** **No** — select "Data Not Linked to You" for Product Interaction. PostHog
+  only sees a random identifier generated on-device, never anything that identifies the person.
+- **Purpose:** **Analytics** / App Functionality.
+
+This needs to go live in App Store Connect no later than the first build that includes the
+analytics code — don't submit with the old "Data Not Collected" answers once this ships.
 
 ## Privacy Policy URL
 Required field — point it at wherever you end up hosting `privacy-policy-draft.md`'s content. It must be a live, public URL; Apple does check that it resolves.

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import posthog from 'posthog-js';
+import { track } from '@/lib/track';
 import NextImage from 'next/image';
 import Link from 'next/link';
 import { getPuzzleById, SAMPLE_PUZZLES } from '@/data/samplePuzzles';
@@ -417,13 +417,14 @@ export default function PuzzleClient() {
         savePlayerState(newState);
       }
       if (solved) {
-        posthog.capture('puzzle_completed', {
+        track('puzzle_completed', {
           puzzle_id:   puzzle.id,
           size:        puzzle.size,
           difficulty:  puzzle.difficulty,
           score:       puzzle.score,
           hints_used:  newState.hintsUsed,
           mode:        puzzle.mode ?? 'initiate',
+          region:      findRegionForPuzzle(puzzle)?.name ?? null,
         });
         const earned = getLanternRating(newState.hintsUsed, puzzle.mode ?? 'initiate', puzzle.difficulty);
         setLanternsEarned(earned);
@@ -636,7 +637,7 @@ export default function PuzzleClient() {
     // Lantern (see HintResult.costsLantern), since that's the game being
     // fair to an error, not solving the puzzle for you.
     const newHintsUsed = hint.costsLantern ? playerState.hintsUsed + 1 : playerState.hintsUsed;
-    posthog.capture('hint_used', {
+    track('hint_used', {
       puzzle_id:  puzzle.id,
       difficulty: puzzle.difficulty,
       hint_level: hint.level,
