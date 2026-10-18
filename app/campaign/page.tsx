@@ -60,7 +60,16 @@ export default function CampaignPage() {
     setStarted(completed.size > 0 || noteSeen);
     setChapter(getCurrentChapter(completed));
     setReady(true);
-  }, []);
+    // Reported bug: tapping the Begin/Continue button after the app sat
+    // stale a long while bounced to Home instead of opening the map. The
+    // Home -> here navigation (a <Link>, auto-prefetched) kept working in
+    // the same stale state, but this button's router.push() below doesn't
+    // get that prefetch — it has to fetch /campaign/map's route data on
+    // click, which is exactly the kind of on-demand work that can fail in a
+    // long-stale JS context. Prefetching it as soon as this page mounts
+    // means the data's already in hand well before any tap.
+    router.prefetch('/campaign/map');
+  }, [router]);
 
   function handleBeginClick() {
     const noteSeen = !!localStorage.getItem(NOTE_SEEN_KEY);
