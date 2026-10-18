@@ -10,15 +10,14 @@ const UNLOCKED_KEY = 'eb_unlocked_regions';
 
 // Starting prices — easy to retune once there's real play data on how fast
 // Lanterns accumulate vs. how often players actually want Auto-Ward.
-// At ~5 Lanterns/charge, a run of clean 3-lantern solves still buys well
-// under 1 charge per puzzle played — the previous pricing (5 for 12, 15 for
-// 30, ~2.4/charge) let 5 good solves buy 15 charges, more Auto-Ward than
-// puzzles played to earn it. Flat per-charge cost, no bulk discount: a
-// bigger pack is a convenience (fewer taps), not a better rate, so it can't
-// be gamed into an even looser economy by always buying the largest pack.
+// Pushed from 5 to 8 Lanterns/charge (2026-10-18) now that real-money
+// charge packs exist alongside this — the Lantern path should stay usable
+// but clearly the slower of the two routes, not a comparable shortcut to
+// just paying. Flat per-charge cost, no bulk discount: a bigger pack is a
+// convenience (fewer taps), not a better rate.
 const AUTOWARD_PACKS = [
-  { charges: 3, cost: 15 },
-  { charges: 10, cost: 50 },
+  { charges: 3, cost: 24 },
+  { charges: 10, cost: 80 },
 ];
 
 function VolumeSlider({
