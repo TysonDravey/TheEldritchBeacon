@@ -30,6 +30,7 @@ import { WATCHER_SVGS, WARD_PNG } from '@/theme/colors';
 import { isTechniqueNew, markTechniqueDiscovered } from '@/lib/techniques';
 import LanternBadge from '@/components/LanternBadge';
 import { flyLanternsToWallet } from '@/lib/lanternFly';
+import { getProducts, purchaseProduct, STREAK_RESCUE_PRODUCT_ID } from '@/lib/purchases';
 import { ShardProgress } from '@/components/ShardProgress';
 
 const UNDO_LIMIT = 50;
@@ -501,6 +502,8 @@ export default function DailyPage() {
   const [showMonthComplete,    setShowMonthComplete]   = useState(false);
   const [monthCompleteInfo,    setMonthCompleteInfo]   = useState<{ label: string; dayCount: number; monthsCompleted: number } | null>(null);
   const [showStreakRescue,     setShowStreakRescue]    = useState(false);
+  const [streakRescuePrice,    setStreakRescuePrice]   = useState<string | null>(null);
+  const [purchasingStreakRescue, setPurchasingStreakRescue] = useState(false);
   const [settings, updateSettings] = useSettings();
   const [wardRevealDelays, setWardRevealDelays] = useState<Map<string, number>>(new Map());
   const [autoWardCharges, setAutoWardCharges] = useState(0);
@@ -523,6 +526,7 @@ export default function DailyPage() {
     setMonthAwardCount(loadMonthAwards().size);
     setLanternTotal(getLanternTotal());
     setAutoWardCharges(getAutoWardCharges());
+    getProducts([STREAK_RESCUE_PRODUCT_ID]).then(products => setStreakRescuePrice(products[0]?.displayPrice ?? null));
     let alreadyDeclined = false;
     try { alreadyDeclined = sessionStorage.getItem(streakRescueDeclinedKey(todayStr)) === '1'; } catch { /* ignore */ }
     if (isStreakAtRisk(loadedStreak, todayStr) && !alreadyDeclined) setShowStreakRescue(true);
@@ -1357,6 +1361,17 @@ export default function DailyPage() {
           onDismiss={() => {
             setShowStreakRescue(false);
             try { sessionStorage.setItem(streakRescueDeclinedKey(todayStr), '1'); } catch { /* ignore */ }
+          }}
+          realMoneyPrice={streakRescuePrice}
+          purchasingRealMoney={purchasingStreakRescue}
+          onPurchaseRealMoney={async () => {
+            setPurchasingStreakRescue(true);
+            const result = await purchaseProduct(STREAK_RESCUE_PRODUCT_ID);
+            setPurchasingStreakRescue(false);
+            if (result.success) {
+              setStreak(rescueStreak(streak, todayStr));
+              setShowStreakRescue(false);
+            }
           }}
         />
       )}

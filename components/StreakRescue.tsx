@@ -8,9 +8,18 @@ interface StreakRescueProps {
   lanternTotal: number;
   onRestore: () => void;
   onDismiss: () => void;
+  /** Real-money alternative, alongside the Lantern path (not replacing it).
+   *  null price means the product hasn't loaded yet (or isn't available,
+   *  e.g. on web) -- that row is simply hidden in that case. */
+  realMoneyPrice: string | null;
+  purchasingRealMoney: boolean;
+  onPurchaseRealMoney: () => void;
 }
 
-export default function StreakRescue({ streakCount, cost, lanternTotal, onRestore, onDismiss }: StreakRescueProps) {
+export default function StreakRescue({
+  streakCount, cost, lanternTotal, onRestore, onDismiss,
+  realMoneyPrice, purchasingRealMoney, onPurchaseRealMoney,
+}: StreakRescueProps) {
   const [visible, setVisible] = useState(false);
   const canAfford = lanternTotal >= cost;
 
@@ -117,6 +126,17 @@ export default function StreakRescue({ streakCount, cost, lanternTotal, onRestor
             Restore
           </button>
         </div>
+
+        {realMoneyPrice && (
+          <button
+            onClick={() => { if (!purchasingRealMoney) onPurchaseRealMoney(); }}
+            disabled={purchasingRealMoney}
+            className="font-serif text-xs text-ink-light transition-opacity hover:opacity-70"
+            style={{ background: 'transparent', border: 'none', marginTop: 14 }}
+          >
+            {purchasingRealMoney ? 'Purchasing…' : `Or restore instantly — ${realMoneyPrice}`}
+          </button>
+        )}
       </div>
     </div>
   );

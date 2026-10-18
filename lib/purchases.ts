@@ -9,6 +9,7 @@ export const AUTOWARD_PACK_CHARGES: Record<string, number> = {
   'com.tysondravey.eldritchbeacon.autoward30': 30,
 };
 export const AUTOWARD_PACK_PRODUCT_IDS = Object.keys(AUTOWARD_PACK_CHARGES);
+export const STREAK_RESCUE_PRODUCT_ID = 'com.tysondravey.eldritchbeacon.streakrescue';
 
 export interface StoreProduct {
   id: string;
