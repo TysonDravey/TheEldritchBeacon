@@ -27,7 +27,7 @@
 >
 > **Smart hints, not spoilers.** Ask for help and get a nudge first, a fuller explanation if you ask again — and if you've placed something that doesn't match the true chart, the game tells you outright instead of leaving you stuck on a deduction that can't go anywhere.
 >
-> **No ads. No in-app purchases. No account required.** Your progress stays on your device.
+> **No ads. Ever.** Not a banner, not a video, not an interstitial between puzzles — the whole campaign and Daily Beacon are free to play, no account required, your progress stays on your device. Advanced Modes and an optional Auto-Ward assist are available as one-time purchases, if you want them — nothing is ever required to keep playing.
 >
 > One Watcher. One row. One column. One territory. The Beacon holds — for now.
 
