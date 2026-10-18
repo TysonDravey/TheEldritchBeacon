@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSettings } from '@/lib/settings';
 import { getLanternTotal, getAutoWardCharges, spendLanterns, addAutoWardCharges, LANTERNS_CHANGED_EVENT } from '@/lib/storage';
+import { getProducts, purchaseProduct, AUTOWARD_PACK_PRODUCT_IDS, AUTOWARD_PACK_CHARGES, type StoreProduct } from '@/lib/purchases';
+import { useAdvancedModesEntitlement } from '@/lib/useAdvancedModesEntitlement';
 
 const STORAGE_KEY_PREFIX = 'eldritch_beacon_state_';
 const UNLOCKED_KEY = 'eb_unlocked_regions';
@@ -97,12 +99,16 @@ export default function SettingsPage() {
   const [lanternTotal, setLanternTotal] = useState(0);
   const [autoWardCharges, setAutoWardCharges] = useState(0);
   const [purchaseError, setPurchaseError] = useState(false);
+  const [realMoneyPacks, setRealMoneyPacks] = useState<StoreProduct[]>([]);
+  const [purchasingPackId, setPurchasingPackId] = useState<string | null>(null);
+  const advancedModes = useAdvancedModesEntitlement();
 
   useEffect(() => {
     setLanternTotal(getLanternTotal());
     setAutoWardCharges(getAutoWardCharges());
     const onLanternsChanged = (e: Event) => setLanternTotal((e as CustomEvent<number>).detail);
     window.addEventListener(LANTERNS_CHANGED_EVENT, onLanternsChanged);
+    getProducts(AUTOWARD_PACK_PRODUCT_IDS).then(setRealMoneyPacks);
     return () => window.removeEventListener(LANTERNS_CHANGED_EVENT, onLanternsChanged);
   }, []);
 
@@ -114,6 +120,15 @@ export default function SettingsPage() {
     }
     setLanternTotal(getLanternTotal());
     setAutoWardCharges(addAutoWardCharges(pack.charges));
+  }
+
+  async function handleRealMoneyPurchase(product: StoreProduct) {
+    setPurchasingPackId(product.id);
+    const result = await purchaseProduct(product.id);
+    setPurchasingPackId(null);
+    if (result.success) {
+      setAutoWardCharges(addAutoWardCharges(AUTOWARD_PACK_CHARGES[product.id] ?? 0));
+    }
   }
 
   function handleReset() {
@@ -219,6 +234,59 @@ export default function SettingsPage() {
           {purchaseError && (
             <p className="font-serif text-xs text-red-ink">Not enough Lanterns for that pack.</p>
           )}
+
+          {realMoneyPacks.length > 0 && (
+            <>
+              <div className="border-t border-ink opacity-10" />
+              <p className="font-serif text-xs text-ink-light" style={{ opacity: 0.75 }}>
+                Or skip the wait:
+              </p>
+              <div className="flex gap-2">
+                {realMoneyPacks.map(product => (
+                  <button
+                    key={product.id}
+                    onClick={() => handleRealMoneyPurchase(product)}
+                    disabled={purchasingPackId === product.id}
+                    className="flex-1 font-serif text-xs text-ink border border-ink border-opacity-30 rounded-sm px-3 py-2 bg-parchment hover:bg-parchment-dark transition-colors"
+                    style={{ opacity: purchasingPackId === product.id ? 0.5 : 1 }}
+                  >
+                    +{AUTOWARD_PACK_CHARGES[product.id] ?? '?'} charges<br />
+                    <span className="opacity-60">
+                      {purchasingPackId === product.id ? 'Purchasing…' : product.displayPrice}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </section>
+
+        <section className="flex flex-col gap-3 border border-ink border-opacity-30 rounded-sm p-4 bg-parchment">
+          <h2 className="font-lovecraftian text-lg text-ink">Advanced Modes</h2>
+          <p className="font-serif text-xs text-ink-light" style={{ opacity: 0.75 }}>
+            {advancedModes.unlocked
+              ? 'Shattered Realms and Twin Watchers are unlocked.'
+              : 'Unlock Shattered Realms and Twin Watchers together with one purchase.'}
+          </p>
+          {!advancedModes.unlocked && (
+            <button
+              onClick={advancedModes.purchase}
+              disabled={advancedModes.purchasing}
+              className="font-serif text-sm text-ink border border-ink border-opacity-30 rounded-sm px-3 py-2 bg-parchment hover:bg-parchment-dark transition-colors"
+              style={{ opacity: advancedModes.purchasing ? 0.5 : 1 }}
+            >
+              {advancedModes.purchasing ? 'Purchasing…' : advancedModes.price ? `Unlock — ${advancedModes.price}` : 'Unlock'}
+            </button>
+          )}
+          {advancedModes.error && (
+            <p className="font-serif text-xs text-red-ink">{advancedModes.error}</p>
+          )}
+          <button
+            onClick={advancedModes.restore}
+            className="font-serif text-xs text-ink-light self-start hover:text-ink transition-colors"
+          >
+            Restore Purchases
+          </button>
         </section>
 
         <section className="text-center pt-4">

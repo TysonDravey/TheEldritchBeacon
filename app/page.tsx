@@ -10,15 +10,44 @@ import { useSettings } from '@/lib/settings';
 import { playSound } from '@/lib/sound';
 import PuzzleCard from '@/components/PuzzleCard';
 import LanternBadge from '@/components/LanternBadge';
+import { useAdvancedModesEntitlement } from '@/lib/useAdvancedModesEntitlement';
 
 const STORAGE_KEY_PREFIX = 'eldritch_beacon_state_';
 const UNLOCKED_KEY = 'eb_unlocked_regions';
+
+function LockedModeCard({ price, purchasing, onPurchase }: { price: string | null; purchasing: boolean; onPurchase: () => void }) {
+  return (
+    <button
+      onClick={onPurchase}
+      disabled={purchasing}
+      className="w-full text-left transition-opacity hover:opacity-90"
+      style={{
+        border: '1px dashed rgba(26,18,9,0.3)',
+        borderRadius: 4,
+        padding: '14px 16px',
+        background: 'rgba(26,18,9,0.04)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 10,
+      }}
+    >
+      <span className="font-serif text-sm text-ink-light">
+        &#128274; Unlock both Advanced Modes
+      </span>
+      <span className="font-serif text-xs text-ink shrink-0" style={{ opacity: purchasing ? 0.5 : 1 }}>
+        {purchasing ? 'Purchasing…' : price ?? 'Unlock'}
+      </span>
+    </button>
+  );
+}
 
 export default function HomePage() {
   const [completedIds, setCompletedIds]   = useState<Set<string>>(new Set());
   const [newlyUnlocked, setNewlyUnlocked] = useState<string | null>(null);
   const [showBanner, setShowBanner]       = useState(false);
   const [settings, updateSettings]        = useSettings();
+  const advancedModes = useAdvancedModesEntitlement();
 
   useEffect(() => {
     // Load completed puzzle IDs
@@ -244,10 +273,16 @@ export default function HomePage() {
                     </p>
                     {current && (
                       <div className="mt-3">
-                        <PuzzleCard puzzle={current} completed={false} />
-                        <p className="mt-2 font-serif text-xs text-center text-ink-light">
-                          Puzzle {currentIdx + 1} of {sorted.length}
-                        </p>
+                        {advancedModes.unlocked ? (
+                          <>
+                            <PuzzleCard puzzle={current} completed={false} />
+                            <p className="mt-2 font-serif text-xs text-center text-ink-light">
+                              Puzzle {currentIdx + 1} of {sorted.length}
+                            </p>
+                          </>
+                        ) : (
+                          <LockedModeCard price={advancedModes.price} purchasing={advancedModes.purchasing} onPurchase={advancedModes.purchase} />
+                        )}
                       </div>
                     )}
                   </div>
@@ -291,10 +326,16 @@ export default function HomePage() {
                     </p>
                     {current && (
                       <div className="mt-3">
-                        <PuzzleCard puzzle={current} completed={false} />
-                        <p className="mt-2 font-serif text-xs text-center text-ink-light">
-                          Puzzle {currentIdx + 1} of {sorted.length}
-                        </p>
+                        {advancedModes.unlocked ? (
+                          <>
+                            <PuzzleCard puzzle={current} completed={false} />
+                            <p className="mt-2 font-serif text-xs text-center text-ink-light">
+                              Puzzle {currentIdx + 1} of {sorted.length}
+                            </p>
+                          </>
+                        ) : (
+                          <LockedModeCard price={advancedModes.price} purchasing={advancedModes.purchasing} onPurchase={advancedModes.purchase} />
+                        )}
                       </div>
                     )}
                   </div>

@@ -29,6 +29,8 @@ import { isRuleChangeNew } from '@/lib/ruleChanges';
 import RuleChangeIntro from '@/components/RuleChangeIntro';
 import LanternBadge from '@/components/LanternBadge';
 import { flyLanternsToWallet } from '@/lib/lanternFly';
+import AdvancedModesPaywall from '@/components/AdvancedModesPaywall';
+import { useAdvancedModesEntitlement } from '@/lib/useAdvancedModesEntitlement';
 import { haptic } from '@/lib/haptic';
 import { playSound } from '@/lib/sound';
 import { isTechniqueNew, markTechniqueDiscovered } from '@/lib/techniques';
@@ -145,6 +147,7 @@ export default function PuzzleClient() {
   const [settings, updateSettings] = useSettings();
   const [wardRevealDelays, setWardRevealDelays] = useState<Map<string, number>>(new Map());
   const [autoWardCharges, setAutoWardCharges] = useState(0);
+  const advancedModes = useAdvancedModesEntitlement();
   // Tracks how many hints player has asked without making a move — drives escalation
   const hintDepthRef      = useRef(0);
   const flashTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -182,6 +185,8 @@ export default function PuzzleClient() {
     setLanternTotal(getLanternTotal());
     setAutoWardCharges(getAutoWardCharges());
   }, []);
+
+  const isLockedMode = puzzle != null && (puzzle.mode === 'shattered-realms' || puzzle.mode === 'twin-watchers');
 
   useEffect(() => {
     if (!puzzle) return;
@@ -735,6 +740,19 @@ export default function PuzzleClient() {
       <main className="min-h-screen flex items-center justify-center">
         <p className="font-serif text-ink opacity-60">Loading…</p>
       </main>
+    );
+  }
+
+  if (isLockedMode && !advancedModes.unlocked) {
+    return (
+      <AdvancedModesPaywall
+        price={advancedModes.price}
+        purchasing={advancedModes.purchasing}
+        error={advancedModes.error}
+        onPurchase={advancedModes.purchase}
+        onRestore={advancedModes.restore}
+        onBack={() => router.push('/')}
+      />
     );
   }
 

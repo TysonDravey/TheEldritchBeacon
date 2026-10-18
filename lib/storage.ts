@@ -169,6 +169,34 @@ export function markAutoWardChargeConsumed(puzzleId: string): void {
   }
 }
 
+export const ADVANCED_MODES_CHANGED_EVENT = 'eb-advanced-modes-changed';
+const ADVANCED_MODES_UNLOCKED_KEY = 'eldritch_beacon_advanced_modes_unlocked';
+
+// Synchronous local cache of the Advanced Modes IAP entitlement. StoreKit
+// itself (lib/purchases.ts's getEntitlements()) is the real source of
+// truth, but it's async — this cache lets gating render correctly on first
+// paint without a flash of "locked" content, and gets corrected within one
+// round-trip on mount. Defaults to locked (safe default) until proven
+// otherwise by an actual entitlement check.
+export function isAdvancedModesUnlockedCached(): boolean {
+  try {
+    return localStorage.getItem(ADVANCED_MODES_UNLOCKED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function setAdvancedModesUnlockedCache(unlocked: boolean): void {
+  try {
+    localStorage.setItem(ADVANCED_MODES_UNLOCKED_KEY, unlocked ? '1' : '0');
+  } catch {
+    // SSR or storage unavailable — silently ignore
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent<boolean>(ADVANCED_MODES_CHANGED_EVENT, { detail: unlocked }));
+  }
+}
+
 export function createFreshPlayerState(puzzleId: string, size: number): PlayerState {
   return {
     puzzleId,
